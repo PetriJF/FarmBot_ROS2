@@ -20,6 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            "interface_controller = farmbot_controller.farmbot_interface_controller:main"
         ],
     },
 )
