@@ -15,12 +15,13 @@ setup(
     zip_safe=True,
     maintainer='farmbotdev',
     maintainer_email='jamespetri28@gmail.com',
-    description='This Package deals with the interface interpreter that receives commands and forwards them as needed to the other packages and nodes.',
+    description='This Package deals with the interface interpreter that receives commands and forwards them as needed to the relevant nodes.',
     license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "interface_controller = farmbot_controller.farmbot_interface_controller:main"
+            "interface_controller = farmbot_controller.control_interface_handler:main",
+            "gantry_controller = farmbot_controller.gantry_movement_controller:main"
         ],
     },
 )
