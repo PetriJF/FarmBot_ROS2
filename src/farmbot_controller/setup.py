@@ -21,7 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             "interface_controller = farmbot_controller.control_interface_handler:main",
-            "gantry_controller = farmbot_controller.gantry_movement_controller:main"
+            "hardware_controller = farmbot_controller.hardware_controller:main"
         ],
     },
 )
