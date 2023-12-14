@@ -3,16 +3,16 @@ import rclpy
 from rclpy.node import Node
 
 
-class InterfaceController(Node):
+class ControlInterfaceHandler(Node):
     def __init__(self):
-        super().__init__("InterfaceController")
-        self.get_logger().info("Interface Controller Initialized..")
+        super().__init__("ControlInterfaceHandler")
+        self.get_logger().info("Control Interface Handler Initialized..")
         
 
 def main(args = None):
     rclpy.init(args = args)
 
-    intCtrlNode = InterfaceController()
+    intCtrlNode = ControlInterfaceHandler()
 
     rclpy.shutdown()
 
