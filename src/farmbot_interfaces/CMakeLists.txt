@@ -15,6 +15,9 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/HomeCommand.msg"
   "msg/I2CCommand.msg"
   "msg/PinCommand.msg"
+  "msg/ParameterCommand.msg"
+  "msg/StateCommand.msg"
+  "msg/StatusCommand.msg"
 )
 
 ament_package()
