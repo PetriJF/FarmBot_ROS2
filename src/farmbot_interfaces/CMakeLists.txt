@@ -12,6 +12,9 @@ find_package(rosidl_default_generators REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/GantryCommand.msg"
   "msg/ServoCommand.msg"
+  "msg/HomeCommand.msg"
+  "msg/I2CCommand.msg"
+  "msg/PinCommand.msg"
 )
 
 ament_package()
