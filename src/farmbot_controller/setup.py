@@ -20,8 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "interface_controller = farmbot_controller.control_interface_handler:main",
-            "hardware_controller = farmbot_controller.hardware_controller:main"
+            "motor_controller = farmbot_controller.motor_controller:main",
+            "device_controller = farmbot_controller.device_controller:main"
         ],
     },
 )
