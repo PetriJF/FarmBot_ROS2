@@ -29,7 +29,8 @@ class MotorController(Node):
         max_x, max_y, max_z = moveCommand.a, moveCommand.b, moveCommand.c
 
         # Form the GCode command for the "move at location" action
-        self.uart_cmd_.data = ("G01 " if mode else "G00 ") + str(x) + " " + str(y) + " " + str(z) + ("" if mode else (" " + str(max_x) + " " + str(max_y) + " " + str(max_z)))
+        self.uart_cmd_.data = ("G01 " if mode else "G00 ") + "X" + str(x) + " Y" + str(y) + " Z" + str(z) \
+                            + ("" if mode else (" A" + str(max_x) + " B" + str(max_y) + " C" + str(max_z)))
 
         self.uartTxPub_.publish(self.uart_cmd_)
 
@@ -42,9 +43,9 @@ class MotorController(Node):
         if homingCommand.go_home:            # Home all axis
             self.uart_cmd_.data = "G28"
         elif homingCommand.current_pos_home: # Set the current position as home
-            self.uart_cmd_.data = "F84 " + ("1 " if homingCommand.x else "0 ")\
-                                         + ("1 " if homingCommand.y else "0 ")\
-                                         + ("1" if homingCommand.z else "0")
+            self.uart_cmd_.data = "F84 " + "X" + ("1 " if homingCommand.x else "0 ")\
+                                         + "Y" + ("1 " if homingCommand.y else "0 ")\
+                                         + "Z" + ("1" if homingCommand.z else "0")
         else:
             if homingCommand.x:              # Find home or calibrate x axis
                 self.uart_cmd_.data = "F11" if not homingCommand.calib else "F14"
@@ -67,7 +68,7 @@ class MotorController(Node):
         # If the servo pin is within the valid pins:
         if (servoCommand.pin in valid_servo_pins):
             # Request servo attached to PIN to be rotated to ANGLE
-            self.uart_cmd_.data = "F61 " + str(servoCommand.pin) + " " + str(servoCommand.ang)
+            self.uart_cmd_.data = "F61 P" + str(servoCommand.pin) + " V" + str(servoCommand.ang)
 
             self.uartTxPub_.publish(self.uart_cmd_)
             self.get_logger().info(self.uart_cmd_.data)

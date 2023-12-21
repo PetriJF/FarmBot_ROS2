@@ -26,11 +26,11 @@ class StateController(Node):
             self.uart_cmd_.data = "F20"
         else:
             if cmd.read:    # Read a parameter
-                self.uart_cmd_.data = "F21 " + str(cmd.param)
+                self.uart_cmd_.data = "F21 P" + str(cmd.param)
             elif cmd.write: # Write to a parameter
-                self.uart_cmd_.data = "F22 " + str(cmd.param) + " " + str(cmd.value)
+                self.uart_cmd_.data = "F22 P" + str(cmd.param) + " V" + str(cmd.value)
             elif cmd.update:# Update a paramanter (in the calibration state)
-                self.uart_cmd_.data = "F23 " + str(cmd.param) + " " + str(cmd.value)
+                self.uart_cmd_.data = "F23 P" + str(cmd.param) + " V" + str(cmd.value)
 
         self.uartTxPub_.publish(self.uart_cmd_)
         self.get_logger().info(self.uart_cmd_.data)
@@ -62,9 +62,9 @@ class StateController(Node):
     # Function covering the read and write of a status command 
     def statusCommandHandler(self, cmd = StatusCommand):
         if cmd.mode:    # Write mode
-            self.uart_cmd_.data = "F32 " + str(cmd.p) + " " + str(cmd.v)
+            self.uart_cmd_.data = "F32 P" + str(cmd.p) + " V" + str(cmd.v)
         else:           # Read mode
-            self.uart_cmd_.data = "F31 " + str(cmd.p)
+            self.uart_cmd_.data = "F31 P" + str(cmd.p)
         
         self.uartTxPub_.publish(self.uart_cmd_)
         self.get_logger().info(self.uart_cmd_.data)

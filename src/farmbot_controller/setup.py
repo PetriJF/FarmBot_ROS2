@@ -22,7 +22,8 @@ setup(
         'console_scripts': [
             "motor_controller = farmbot_controller.motor_controller:main",
             "device_controller = farmbot_controller.device_controller:main",
-            "state_controller = farmbot_controller.state_controller:main"
+            "state_controller = farmbot_controller.state_controller:main",
+            "uart_controller = farmbot_controller.UART_controller:main"
         ],
     },
 )
