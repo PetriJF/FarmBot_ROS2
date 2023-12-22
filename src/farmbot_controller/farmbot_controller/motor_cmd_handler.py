@@ -4,10 +4,10 @@ from rclpy.node import Node
 from farmbot_interfaces.msg import GantryCommand, ServoCommand, HomeCommand
 from std_msgs.msg import String
 
-class MotorController(Node):
+class MotorCmdHandler(Node):
     # Node contructor
     def __init__(self):
-        super().__init__("MotorController")
+        super().__init__("MotorCmdHandler")
 
         self.uart_cmd_ = String()
 
@@ -18,7 +18,7 @@ class MotorController(Node):
         self.uartTxPub_ = self.create_publisher(String, 'uart_transmit', 10)
         
         # Log the initialization
-        self.get_logger().info("Motor Controller Initialized..")
+        self.get_logger().info("Motor Command Handler Initialized..")
 
     # Function handling the axis actuation on the gantry
     def gantryMovementCallback(self, moveCommand = GantryCommand):
@@ -79,10 +79,10 @@ class MotorController(Node):
 def main(args = None):
     rclpy.init(args = args)
 
-    motorControlNode = MotorController()
+    motorCmdHandlerNode = MotorCmdHandler()
     
     try:
-        rclpy.spin(motorControlNode)
+        rclpy.spin(motorCmdHandlerNode)
     except KeyboardInterrupt:
         pass
 

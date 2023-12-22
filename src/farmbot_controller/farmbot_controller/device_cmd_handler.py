@@ -5,10 +5,10 @@ from std_msgs.msg import String, Int64MultiArray
 from farmbot_interfaces.msg import I2CCommand, PinCommand
 
 
-class DeviceController(Node):
+class DeviceCmdHandler(Node):
     # Node contructor
     def __init__(self):
-        super().__init__("DeviceController")
+        super().__init__("DeviceCmdHandler")
         
         self.uart_cmd_ = String()
 
@@ -18,7 +18,7 @@ class DeviceController(Node):
         self.uartTxPub_ = self.create_publisher(String, 'uart_transmit', 10)
 
         # Log the initialization
-        self.get_logger().info("Device Controller Initialized..")
+        self.get_logger().info("Device Command Handler Initialized..")
 
     # Function handling the watering commands
     def waterCommandHandler(self, cmd = Int64MultiArray):
@@ -71,10 +71,10 @@ class DeviceController(Node):
 def main(args = None):
     rclpy.init(args = args)
 
-    deviceControlNode = DeviceController()
+    deviceCmdHandlerNode = DeviceCmdHandler()
     
     try:
-        rclpy.spin(deviceControlNode)
+        rclpy.spin(deviceCmdHandlerNode)
     except KeyboardInterrupt:
         pass
 
