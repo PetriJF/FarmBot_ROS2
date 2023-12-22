@@ -4,10 +4,10 @@ from rclpy.node import Node
 from farmbot_interfaces.msg import ParameterCommand, StateCommand, StatusCommand
 from std_msgs.msg import String
 
-class StateController(Node):
+class StateCmdHandler(Node):
     # Node contructor
     def __init__(self):
-        super().__init__("StateController")
+        super().__init__("StateCmdHandler")
 
         self.uart_cmd_ = String()
 
@@ -18,7 +18,7 @@ class StateController(Node):
         self.uartTxPub_ = self.create_publisher(String, 'uart_transmit', 10)
         
         # Log the initialization
-        self.get_logger().info("State Controller Initialized..")
+        self.get_logger().info("State Command Handler Initialized..")
     
     # Function handling the parameter commands
     def parameterCommandHandler(self, cmd = ParameterCommand):
@@ -73,10 +73,10 @@ class StateController(Node):
 def main(args = None):
     rclpy.init(args = args)
 
-    stateControlNode = StateController()
+    stateCmdHandlerNode = StateCmdHandler()
     
     try:
-        rclpy.spin(stateControlNode)
+        rclpy.spin(stateCmdHandlerNode)
     except KeyboardInterrupt:
         pass
 
