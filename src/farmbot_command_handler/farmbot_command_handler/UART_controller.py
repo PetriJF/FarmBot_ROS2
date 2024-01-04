@@ -1,14 +1,33 @@
 #!/usr/bin/env python3
+
+# ROS2 Imports
 import rclpy
 import serial
 from rclpy.node import Node
 from std_msgs.msg import String
+from rclpy.clock import ROSClock
+
+# Standard Imports
+import os
+import time
 
 class UARTController(Node):
     # Node contructor
     def __init__(self):
         super().__init__("UARTController")
 
+        # Get the path to the logging directory and 
+        UART_LOG_PATH = os.path.join(self.get_workspace(), 'log', 'UART_Logs')
+        os.makedirs(UART_LOG_PATH, exist_ok=True)
+
+        # Create a log file based on the node initialization date and time
+        timestamp = ROSClock().now().to_msg()
+        LOG_FILE_NAME = time.strftime("uart_log_%d_%m_%Y_%H_%M_%S.txt", time.localtime(timestamp.sec))
+        LOG_FILE_PATH = os.path.join(UART_LOG_PATH, LOG_FILE_NAME)
+
+        # Open the log file in append mode
+        self.uart_log_file_ = open(LOG_FILE_PATH, 'a')
+        
         self.uart_cmd_ = String()
 
         serialPort = '/dev/ttyACM0'
@@ -27,11 +46,12 @@ class UARTController(Node):
         # Log the initialization
         self.get_logger().info("State Controller Initialized..")
 
-    def uartTransmitCallback(self, cmd = String):
-        if cmd.data[-1] != '\n':
-            cmd.data += "\n"
+    def uartTransmitCallback(self, message = String):
+        if message.data[-1] != '\n':
+            message.data += "\n"
         
-        self.ser_.write(cmd.data.encode('utf-8'))
+        self.log_uart(transmit = True, cmd = message)
+        self.ser_.write(message.data.encode('utf-8'))
 
     def uartReceive(self):
         line = self.ser_.readline().decode('utf-8').rstrip()
@@ -43,7 +63,25 @@ class UARTController(Node):
             self.handle_message(line)
 
     def handle_message(self, message):
-        self.get_logger().info(f"Handling message: {message}")
+        self.log_uart(receive = True, cmd = message)
+
+
+    def log_uart(self, transmit = False, receive = False, cmd = String):
+        if transmit and receive:
+            self.get_logger().error("A command can't be logged as both transmitted and received at the same time")
+        elif not transmit and not receive:
+            self.get_logger().error("You need to choose whether the command was transmitted or received")
+        else:
+            timestamp = ROSClock().now().to_msg()
+            message_type = "Sent" if transmit else "Received"
+            self.uart_log_file_.write(f"{timestamp.sec:02d}_{timestamp.nanosec:09d} - \
+                                           {message_type}: {cmd}\n")
+
+    def destroy_node(self):
+        # Close the UART and log file when the node is destroyed
+        self.ser_.close()
+        self.uart_log_file_.close()
+
 
 # Main Function called on the initialization of the ROS2 Node
 def main(args = None):
