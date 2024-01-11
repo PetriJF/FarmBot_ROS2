@@ -47,14 +47,16 @@ class MotorCmdHandler(Node):
                                          + "Y" + ("1 " if homingCommand.y else "0 ")\
                                          + "Z" + ("1" if homingCommand.z else "0")
         else:
-            if homingCommand.x:              # Find home or calibrate x axis
-                self.uart_cmd_.data = "F11" if not homingCommand.calib else "F14"
-            elif homingCommand.y:            # Find home or calibrate y axis
-                self.uart_cmd_.data = "F12" if not homingCommand.calib else "F15"
-            elif homingCommand.z:            # Find home or calibrate z axis
-                self.uart_cmd_.data = "F13" if not homingCommand.calib else "F16"
-            else:
+            if not homingCommand.x and not homingCommand.y and not homingCommand.z:
                 self.get_logger().error("No axis selected for homing/calibration!")
+            else:
+                if homingCommand.x:              # Find home or calibrate x axis
+                    self.uart_cmd_.data = "F11" if not homingCommand.calib else "F14"
+                if homingCommand.y:            # Find home or calibrate y axis
+                    self.uart_cmd_.data = "F12" if not homingCommand.calib else "F15"
+                if homingCommand.z:            # Find home or calibrate z axis
+                    self.uart_cmd_.data = "F13" if not homingCommand.calib else "F16"
+
         
         self.uartTxPub_.publish(self.uart_cmd_)
         self.get_logger().info(self.uart_cmd_.data)
