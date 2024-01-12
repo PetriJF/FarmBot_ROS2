@@ -17,16 +17,16 @@ class UARTController(Node):
         super().__init__("UARTController")
 
         # Get the path to the logging directory and 
-        UART_LOG_PATH = os.path.join(self.get_workspace(), 'log', 'UART_Logs')
-        os.makedirs(UART_LOG_PATH, exist_ok=True)
+        #UART_LOG_PATH = os.path.join(self.get_namespace(), 'log', 'UART_Logs')
+        #os.makedirs(UART_LOG_PATH, exist_ok=True)
 
         # Create a log file based on the node initialization date and time
-        timestamp = ROSClock().now().to_msg()
-        LOG_FILE_NAME = time.strftime("uart_log_%d_%m_%Y_%H_%M_%S.txt", time.localtime(timestamp.sec))
-        LOG_FILE_PATH = os.path.join(UART_LOG_PATH, LOG_FILE_NAME)
+        #timestamp = ROSClock().now().to_msg()
+        #LOG_FILE_NAME = time.strftime("uart_log_%d_%m_%Y_%H_%M_%S.txt", time.localtime(timestamp.sec))
+        #LOG_FILE_PATH = os.path.join(UART_LOG_PATH, LOG_FILE_NAME)
 
         # Open the log file in append mode
-        self.uart_log_file_ = open(LOG_FILE_PATH, 'a')
+        #self.uart_log_file_ = open(LOG_FILE_PATH, 'a')
         
         self.uart_cmd_ = String()
 
@@ -67,15 +67,16 @@ class UARTController(Node):
 
 
     def log_uart(self, transmit = False, receive = False, cmd = String):
-        if transmit and receive:
-            self.get_logger().error("A command can't be logged as both transmitted and received at the same time")
-        elif not transmit and not receive:
-            self.get_logger().error("You need to choose whether the command was transmitted or received")
-        else:
-            timestamp = ROSClock().now().to_msg()
-            message_type = "Sent" if transmit else "Received"
-            self.uart_log_file_.write(f"{timestamp.sec:02d}_{timestamp.nanosec:09d} - \
-                                           {message_type}: {cmd}\n")
+        pass
+        #if transmit and receive:
+        #    self.get_logger().error("A command can't be logged as both transmitted and received at the same time")
+        #elif not transmit and not receive:
+        #    self.get_logger().error("You need to choose whether the command was transmitted or received")
+        #else:
+        #    timestamp = ROSClock().now().to_msg()
+        #    message_type = "Sent" if transmit else "Received"
+        #    self.uart_log_file_.write(f"{timestamp.sec:02d}_{timestamp.nanosec:09d} - \
+        #                                   {message_type}: {cmd}\n")
 
     def destroy_node(self):
         # Close the UART and log file when the node is destroyed

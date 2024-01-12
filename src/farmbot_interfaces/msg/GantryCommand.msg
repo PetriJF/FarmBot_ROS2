@@ -1,5 +1,5 @@
 # Message to represent the movement of the farmbot's gantry
-bool mode   # The movement mode. 0 - standard, 1 - straight line (needs constant feed rate)
+bool mode     # The movement mode. 0 - standard, 1 - straight line (needs constant feed rate)
 float64 x     # Desired x coordinate
 float64 y     # Desired y coordinate
 float64 z     # Desired z coordinate
