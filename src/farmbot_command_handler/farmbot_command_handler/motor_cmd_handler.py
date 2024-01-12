@@ -37,8 +37,6 @@ class MotorCmdHandler(Node):
         self.get_logger().info(self.uart_cmd_.data)
 
     # Function Handling the homing and calibration commands
-    # TODO: Improve function so in the case False, True, True, True all
-    #       the home commands are sent
     def homeHandlerCallback(self, homingCommand = HomeCommand):
         if homingCommand.go_home:            # Home all axis
             self.uart_cmd_.data = "G28"
