@@ -32,7 +32,7 @@ class UARTController(Node):
 
         serialPort = '/dev/ttyACM0'
         serialSpeed = 115200
-        checkUartFreq = 10
+        checkUartFreq = 100
 
         # Node subscripters and publishers
         self.uartTxSub_ = self.create_subscription(String, 'uart_transmit', self.uartTransmitCallback, 10)
