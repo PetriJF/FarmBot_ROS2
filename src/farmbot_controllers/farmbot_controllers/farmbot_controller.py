@@ -4,6 +4,8 @@ from rclpy.node import Node
 from farmbot_interfaces.msg import GantryCommand, HomeCommand, ParameterCommand
 from std_msgs.msg import String
 
+from farmbot_controllers.farmbot_controllers.parameterList import *
+from farmbot_controllers.farmbot_controllers.parameterValues import ParameterValues
 
 class KeyboardTeleOp(Node):
     # Node contructor
@@ -273,7 +275,6 @@ def main(args = None):
         pass
 
     rclpy.shutdown()
-
 
 if __name__ == '__main__':
     main()
