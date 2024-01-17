@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from farmbot_interfaces.msg import GantryCommand, HomeCommand, ParameterCommand
+from farmbot_interfaces.msg import GantryCommand, HomeCommand, ParameterCommand, StateCommand
 from std_msgs.msg import String
 
 from . utils.parameterList import *
@@ -34,6 +34,7 @@ class KeyboardTeleOp(Node):
         # Variables used to create the commands
         self.gantryConf_ = HomeCommand()    # Used for gantry configuration (homing, calibration)
         self.gantryMove_ = GantryCommand()  # Used for moving the gantry along the 3 axis
+        self.state_ = StateCommand()
         self.paramHandler_ = ParameterCommand() # Used for reading and writing to the FarmBot Parameters
 
         # Temporary Keyboard subscriber
@@ -49,6 +50,7 @@ class KeyboardTeleOp(Node):
         # Control publishers
         self.gantryMovePub_ = self.create_publisher(GantryCommand, 'move_gantry', 10)
         self.gantryConfPub_ = self.create_publisher(HomeCommand, 'home_handler', 10)
+        self.statePub_ = self.create_publisher(StateCommand, 'state_command', 10)
         self.paramCmdPub_ = self.create_publisher(ParameterCommand, 'parameter_command', 10)
 
         # Log the initialization
@@ -95,6 +97,10 @@ class KeyboardTeleOp(Node):
                 self.writeParam(ENCODER_ENABLED_Y, 1)
                 self.writeParam(ENCODER_ENABLED_Z, 1)
 
+                self.writeParam(MOVEMENT_KEEP_ACTIVE_X, 1)
+                self.writeParam(MOVEMENT_KEEP_ACTIVE_Y, 1)
+                self.writeParam(MOVEMENT_KEEP_ACTIVE_Z, 1)
+
                 self.writeParam(MOVEMENT_INVERT_MOTOR_Y, 1)
                 self.writeParam(ENCODER_INVERT_Y, 1)
                 
@@ -107,6 +113,10 @@ class KeyboardTeleOp(Node):
                 self.goHome()
             case 'c':
                 self.findAllHomes()
+            case 'e':
+                self.electronicStop()
+            case 'E':
+                self.resetElectronicStop()
 
     ## UART Handling Callback
     def farmbotFeedbackCallback(self, msg = String):
@@ -124,6 +134,67 @@ class KeyboardTeleOp(Node):
             self.curr_farmbot_state_ = CMD_FINISHED_ERROR
             self.get_logger().info(msg.data)
         
+
+    ## State handling functions
+    
+    def electronicStop(self):
+        """
+        Imposes the electronic stop, turning off all the motors 
+        """
+        self.defineState(estop = True)
+
+    def abortMovement(self):
+        """
+        Aborts the current movement command
+        """
+        self.defineState(abort_movement = True)
+
+    def resetElectronicStop(self):
+        """
+        Resets the electronic stop
+        """
+        self.defineState(reset_estop = True)
+
+    def requestEndStop(self):
+        """
+        Requests the end stops
+        """
+        self.defineState(rep_end_stop = True)
+
+    def requestSoftwareVersion(self):
+        """
+        Requests the software version
+        """
+        self.defineState(rep_sw_ver = True)
+    
+    def requestCurrentPosition(self):
+        """
+        Requests the current position of the extruder
+        """
+        self.defineState(rep_curr_pos = True)
+
+    def defineState(self, estop = False, abort_movement = False, reset_estop = False,\
+                    rep_end_stop = False, rep_curr_pos = False, rep_sw_ver = False):
+        """
+        Creates the state definition request.
+
+        Args:
+            estop {Bool}: Initializes the Electronic Stop, stopping all the motors
+            abort_movement {Bool}: Aborts the current movement command
+            reset_estop {Bool}: Resets the farmbot from the Electronic Stop state
+            rep_end_stop {Bool}: Requests the end stops
+            rep_curr_pos {Bool}: Requests the current position of the gantry
+            rep_sw_ver   {Bool}: Requests the software version
+        """
+        
+        self.state_.estop = estop
+        self.state_.abort_movement = abort_movement
+        self.state_.reset_estop = reset_estop
+        self.state_.rep_end_stop = rep_end_stop
+        self.state_.rep_curr_pos = rep_curr_pos
+        self.state_.rep_sw_ver = rep_sw_ver
+
+        self.statePub_.publish(self.state_)
 
 
     ## Calibration and Homing Functions
