@@ -34,6 +34,9 @@ class UARTController(Node):
         serialSpeed = 115200
         checkUartFreq = 100
 
+        # UART receive publisher
+        self.uartRxPub_ = self.create_publisher(String, 'uart_receive', 10)
+
         # Node subscripters and publishers
         self.uartTxSub_ = self.create_subscription(String, 'uart_transmit', self.uartTransmitCallback, 10)
         
@@ -51,7 +54,9 @@ class UARTController(Node):
             message.data += "\n"
         
         self.log_uart(transmit = True, cmd = message)
+        self.get_logger().info(f"Sent message: {message.data}")
         self.ser_.write(message.data.encode('utf-8'))
+        time.sleep(0.1)
 
     def uartReceive(self):
         line = self.ser_.readline().decode('utf-8').rstrip()
@@ -63,6 +68,9 @@ class UARTController(Node):
             self.handle_message(line)
 
     def handle_message(self, message):
+        self.uart_cmd_.data = message
+        self.uartRxPub_.publish(self.uart_cmd_)
+        
         self.log_uart(receive = True, cmd = message)
 
 
