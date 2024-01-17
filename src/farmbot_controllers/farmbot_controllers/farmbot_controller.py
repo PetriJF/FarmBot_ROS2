@@ -133,6 +133,10 @@ class KeyboardTeleOp(Node):
         if reportCode == 'R03':
             self.curr_farmbot_state_ = CMD_FINISHED_ERROR
             self.get_logger().info(msg.data)
+        if reportCode == 'R82':
+            self.cur_x_ = float(msgSplit[1][1:])
+            self.cur_y_ = float(msgSplit[2][1:])
+            self.cur_z_ = float(msgSplit[3][1:])
         
 
     ## State handling functions
