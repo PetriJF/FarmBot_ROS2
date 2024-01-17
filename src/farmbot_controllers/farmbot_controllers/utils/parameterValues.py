@@ -1,4 +1,4 @@
-from parameterList import *
+from . parameterList import *
 
 class ParameterValues:
     def __init__(self):
@@ -126,4 +126,3 @@ class ParameterValues:
     
     def get_value(self, param):
         return self.parameterValues[param]
-        

@@ -1,4 +1,4 @@
-#parameters.py
+#parameterList.py
 PARAM_CONFIG_OK = 2
 PARAM_USE_EEPROM = 3
 PARAM_E_STOP_ON_MOV_ERR = 4
