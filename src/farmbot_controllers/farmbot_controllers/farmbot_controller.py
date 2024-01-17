@@ -1,14 +1,22 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from farmbot_interfaces.msg import GantryCommand, HomeCommand
+from farmbot_interfaces.msg import GantryCommand, HomeCommand, ParameterCommand
 from std_msgs.msg import String
 
+from . utils.parameterList import *
+from . utils.parameterValues import ParameterValues
+from . utils.farmbotStates import *
 
 class KeyboardTeleOp(Node):
     # Node contructor
     def __init__(self):
         super().__init__("FarmBotController")
+
+        self.curr_farmbot_state_ = IDLE
+        self.command_queue = []
+
+        self.publisherTimer_ = self.create_timer(0.2, self.masterPublisher)
 
         # Memory
         self.cur_x_ = 0.0
@@ -26,21 +34,50 @@ class KeyboardTeleOp(Node):
         # Variables used to create the commands
         self.gantryConf_ = HomeCommand()    # Used for gantry configuration (homing, calibration)
         self.gantryMove_ = GantryCommand()  # Used for moving the gantry along the 3 axis
+        self.paramHandler_ = ParameterCommand() # Used for reading and writing to the FarmBot Parameters
 
         # Temporary Keyboard subscriber
         self.cur_increment_ = 10.0
         self.inputSub_ = self.create_subscription(String, 'keyboard_topic', self.commandInterpretationCallback, 10)
 
+        #
+        self.params_ = ParameterValues()
+
+        # UART Rx Subscriber
+        self.uartRxSub_ = self.create_subscription(String, 'uart_receive', self.farmbotFeedbackCallback, 10)
 
         # Control publishers
         self.gantryMovePub_ = self.create_publisher(GantryCommand, 'move_gantry', 10)
         self.gantryConfPub_ = self.create_publisher(HomeCommand, 'home_handler', 10)
+        self.paramCmdPub_ = self.create_publisher(ParameterCommand, 'parameter_command', 10)
 
         # Log the initialization
         self.get_logger().info("Farmbot Controller Initialized..")
 
+    def masterPublisher(self):
+        if self.curr_farmbot_state_ == IDLE and self.command_queue:
+            type, cmd = self.command_queue.pop(0)  # get the oldest message from the queue
+
+            self.get_logger().info("publishing")
+
+            self.curr_farmbot_state_ = CMD_STARTED
+            
+            if type == GANTRY_CONF_CMD:
+                self.gantryConfPub_.publish(cmd)
+            if type == GANTRY_MOVE_CMD:
+                self.gantryMovePub_.publish(cmd)
+
+    def addToPublishQueue(self, type, cmd):
+        self.command_queue.append((type, cmd))
+
     def commandInterpretationCallback(self, cmd = String):
         match cmd.data:
+            case '1':
+                self.cur_increment_ = 10.0
+            case '2':
+                self.cur_increment_ = 100.0
+            case '3':
+                self.cur_increment_ = 500.0
             case 'w':
                 self.cur_x_ += self.cur_increment_
                 self.moveGantryAbsolute(x_coord = self.cur_x_ + self.cur_increment_, y_coord = self.cur_y_, z_coord = self.cur_z_)
@@ -53,21 +90,57 @@ class KeyboardTeleOp(Node):
             case 'd':
                 self.cur_y_ += self.cur_increment_
                 self.moveGantryAbsolute(x_coord = self.cur_x_, y_coord = self.cur_y_ + self.cur_increment_, z_coord = self.cur_z_)
+            case 'i':
+                self.writeParam(ENCODER_ENABLED_X, 1)
+                self.writeParam(ENCODER_ENABLED_Y, 1)
+                self.writeParam(ENCODER_ENABLED_Z, 1)
+
+                self.writeParam(MOVEMENT_INVERT_MOTOR_Y, 1)
+                self.writeParam(ENCODER_INVERT_Y, 1)
                 
-                
+                self.writeParam(ENCODER_USE_FOR_POS_X, 1)
+                self.writeParam(ENCODER_USE_FOR_POS_Y, 1)
+                self.writeParam(ENCODER_USE_FOR_POS_Z, 1)
+
+                self.writeParam(PARAM_CONFIG_OK, 1)
+            case 'h': 
+                self.goHome()
+            case 'c':
+                self.findAllHomes()
+
+    ## UART Handling Callback
+    def farmbotFeedbackCallback(self, msg = String):
+        msgSplit = (msg.data).split(' ')
+        reportCode = msgSplit[0]
+        if reportCode == 'R21' or reportCode == 'R23':
+            self.params_.set_value(param = int(msgSplit[1][1:]), value = int(msgSplit[2][1:]))
+        if reportCode == 'R00':
+            self.curr_farmbot_state_ = IDLE
+        if reportCode == 'R01':
+            self.curr_farmbot_state_ = CMD_STARTED
+        if reportCode == 'R02':
+            self.curr_farmbot_state_ = CMD_FINISHED_SUCCESS
+        if reportCode == 'R03':
+            self.curr_farmbot_state_ = CMD_FINISHED_ERROR
+            self.get_logger().info(msg.data)
+        
+
+
     ## Calibration and Homing Functions
 
     def goHome(self):
         """
         Goes to the home position on each axis
         """
-        self.manipulateConfig(homing = True)
+        self.manipulateConfig(allHome = True)
 
     def findAllHomes(self):
         """
         Finds the home for all the axis on the farmbot.
         """
-        self.findAxisHome(x = True, y = True, z = True)
+        self.findAxisHome(x = True, y = False, z = False)
+        self.findAxisHome(x = False, y = True, z = False)
+        self.findAxisHome(x = False, y = False, z = True)
 
     def findAxisHome(self, x = False, y = False, z = False):
         """Homes the selected axis on the farmbot. For example, for homing x and y you set them to True.
@@ -77,7 +150,7 @@ class KeyboardTeleOp(Node):
             y {Bool}: True if the X-Axis should have it's home position found. Defaults to False
             z {Bool}: True if the X-Axis should have it's home position found. Defaults to False
         """
-        self.manipulateConfig(home_x = x, home_y = y, home_z = z)
+        self.manipulateConfig(x_axis = x, y_axis = y, z_axis = z)
 
     def calibrateAllLens(self):
         """
@@ -93,7 +166,7 @@ class KeyboardTeleOp(Node):
             y {Bool}: True if the Y-Axis is to be calibrated. Defaults to False
             z {Bool}: True if the Z-Axis is to be calibrated. Defaults to False
         """
-        self.manipulateConfig(calibrate = True, home_x = x, home_y = y, home_z = z)
+        self.manipulateConfig(calibrate = True, x_axis = x, y_axis = y, z_axis = z)
 
     def setCurrentPosHomeAll(self):
         """
@@ -109,7 +182,7 @@ class KeyboardTeleOp(Node):
             y {Bool}: True if this axis' position should be set as the axis' home. Defaults to False
             z {Bool}: True if this axis' position should be set as the axis' home. Defaults to False
         """
-        self.manipulateConfig(set_this_home = True, home_x = x, home_y = y, home_z = z)
+        self.manipulateConfig(set_this_home = True, x_axis = x, y_axis = y, z_axis = z)
 
     def manipulateConfig(self, allHome = False, set_this_home = False, calibrate = False, x_axis = False, y_axis = False, z_axis = False):
         """
@@ -134,7 +207,8 @@ class KeyboardTeleOp(Node):
         self.gantryConf_.y = y_axis
         self.gantryConf_.z = z_axis
 
-        self.gantryConfPub_.publish(self.gantryConf_)
+        #self.gantryConfPub_.publish(self.gantryConf_)
+        self.addToPublishQueue(GANTRY_CONF_CMD, self.gantryConf_)
 
     ## Gantry Movement Functions
 
@@ -200,7 +274,66 @@ class KeyboardTeleOp(Node):
         self.gantryMove_.b = y_speed
         self.gantryMove_.c = z_speed
 
-        self.gantryMovePub_.publish(self.gantryMove_)
+        self.addToPublishQueue(GANTRY_MOVE_CMD, self.gantryMove_)
+        #self.gantryMovePub_.publish(self.gantryMove_)
+    
+    ## Parameter Handling Commands
+
+    def readParam(self, param = int):
+        """
+        Read the value on parameter {param}.
+
+        Args:
+            param {Int}: Parameter in question
+        """
+        self.parameterHandler(list = False, write = False, read = True, update = False, param = param)
+
+    def listAllParams(self):
+        """
+        List all the parameters and their values
+        """
+        self.parameterHandler(list = True, write = False, read = False, update = False)
+
+    def writeParam(self, param = int, value = int):
+        """
+        Write {value} to parameter {param}
+
+        Args:
+            param {Int}: Parameter in question
+            value {Int}: Value written to param if write or update modes are active
+        """
+        self.parameterHandler(list = False, write = True, read = False, update = False, param = param, value = value)
+    
+    def updateParam(self, param = int, value = int):
+        """
+        Update parameter {param} with {value}.
+
+        Args:
+            param {Int}: Parameter in question
+            value {Int}: Value written to param if write or update modes are active
+        """
+        self.parameterHandler(list = False, write = False, read = False, update = True, param = param, value = value)
+
+    def parameterHandler(self, list = bool, write = bool, read = bool, update = bool, param = int, value = int):
+        """
+        Function for parameter handling commands.
+
+        Args:
+            list {bool}: If true, all the parameters will be listed
+            write {bool}: If true, value V will be written to parameter P
+            read {bool}: If true, parameter P will be listed
+            update {bool}: If true, parameter P will be updated with value V (e.g. during calib.)
+            param {Int}: Parameter in question
+            value {Int}: Value written to param if write or update modes are active
+        """
+        self.paramHandler_.list = list
+        self.paramHandler_.write = write
+        self.paramHandler_.read = read
+        self.paramHandler_.update = update
+        self.paramHandler_.param = param
+        self.paramHandler_.value = value
+
+        self.paramCmdPub_.publish(self.paramHandler_)
 
 def main(args = None):
     rclpy.init(args = args)
@@ -213,7 +346,6 @@ def main(args = None):
         pass
 
     rclpy.shutdown()
-
 
 if __name__ == '__main__':
     main()
