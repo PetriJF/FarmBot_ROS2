@@ -8,6 +8,12 @@ from launch.event_handlers.on_process_start import OnProcessStart
 def generate_launch_description():
     ld = LaunchDescription()
 
+    panel_node = Node(
+        package = 'farmbot_controllers',
+        executable = 'panel_controller',
+        name = 'panel_controller'
+    )
+
     controller_node = Node(
         package = 'farmbot_controllers',
         executable = 'farmbot_controller',
@@ -43,11 +49,13 @@ def generate_launch_description():
     def start_next_node(event: ProcessStarted, context: LaunchContext):
         print(f'node {event.process_name} started.')
         already_started_nodes.update([event.process_name])
-        if len(already_started_nodes) == 4:
+        if len(already_started_nodes) == 5:
             print(f'all required nodes are up, starting uart_controller')
             return uart_ctrl_node
 
     return LaunchDescription([
+        RegisterEventHandler(event_handler = OnProcessStart(target_action = panel_node,
+                                                            on_start = start_next_node)),
         RegisterEventHandler(event_handler = OnProcessStart(target_action = controller_node,
                                                             on_start = start_next_node)),
         RegisterEventHandler(event_handler = OnProcessStart(target_action = motor_interp_node,
@@ -56,6 +64,7 @@ def generate_launch_description():
                                                             on_start = start_next_node)),
         RegisterEventHandler(event_handler = OnProcessStart(target_action = device_interp_node,
                                                             on_start = start_next_node)),
+        panel_node,
         controller_node,
         motor_interp_node,
         state_interp_node,
