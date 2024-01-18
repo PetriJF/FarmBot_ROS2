@@ -13,7 +13,7 @@ class StateCmdHandler(Node):
 
         # Node subscripters and publishers
         self.parameterSub_ = self.create_subscription(ParameterCommand, 'parameter_command', self.parameterCommandHandler, 10)
-        self.stateSub_ = self.create_subscription(StateCommand, '/state_command', self.stateCommandHandler, 10)
+        self.stateSub_ = self.create_subscription(StateCommand, 'state_command', self.stateCommandHandler, 10)
         self.statusSub_ = self.create_subscription(StatusCommand, 'status_command', self.statusCommandHandler, 10)
         self.uartTxPub_ = self.create_publisher(String, 'uart_transmit', 10)
         

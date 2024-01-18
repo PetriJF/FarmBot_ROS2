@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/FBPanel.msg"
   "msg/GantryCommand.msg"
   "msg/ServoCommand.msg"
   "msg/HomeCommand.msg"
@@ -18,6 +19,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ParameterCommand.msg"
   "msg/StateCommand.msg"
   "msg/StatusCommand.msg"
+  "srv/LedPanelHandler.srv"
 )
 
 ament_package()
