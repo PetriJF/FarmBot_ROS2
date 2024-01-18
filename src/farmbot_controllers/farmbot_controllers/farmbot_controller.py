@@ -8,15 +8,17 @@ from . utils.parameterList import *
 from . utils.parameterValues import ParameterValues
 from . utils.farmbotStates import *
 
+import time
+
 class KeyboardTeleOp(Node):
     # Node contructor
     def __init__(self):
         super().__init__("FarmBotController")
 
-        self.curr_farmbot_state_ = IDLE
-        self.command_queue = []
+        #self.curr_farmbot_state_ = IDLE
+        #self.command_queue = []
 
-        self.publisherTimer_ = self.create_timer(0.2, self.masterPublisher)
+        #self.publisherTimer_ = self.create_timer(0.2, self.masterPublisher)
 
         # Memory
         self.cur_x_ = 0.0
@@ -56,21 +58,22 @@ class KeyboardTeleOp(Node):
         # Log the initialization
         self.get_logger().info("Farmbot Controller Initialized..")
 
-    def masterPublisher(self):
-        if self.curr_farmbot_state_ == IDLE and self.command_queue:
-            type, cmd = self.command_queue.pop(0)  # get the oldest message from the queue
+    # def masterPublisher(self):
+    #     if self.curr_farmbot_state_ == IDLE and self.command_queue:
+    #         type, cmd = self.command_queue.pop(0)  # get the oldest message from the queue
 
-            self.get_logger().info("publishing")
+    #         self.get_logger().info("publishing")
 
-            self.curr_farmbot_state_ = CMD_STARTED
+    #         self.curr_farmbot_state_ = CMD_STARTED
             
-            if type == GANTRY_CONF_CMD:
-                self.gantryConfPub_.publish(cmd)
-            if type == GANTRY_MOVE_CMD:
-                self.gantryMovePub_.publish(cmd)
+    #         if type == GANTRY_CONF_CMD:
+    #             self.gantryConfPub_.publish(cmd)
+    #         if type == GANTRY_MOVE_CMD:
+                
+                
 
-    def addToPublishQueue(self, type, cmd):
-        self.command_queue.append((type, cmd))
+    #def addToPublishQueue(self, type, cmd):
+    #    self.command_queue.append((type, cmd))
 
     def commandInterpretationCallback(self, cmd = String):
         match cmd.data:
@@ -96,21 +99,31 @@ class KeyboardTeleOp(Node):
                 self.writeParam(ENCODER_ENABLED_X, 1)
                 self.writeParam(ENCODER_ENABLED_Y, 1)
                 self.writeParam(ENCODER_ENABLED_Z, 1)
-
+                time.sleep(0.1)
                 self.writeParam(MOVEMENT_KEEP_ACTIVE_X, 1)
                 self.writeParam(MOVEMENT_KEEP_ACTIVE_Y, 1)
                 self.writeParam(MOVEMENT_KEEP_ACTIVE_Z, 1)
-
+                time.sleep(0.1)
                 self.writeParam(MOVEMENT_INVERT_MOTOR_Y, 1)
                 self.writeParam(ENCODER_INVERT_Y, 1)
-                
+                time.sleep(0.1)
+                self.writeParam(ENCODER_TYPE_X, 1)
+                self.writeParam(ENCODER_TYPE_Y, 1)
+                self.writeParam(ENCODER_TYPE_Z, 1)
+                time.sleep(0.1)
                 self.writeParam(ENCODER_USE_FOR_POS_X, 1)
                 self.writeParam(ENCODER_USE_FOR_POS_Y, 1)
                 self.writeParam(ENCODER_USE_FOR_POS_Z, 1)
-
+                time.sleep(0.1)
                 self.writeParam(PARAM_CONFIG_OK, 1)
             case 'h': 
                 self.goHome()
+            case 'j':
+                self.findAxisHome(x = True)
+            case 'k':
+                self.findAxisHome(y = True)
+            case 'l':
+                self.findAxisHome(z = True)
             case 'c':
                 self.findAllHomes()
             case 'e':
@@ -124,15 +137,15 @@ class KeyboardTeleOp(Node):
         reportCode = msgSplit[0]
         if reportCode == 'R21' or reportCode == 'R23':
             self.params_.set_value(param = int(msgSplit[1][1:]), value = int(msgSplit[2][1:]))
-        if reportCode == 'R00':
-            self.curr_farmbot_state_ = IDLE
-        if reportCode == 'R01':
-            self.curr_farmbot_state_ = CMD_STARTED
-        if reportCode == 'R02':
-            self.curr_farmbot_state_ = CMD_FINISHED_SUCCESS
-        if reportCode == 'R03':
-            self.curr_farmbot_state_ = CMD_FINISHED_ERROR
-            self.get_logger().info(msg.data)
+        # if reportCode == 'R00':
+        #     self.curr_farmbot_state_ = IDLE
+        # if reportCode == 'R01':
+        #     self.curr_farmbot_state_ = CMD_STARTED
+        # if reportCode == 'R02':
+        #     self.curr_farmbot_state_ = CMD_FINISHED_SUCCESS
+        # if reportCode == 'R03':
+        #     self.curr_farmbot_state_ = CMD_FINISHED_ERROR
+            #self.get_logger().info(msg.data)
         if reportCode == 'R82':
             self.cur_x_ = float(msgSplit[1][1:])
             self.cur_y_ = float(msgSplit[2][1:])
@@ -282,8 +295,8 @@ class KeyboardTeleOp(Node):
         self.gantryConf_.y = y_axis
         self.gantryConf_.z = z_axis
 
-        #self.gantryConfPub_.publish(self.gantryConf_)
-        self.addToPublishQueue(GANTRY_CONF_CMD, self.gantryConf_)
+        self.gantryConfPub_.publish(self.gantryConf_)
+        #self.addToPublishQueue(GANTRY_CONF_CMD, self.gantryConf_)
 
     ## Gantry Movement Functions
 
@@ -349,8 +362,8 @@ class KeyboardTeleOp(Node):
         self.gantryMove_.b = y_speed
         self.gantryMove_.c = z_speed
 
-        self.addToPublishQueue(GANTRY_MOVE_CMD, self.gantryMove_)
-        #self.gantryMovePub_.publish(self.gantryMove_)
+        #self.addToPublishQueue(GANTRY_MOVE_CMD, self.gantryMove_)
+        self.gantryMovePub_.publish(self.gantryMove_)
     
     ## Parameter Handling Commands
 
