@@ -94,7 +94,7 @@ class UARTController(Node):
         self.uart_cmd_.data = message
         
         reportCode = (message).split(' ')[0]
-        if reportCode in ['R08']:
+        if reportCode in ['R08', 'R02', 'R03']:
             self.txBlocker_ = False
         
         self.uartRxPub_.publish(self.uart_cmd_)

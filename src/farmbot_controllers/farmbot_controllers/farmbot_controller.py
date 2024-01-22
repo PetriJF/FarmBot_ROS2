@@ -104,8 +104,7 @@ class KeyboardTeleOp(Node):
                 self.writeParam(MOVEMENT_KEEP_ACTIVE_Y, 1)
                 self.writeParam(MOVEMENT_KEEP_ACTIVE_Z, 1)
                 time.sleep(0.1)
-                self.writeParam(MOVEMENT_INVERT_MOTOR_Y, 1)
-                self.writeParam(ENCODER_INVERT_Y, 1)
+                #self.writeParam(MOVEMENT_INVERT_ENDPOINTS_Y, 1)
                 time.sleep(0.1)
                 self.writeParam(ENCODER_TYPE_X, 1)
                 self.writeParam(ENCODER_TYPE_Y, 1)
@@ -114,6 +113,18 @@ class KeyboardTeleOp(Node):
                 self.writeParam(ENCODER_USE_FOR_POS_X, 1)
                 self.writeParam(ENCODER_USE_FOR_POS_Y, 1)
                 self.writeParam(ENCODER_USE_FOR_POS_Z, 1)
+                time.sleep(0.1)
+                self.writeParam(ENCODER_INVERT_X, 0)
+                self.writeParam(ENCODER_INVERT_Y, 0)
+                self.writeParam(ENCODER_INVERT_Z, 0)
+                time.sleep(0.1)
+                self.writeParam(MOVEMENT_CALIBRATION_RETRY_X, 1)
+                self.writeParam(MOVEMENT_CALIBRATION_RETRY_Y, 1)
+                self.writeParam(MOVEMENT_CALIBRATION_RETRY_Z, 1)
+                time.sleep(0.1)
+                self.writeParam(MOVEMENT_CALIBRATION_DEADZONE_X, 15)
+                self.writeParam(MOVEMENT_CALIBRATION_DEADZONE_Y, 15)
+                self.writeParam(MOVEMENT_CALIBRATION_DEADZONE_Z, 15)
                 time.sleep(0.1)
                 self.writeParam(PARAM_CONFIG_OK, 1)
             case 'h': 
@@ -124,8 +135,16 @@ class KeyboardTeleOp(Node):
                 self.findAxisHome(y = True)
             case 'l':
                 self.findAxisHome(z = True)
-            case 'c':
+            case 'fh':
                 self.findAllHomes()
+            case 'c':
+                self.calibrateAllLens()
+            case 'v':
+                self.calibrateAxisLen(x = True)
+            case 'b':
+                self.calibrateAxisLen(y = True)
+            case 'n':
+                self.calibrateAxisLen(z = True)
             case 'e':
                 self.electronicStop()
             case 'E':
@@ -136,7 +155,7 @@ class KeyboardTeleOp(Node):
         msgSplit = (msg.data).split(' ')
         reportCode = msgSplit[0]
         if reportCode == 'R21' or reportCode == 'R23':
-            self.params_.set_value(param = int(msgSplit[1][1:]), value = int(msgSplit[2][1:]))
+            self.params_.set_value(param = int(msgSplit[1][1:]), value = int(float(msgSplit[2][1:])))
         # if reportCode == 'R00':
         #     self.curr_farmbot_state_ = IDLE
         # if reportCode == 'R01':
