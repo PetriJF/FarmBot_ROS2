@@ -16,7 +16,7 @@ class KeyboardTeleOp(Node):
         self.get_logger().info("Keyboard Controller Initialized..")
 
     def checkKeyPress(self):
-        validKeys = ('e', 'E', 'w', 'a', 's', 'd', '0', '1', '2', '3', 'h', 'c', 'v', 'b', 'n', 'o', 'i', 'j', 'k', 'l', 'fh')
+        validKeys = ('e', 'E', 'w', 'a', 's', 'd', '1', '2', '3', 'h', 'c', 'v', 'b', 'n', 'o', 'i', 'j', 'k', 'l', 'fh', 't', 'r')
         userInput = input("\nEnter command: ")
 
         if userInput in validKeys:
