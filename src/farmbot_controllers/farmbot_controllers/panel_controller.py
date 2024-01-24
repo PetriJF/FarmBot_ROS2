@@ -62,6 +62,8 @@ class PanelController(Node):
         # Log the initialization
         self.get_logger().info("Panel Controller Initialized..")
 
+    ### Verifying user input for E_STOPS and RESETS
+
     def cmdCallback(self, cmd = String):
         if cmd.data == 'e':
             self.callLEDPanel(FBPanel.ESTOP_LED, FBPanel.OFF)
@@ -76,7 +78,7 @@ class PanelController(Node):
 
         self.inputPub_.publish(cmd)
 
-    ###
+    ### Service Server
 
     def ledHandlerCallback(self, request, response):
         # Check if the LED Pin is correct
@@ -110,7 +112,7 @@ class PanelController(Node):
         if led_pin in self.ledsToFlash_:
             self.ledsToFlash_.remove(led_pin)
 
-    ###
+    ### Service Client
 
     def callLEDPanel(self, led_pin, state):
         client = self.create_client(LedPanelHandler, 'set_led')
@@ -132,7 +134,7 @@ class PanelController(Node):
         except Exception as e:
             self.get_logger().error("Service call failed %r" % (e, ))
 
-    ###
+    ### LED states for the panel
 
     def ledFlasher(self):
         for led_pin in self.ledsToFlash_:

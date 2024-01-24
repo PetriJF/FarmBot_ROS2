@@ -33,30 +33,53 @@ class UARTController(Node):
         serialPort = '/dev/ttyACM0'
         serialSpeed = 115200
         checkUartFreq = 100
+        txFreq = 10
 
         # UART receive publisher
         self.uartRxPub_ = self.create_publisher(String, 'uart_receive', 10)
 
         # Node subscripters and publishers
+        self.txBlocker_ = False
+        self.txQueue_ = []
         self.uartTxSub_ = self.create_subscription(String, 'uart_transmit', self.uartTransmitCallback, 10)
         
         # Initialize Serial Communication
         self.ser_ = serial.Serial(serialPort, serialSpeed, timeout=1)
         self.ser_.reset_input_buffer()
         # Create a timer to periodically check for incoming serial messages
-        self.timer = self.create_timer(1.0 / checkUartFreq, self.uartReceive)
+        self.rxTimer_ = self.create_timer(1.0 / checkUartFreq, self.uartReceive)
+        self.txTimer_ = self.create_timer(1.0 / txFreq, self.uartTransmit)
+
+
 
         # Log the initialization
         self.get_logger().info("State Controller Initialized..")
 
-    def uartTransmitCallback(self, message = String):
-        if message.data[-1] != '\n':
-            message.data += "\n"
+    def uartTransmit(self):
+        if not self.txBlocker_ and self.txQueue_:
+            self.txBlocker_ = True
+            message = self.txQueue_.pop(0)
+            
+            if message[-1] != '\n':
+                message += "\n"
         
-        self.log_uart(transmit = True, cmd = message)
-        self.get_logger().info(f"Sent message: {message.data}")
-        self.ser_.write(message.data.encode('utf-8'))
-        time.sleep(0.1)
+
+            self.log_uart(transmit = True, cmd = message)
+            self.get_logger().info(f"Sent message: {message}")
+            self.ser_.write(message.encode('utf-8'))
+
+    def uartTransmitCallback(self, message = String):
+        if message.data in ['E', 'F09', '@']:
+            self.get_logger().info(f"Sent message: {message.data}")
+            
+            if message.data[-1] != '\n':
+                message.data += "\n"
+
+            self.ser_.write(message.data.encode('utf-8'))
+            self.txQueue_.clear()
+            self.txBlocker_ = False
+        else:
+            self.txQueue_.append(message.data)
 
     def uartReceive(self):
         line = self.ser_.readline().decode('utf-8').rstrip()
@@ -69,6 +92,11 @@ class UARTController(Node):
 
     def handle_message(self, message):
         self.uart_cmd_.data = message
+        
+        reportCode = (message).split(' ')[0]
+        if reportCode in ['R08', 'R02', 'R03']:
+            self.txBlocker_ = False
+        
         self.uartRxPub_.publish(self.uart_cmd_)
         
         self.log_uart(receive = True, cmd = message)

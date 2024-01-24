@@ -1,0 +1,5 @@
+string data
+---
+bool success
+string cmd
+int64 value

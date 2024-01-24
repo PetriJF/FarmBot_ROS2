@@ -3,20 +3,15 @@ import rclpy
 from rclpy.node import Node
 from farmbot_interfaces.msg import GantryCommand, HomeCommand, ParameterCommand, StateCommand
 from std_msgs.msg import String
+from farmbot_interfaces.msg import ParameterList
+from farmbot_interfaces.srv import ParameterConfig, LoadParamConfig
 
-from . utils.parameterList import *
-from . utils.parameterValues import ParameterValues
-from . utils.farmbotStates import *
+import time
 
 class KeyboardTeleOp(Node):
     # Node contructor
     def __init__(self):
         super().__init__("FarmBotController")
-
-        self.curr_farmbot_state_ = IDLE
-        self.command_queue = []
-
-        self.publisherTimer_ = self.create_timer(0.2, self.masterPublisher)
 
         # Memory
         self.cur_x_ = 0.0
@@ -41,9 +36,6 @@ class KeyboardTeleOp(Node):
         self.cur_increment_ = 10.0
         self.inputSub_ = self.create_subscription(String, 'input_topic', self.commandInterpretationCallback, 10)
 
-        #
-        self.params_ = ParameterValues()
-
         # UART Rx Subscriber
         self.uartRxSub_ = self.create_subscription(String, 'uart_receive', self.farmbotFeedbackCallback, 10)
 
@@ -55,22 +47,6 @@ class KeyboardTeleOp(Node):
 
         # Log the initialization
         self.get_logger().info("Farmbot Controller Initialized..")
-
-    def masterPublisher(self):
-        if self.curr_farmbot_state_ == IDLE and self.command_queue:
-            type, cmd = self.command_queue.pop(0)  # get the oldest message from the queue
-
-            self.get_logger().info("publishing")
-
-            self.curr_farmbot_state_ = CMD_STARTED
-            
-            if type == GANTRY_CONF_CMD:
-                self.gantryConfPub_.publish(cmd)
-            if type == GANTRY_MOVE_CMD:
-                self.gantryMovePub_.publish(cmd)
-
-    def addToPublishQueue(self, type, cmd):
-        self.command_queue.append((type, cmd))
 
     def commandInterpretationCallback(self, cmd = String):
         match cmd.data:
@@ -93,51 +69,124 @@ class KeyboardTeleOp(Node):
                 self.cur_y_ += self.cur_increment_
                 self.moveGantryAbsolute(x_coord = self.cur_x_, y_coord = self.cur_y_ + self.cur_increment_, z_coord = self.cur_z_)
             case 'i':
-                self.writeParam(ENCODER_ENABLED_X, 1)
-                self.writeParam(ENCODER_ENABLED_Y, 1)
-                self.writeParam(ENCODER_ENABLED_Z, 1)
+                # self.writeParam(MOVEMENT_KEEP_ACTIVE_X, 1)*
+                # self.writeParam(MOVEMENT_KEEP_ACTIVE_Y, 1)*
+                # self.writeParam(MOVEMENT_KEEP_ACTIVE_Z, 1)*
+                # time.sleep(0.1)
+                # #self.writeParam(MOVEMENT_HOME_UP_Y, 1)*
+                # time.sleep(0.1)
+                # self.writeParam(ENCODER_ENABLED_X, 1)*
+                # self.writeParam(ENCODER_ENABLED_Y, 1)*
+                # self.writeParam(ENCODER_ENABLED_Z, 1)*
+                # time.sleep(0.1)
+                # self.writeParam(ENCODER_TYPE_X, 1)*
+                # self.writeParam(ENCODER_TYPE_Y, 1)*
+                # self.writeParam(ENCODER_TYPE_Z, 1)*
+                # time.sleep(0.1)
+                # self.writeParam(ENCODER_USE_FOR_POS_X, 1)*
+                # self.writeParam(ENCODER_USE_FOR_POS_Y, 1)*
+                # self.writeParam(ENCODER_USE_FOR_POS_Z, 1)*
+                # time.sleep(0.1)
+                # time.sleep(0.1)
+                # self.writeParam(MOVEMENT_CALIBRATION_RETRY_X, 1)*
+                # self.writeParam(MOVEMENT_CALIBRATION_RETRY_Y, 1)*
+                # self.writeParam(MOVEMENT_CALIBRATION_RETRY_Z, 1)*
+                # time.sleep(0.1)
+                # self.writeParam(MOVEMENT_CALIBRATION_DEADZONE_X, 15)*
+                # self.writeParam(MOVEMENT_CALIBRATION_DEADZONE_Y, 15)*
+                # self.writeParam(MOVEMENT_CALIBRATION_DEADZONE_Z, 15)*
+                # time.sleep(0.1)
+                # self.writeParam(PARAM_CONFIG_OK, 1)*
 
-                self.writeParam(MOVEMENT_KEEP_ACTIVE_X, 1)
-                self.writeParam(MOVEMENT_KEEP_ACTIVE_Y, 1)
-                self.writeParam(MOVEMENT_KEEP_ACTIVE_Z, 1)
-
-                self.writeParam(MOVEMENT_INVERT_MOTOR_Y, 1)
-                self.writeParam(ENCODER_INVERT_Y, 1)
-                
-                self.writeParam(ENCODER_USE_FOR_POS_X, 1)
-                self.writeParam(ENCODER_USE_FOR_POS_Y, 1)
-                self.writeParam(ENCODER_USE_FOR_POS_Z, 1)
-
-                self.writeParam(PARAM_CONFIG_OK, 1)
+                self.configLoaderClient(standard = False, ver = "labFB")
             case 'h': 
                 self.goHome()
-            case 'c':
+            case 'j':
+                self.findAxisHome(x = True)
+            case 'k':
+                self.findAxisHome(y = True)
+            case 'l':
+                self.findAxisHome(z = True)
+            case 'fh':
                 self.findAllHomes()
+            case 'c':
+                self.calibrateAllLens()
+            case 'v':
+                self.calibrateAxisLen(x = True)
+            case 'b':
+                self.calibrateAxisLen(y = True)
+            case 'n':
+                self.calibrateAxisLen(z = True)
             case 'e':
                 self.electronicStop()
             case 'E':
                 self.resetElectronicStop()
+            case 't':
+                self.parameterConfigClient(cmd = 'SAVE')
+            
 
     ## UART Handling Callback
     def farmbotFeedbackCallback(self, msg = String):
         msgSplit = (msg.data).split(' ')
         reportCode = msgSplit[0]
-        if reportCode == 'R21' or reportCode == 'R23':
-            self.params_.set_value(param = int(msgSplit[1][1:]), value = int(msgSplit[2][1:]))
-        if reportCode == 'R00':
-            self.curr_farmbot_state_ = IDLE
-        if reportCode == 'R01':
-            self.curr_farmbot_state_ = CMD_STARTED
-        if reportCode == 'R02':
-            self.curr_farmbot_state_ = CMD_FINISHED_SUCCESS
-        if reportCode == 'R03':
-            self.curr_farmbot_state_ = CMD_FINISHED_ERROR
-            self.get_logger().info(msg.data)
+        #if reportCode == 'R21' or reportCode == 'R23':
+        #    self.parameterConfigClient(cmd = msg.data)
         if reportCode == 'R82':
             self.cur_x_ = float(msgSplit[1][1:])
             self.cur_y_ = float(msgSplit[2][1:])
             self.cur_z_ = float(msgSplit[3][1:])
+    
+    ## Parameter Loading Service Client
+    def configLoaderClient(self, standard = True, ver = ""):
+        if not standard and ver == "":
+            self.get_logger().warn("Can't set non standard configuration if the version of the farmbot is not set!")
         
+        client = self.create_client(LoadParamConfig, 'load_param_config')
+        while not client.wait_for_service(1.0):
+            self.get_logger().warn("Waiting for Parameter Loading Server...")
+        
+        request = LoadParamConfig.Request()
+        request.standard = standard
+        request.ver = ver
+
+        future = client.call_async(request = request)
+        future.add_done_callback(self.callbackConfigLoading)
+
+    def callbackConfigLoading(self, future):
+        try:
+            response = future.result()
+            if not response:
+                self.get_logger().warn("Failure in Parameter Config Loading!")
+            
+            ## TODO: Add a response to the future
+        except Exception as e:
+            self.get_logger().error("Service call failed %r" % (e, ))
+
+    ## Parameter Config Service Client
+    def parameterConfigClient(self, cmd = String):
+        client = self.create_client(ParameterConfig, 'manage_param_config')
+        while not client.wait_for_service(1.0):
+            self.get_logger().warn("Waiting for Parameter Config Server...")
+
+        request = ParameterConfig.Request()
+        request.data = cmd
+
+        future = client.call_async(request = request)
+        future.add_done_callback(self.callbackParamConfig)
+
+    def callbackParamConfig(self, future):
+        try:
+            response = future.result()
+            if not response:
+                self.get_logger().warn("Failure in Parameter Config Handling!")
+            
+            ## TODO: Add a response to the future
+
+        except Exception as e:
+            self.get_logger().error("Service call failed %r" % (e, ))
+
+
+
 
     ## State handling functions
     
@@ -282,8 +331,7 @@ class KeyboardTeleOp(Node):
         self.gantryConf_.y = y_axis
         self.gantryConf_.z = z_axis
 
-        #self.gantryConfPub_.publish(self.gantryConf_)
-        self.addToPublishQueue(GANTRY_CONF_CMD, self.gantryConf_)
+        self.gantryConfPub_.publish(self.gantryConf_)
 
     ## Gantry Movement Functions
 
@@ -349,8 +397,7 @@ class KeyboardTeleOp(Node):
         self.gantryMove_.b = y_speed
         self.gantryMove_.c = z_speed
 
-        self.addToPublishQueue(GANTRY_MOVE_CMD, self.gantryMove_)
-        #self.gantryMovePub_.publish(self.gantryMove_)
+        self.gantryMovePub_.publish(self.gantryMove_)
     
     ## Parameter Handling Commands
 

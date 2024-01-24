@@ -5,8 +5,14 @@ from launch.actions import RegisterEventHandler
 from launch.events.process import ProcessStarted
 from launch.event_handlers.on_process_start import OnProcessStart
 
+import time
+
 def generate_launch_description():
-    ld = LaunchDescription()
+    param_conf_srv_node = Node(
+        package = 'farmbot_controllers',
+        executable = 'param_conf_server',
+        name = 'param_conf_server'
+    )
 
     panel_node = Node(
         package = 'farmbot_controllers',
@@ -49,11 +55,14 @@ def generate_launch_description():
     def start_next_node(event: ProcessStarted, context: LaunchContext):
         print(f'node {event.process_name} started.')
         already_started_nodes.update([event.process_name])
-        if len(already_started_nodes) == 5:
+        if len(already_started_nodes) == 6:
             print(f'all required nodes are up, starting uart_controller')
+            time.sleep(2)
             return uart_ctrl_node
 
     return LaunchDescription([
+        RegisterEventHandler(event_handler = OnProcessStart(target_action = param_conf_srv_node,
+                                                            on_start = start_next_node)),
         RegisterEventHandler(event_handler = OnProcessStart(target_action = panel_node,
                                                             on_start = start_next_node)),
         RegisterEventHandler(event_handler = OnProcessStart(target_action = controller_node,
@@ -64,6 +73,7 @@ def generate_launch_description():
                                                             on_start = start_next_node)),
         RegisterEventHandler(event_handler = OnProcessStart(target_action = device_interp_node,
                                                             on_start = start_next_node)),
+        param_conf_srv_node,
         panel_node,
         controller_node,
         motor_interp_node,
