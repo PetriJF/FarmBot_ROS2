@@ -3,7 +3,7 @@ import rclpy
 from rclpy.node import Node
 from farmbot_interfaces.msg import GantryCommand, HomeCommand, ParameterCommand, StateCommand
 from std_msgs.msg import String
-from farmbot_interfaces.msg import ParameterList
+from farmbot_interfaces.msg import ParameterList, MapCommand, PlantManage
 from farmbot_interfaces.srv import ParameterConfig, LoadParamConfig
 
 import time
@@ -45,17 +45,18 @@ class KeyboardTeleOp(Node):
         self.statePub_ = self.create_publisher(StateCommand, 'state_command', 10)
         self.paramCmdPub_ = self.create_publisher(ParameterCommand, 'parameter_command', 10)
 
+        # Map publishers
+        self.plantMngPub_ = self.create_publisher(PlantManage, 'plant_mng', 10)
+
         # Log the initialization
         self.get_logger().info("Farmbot Controller Initialized..")
 
     def commandInterpretationCallback(self, cmd = String):
         match cmd.data:
-            case '1':
-                self.cur_increment_ = 10.0
-            case '2':
-                self.cur_increment_ = 100.0
-            case '3':
-                self.cur_increment_ = 500.0
+            case 'e':
+                self.electronicStop()
+            case 'E':
+                self.resetElectronicStop()
             case 'w':
                 self.cur_x_ += self.cur_increment_
                 self.moveGantryAbsolute(x_coord = self.cur_x_ + self.cur_increment_, y_coord = self.cur_y_, z_coord = self.cur_z_)
@@ -68,7 +69,37 @@ class KeyboardTeleOp(Node):
             case 'd':
                 self.cur_y_ += self.cur_increment_
                 self.moveGantryAbsolute(x_coord = self.cur_x_, y_coord = self.cur_y_ + self.cur_increment_, z_coord = self.cur_z_)
+            case '1':
+                self.cur_increment_ = 10.0
+            case '2':
+                self.cur_increment_ = 100.0
+            case '3':
+                self.cur_increment_ = 500.0
             case 'i':
+                self.configLoaderClient(standard = False, ver = "labFB")
+            case 'h': 
+                self.goHome()
+            case 'j':
+                self.findAxisHome(x = True)
+            case 'k':
+                self.findAxisHome(y = True)
+            case 'l':
+                self.findAxisHome(z = True)
+            case 'fh':
+                self.findAllHomes()
+            case 'c':
+                self.calibrateAllLens()
+            case 'v':
+                self.calibrateAxisLen(x = True)
+            case 'b':
+                self.calibrateAxisLen(y = True)
+            case 'n':
+                self.calibrateAxisLen(z = True)
+            case 'o':
+                self.parameterConfigClient(cmd = 'SAVE')
+            case 'p':
+                self.parameterConfigClient(cmd = 'MAP')
+
                 # self.writeParam(MOVEMENT_KEEP_ACTIVE_X, 1)*
                 # self.writeParam(MOVEMENT_KEEP_ACTIVE_Y, 1)*
                 # self.writeParam(MOVEMENT_KEEP_ACTIVE_Z, 1)*
@@ -98,32 +129,6 @@ class KeyboardTeleOp(Node):
                 # time.sleep(0.1)
                 # self.writeParam(PARAM_CONFIG_OK, 1)*
 
-                self.configLoaderClient(standard = False, ver = "labFB")
-            case 'h': 
-                self.goHome()
-            case 'j':
-                self.findAxisHome(x = True)
-            case 'k':
-                self.findAxisHome(y = True)
-            case 'l':
-                self.findAxisHome(z = True)
-            case 'fh':
-                self.findAllHomes()
-            case 'c':
-                self.calibrateAllLens()
-            case 'v':
-                self.calibrateAxisLen(x = True)
-            case 'b':
-                self.calibrateAxisLen(y = True)
-            case 'n':
-                self.calibrateAxisLen(z = True)
-            case 'e':
-                self.electronicStop()
-            case 'E':
-                self.resetElectronicStop()
-            case 't':
-                self.parameterConfigClient(cmd = 'SAVE')
-            
 
     ## UART Handling Callback
     def farmbotFeedbackCallback(self, msg = String):
@@ -135,6 +140,7 @@ class KeyboardTeleOp(Node):
             self.cur_x_ = float(msgSplit[1][1:])
             self.cur_y_ = float(msgSplit[2][1:])
             self.cur_z_ = float(msgSplit[3][1:])
+        
     
     ## Parameter Loading Service Client
     def configLoaderClient(self, standard = True, ver = ""):
@@ -184,9 +190,6 @@ class KeyboardTeleOp(Node):
 
         except Exception as e:
             self.get_logger().error("Service call failed %r" % (e, ))
-
-
-
 
     ## State handling functions
     
@@ -248,7 +251,6 @@ class KeyboardTeleOp(Node):
         self.state_.rep_sw_ver = rep_sw_ver
 
         self.statePub_.publish(self.state_)
-
 
     ## Calibration and Homing Functions
 
@@ -465,8 +467,9 @@ def main(args = None):
     try:
         rclpy.spin(keyboardTeleOpNode)
     except KeyboardInterrupt:
-        pass
+        keyboardTeleOpNode.destroy_node()
 
+    keyboardTeleOpNode.destroy_node()
     rclpy.shutdown()
 
 if __name__ == '__main__':

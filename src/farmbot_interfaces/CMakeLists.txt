@@ -20,9 +20,12 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ParameterCommand.msg"
   "msg/StateCommand.msg"
   "msg/StatusCommand.msg"
+  "msg/PlantManage.msg"
+  "msg/MapCommand.msg"
   "srv/LedPanelHandler.srv"
   "srv/ParameterConfig.srv"
   "srv/LoadParamConfig.srv"
+  "srv/MapInfo.srv"
 )
 
 ament_package()
