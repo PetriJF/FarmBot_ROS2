@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from farmbot_interfaces.msg import ParameterList
+from farmbot_interfaces.msg import ParameterList, MapCommand
 from ament_index_python.packages import get_package_share_directory
 
 import os
@@ -155,6 +155,10 @@ class ConfigServer(Node):
         # UART Rx Subscriber
         self.uartRxSub_ = self.create_subscription(String, 'uart_receive', self.farmbotFeedbackCallback, 10)
 
+        # Map updating publisher
+        self.mapCommand_ = MapCommand()
+        self.mapCmdPub_ = self.create_publisher(MapCommand, 'map_cmd', 10)
+
         # Log the initialization
         self.get_logger().info("Config Server Initialized..")
 
@@ -270,10 +274,27 @@ class ConfigServer(Node):
         # Requests with non farmbot commands
         if code == 'S': # Format S PARAM_INDEX PARAM_VALUE. e.g. S 2 1
             self.set_value(msgSplit[1], msgSplit[2])
-            response.value = 0
+            
             return response
         if code == 'G':
             response.value = self.get_value(msgSplit[1])
+            return response
+        if code == 'MAP':
+            response.value = 0
+            self.mapCommand_.sort = False
+            self.mapCommand_.reindex = False
+            self.mapCommand_.back_up = False
+            self.mapCommand_.update = True
+            self.mapCommand_.update_info = [
+                'X ' + str(self.parameterValues[ParameterList.MOVEMENT_AXIS_NR_STEPS_X] / 
+                                self.parameterValues[ParameterList.MOVEMENT_STEP_PER_MM_X]),
+                'Y ' + str(self.parameterValues[ParameterList.MOVEMENT_AXIS_NR_STEPS_Y] / 
+                                self.parameterValues[ParameterList.MOVEMENT_STEP_PER_MM_Y]),
+                'Z ' + str(self.parameterValues[ParameterList.MOVEMENT_AXIS_NR_STEPS_Z] / 
+                                self.parameterValues[ParameterList.MOVEMENT_STEP_PER_MM_Z]),
+            ]
+            
+            self.mapCmdPub_.publish(self.mapCommand_)
             return response
         if code == 'SAVE':
             response.value = 0

@@ -44,6 +44,12 @@ def generate_launch_description():
         name = 'device_command_handler'
     )
 
+    map_ctrl_node = Node(
+        package = 'map_handler',
+        executable = 'map_controller',
+        name = 'map_controller'
+    )
+
     uart_ctrl_node = Node(
         package = 'farmbot_command_handler',
         executable = 'uart_controller',
@@ -55,7 +61,7 @@ def generate_launch_description():
     def start_next_node(event: ProcessStarted, context: LaunchContext):
         print(f'node {event.process_name} started.')
         already_started_nodes.update([event.process_name])
-        if len(already_started_nodes) == 6:
+        if len(already_started_nodes) == 7:
             print(f'all required nodes are up, starting uart_controller')
             time.sleep(2)
             return uart_ctrl_node
@@ -73,12 +79,15 @@ def generate_launch_description():
                                                             on_start = start_next_node)),
         RegisterEventHandler(event_handler = OnProcessStart(target_action = device_interp_node,
                                                             on_start = start_next_node)),
+        RegisterEventHandler(event_handler = OnProcessStart(target_action = map_ctrl_node,
+                                                            on_start = start_next_node)),
         param_conf_srv_node,
         panel_node,
         controller_node,
         motor_interp_node,
         state_interp_node,
         device_interp_node,
+        map_ctrl_node,
     ])
 
 if __name__ == '__main__':
