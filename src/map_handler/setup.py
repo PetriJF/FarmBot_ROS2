@@ -13,6 +13,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'config'), [os.path.join(package_name, 'config', 'plant_reference.yaml')]),
         (os.path.join('share', package_name, 'config'), [os.path.join(package_name, 'config', 'map_references.yaml')]),
+        (os.path.join('share', package_name, 'config'), [os.path.join(package_name, 'config', 'tool_reference.yaml')]),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

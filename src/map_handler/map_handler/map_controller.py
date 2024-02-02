@@ -2,15 +2,20 @@ import rclpy
 from rclpy.node import Node
 from ament_index_python.packages import get_package_share_directory
 from farmbot_interfaces.msg import MapCommand, PlantManage
-from farmbot_interfaces.srv import MapInfo
-#from farmbot_interfaces.srv import MapInfo, PlantRep
+from farmbot_interfaces.srv import StringRepReq
+
+from map_handler.tool_exchange import ToolDetails, ToolExchanger
 
 import os
 import yaml
+import copy
 
 class MapController(Node):
     def __init__(self):
         super().__init__("MapController")
+
+        self.safe_z_increment_ = 50.0
+
 
         # Relevant directory and file names
         self.directory_ = os.path.join(
@@ -20,23 +25,31 @@ class MapController(Node):
         self.plantRefFile_ = 'plant_reference.yaml'
         self.mapRefFile_ = 'map_references.yaml'
         self.activeMap_ = 'active_map.yaml'
-
-
+        toolRefFile_ = 'tool_reference.yaml'
 
         # Loading the map instance from memory
         self.map_instance_ = self.retrieveMap(directory = self.directory_,
                                               fileName1 = self.activeMap_,
                                               fileName2 = self.mapRefFile_)
+        
+        # Loading the tool exhanging module and the tool command object
+        self.tool_exchanger_ = ToolExchanger(node = self, 
+                                             map_max_x = self.map_instance_['map_reference']['x_len'],
+                                             map_max_y = self.map_instance_['map_reference']['y_len'],
+                                             map_max_z = -self.map_instance_['map_reference']['z_len'])
+        self.tool_details_ = ToolDetails()
+
         # Loading the plant referencing method
         self.plantReference_ = self.load_from_yaml(self.directory_, self.plantRefFile_)
+        # Loading the tool referencing method
+        self.tool_reference_ = self.load_from_yaml(self.directory_, toolRefFile_)
 
         # MapCommand subscriber
         self.mapCmdSub_ = self.create_subscription(MapCommand, 'map_cmd', self.mapCmdCallback, 10)
         # Plant Manager Command Subscriber
         self.plantMngSub_ = self.create_subscription(PlantManage, 'plant_mng', self.plantMngCallback, 10)
         # Map information service server
-        self.mapInfoServer_ = self.create_service(MapInfo, 'map_info', self.mapInfoServer)
-
+        self.mapInfoServer_ = self.create_service(StringRepReq, 'map_cmd', self.map_command_server)
 
         self.get_logger().info("Map Controller Initialized")
 
@@ -57,11 +70,25 @@ class MapController(Node):
         if cmd.update:
             for update in cmd.update_info:
                 cmdSplit = update.split(' ')
+                # Updating the map dimensions
                 match cmdSplit[0]:
-                    case 'X': self.map_instance_['map_reference']['x_len'] = float(cmdSplit[1])
-                    case 'Y': self.map_instance_['map_reference']['y_len'] = float(cmdSplit[1])
-                    case 'Z': self.map_instance_['map_reference']['z_len'] = float(cmdSplit[1])
-                    case _: self.get_logger().warn(f"Command ({update}) not recognized and ignored!")
+                    case 'X': 
+                        self.map_instance_['map_reference']['x_len'] = float(cmdSplit[1])
+                        self.tool_exchanger_.map_max_x = float(cmdSplit[1])
+                    case 'Y': 
+                        self.map_instance_['map_reference']['y_len'] = float(cmdSplit[1])
+                        self.tool_exchanger_.map_max_y = float(cmdSplit[1])
+                    case 'Z': 
+                        self.map_instance_['map_reference']['z_len'] = float(cmdSplit[1])
+                        self.tool_exchanger_.map_max_z = float(cmdSplit[1])
+                    case _: 
+                        self.get_logger().warn(f"Command ({update}) not recognized and ignored!")
+            
+            self.tool_exchanger_ = ToolExchanger(node = self, 
+                                                 map_max_x = self.map_instance_['map_reference']['x_len'],
+                                                 map_max_y = self.map_instance_['map_reference']['y_len'],
+                                                 map_max_z = -self.map_instance_['map_reference']['z_len'])
+
             self.save_to_yaml(self.map_instance_, self.directory_, self.activeMap_, createIfNotExisting = True)
         if cmd.back_up:
             pass
@@ -119,13 +146,71 @@ class MapController(Node):
     ## Map Info Server
 
     # TODO: Add functionality
-    def mapInfoServer(self, request, response):
-        response.item_count = 0
-        response.x = [0]
-        response.y = [0]
-        response.z = [0]
+    def map_command_server(self, request, response):
+        type = request.data[0]
+        # Tool Command Type
+        if type == 'T':
+            response.data = self.tool_cmd_interpreter(request.data)
         
         return response
+
+    def tool_cmd_interpreter(self, msg = str):  
+        elem = msg.split('_')
+        index = elem[1]
+        cmd = int(elem[2][0])
+
+        # Setting up a new tool
+        if cmd == 0:
+            self.add_tool(msg, index)
+            return "T_x_0 SUCCESS"
+        if cmd == 1 or cmd == 2:
+            self.tool_details_.x_pos = self.map_instance_['map_reference']['tools']['T' + index]['position']['x']
+            self.tool_details_.y_pos = self.map_instance_['map_reference']['tools']['T' + index]['position']['y']
+            self.tool_details_.z_pos = self.map_instance_['map_reference']['tools']['T' + index]['position']['z']
+            self.tool_details_.z_safe_inc = self.safe_z_increment_
+            [self.tool_details_.release_x_inc, self.tool_details_.release_y_inc] = \
+                    self.get_release_direction(self.map_instance_['map_reference']['tools']['T' + index]['release_dir'])
+        
+            self.get_logger().info(f"Mounting {self.map_instance_['map_reference']['tools']['T' + index]['name']}")
+
+            if cmd == 1:
+                return self.tool_exchanger_.mount_tool(self.tool_details_)
+            else:
+                return self.tool_exchanger_.unmount_tool(self.tool_details_)
+        
+        # Check if the tool command request is valid
+
+        # Start the appropriate command
+        self.get_logger().warn(f"Unrecognized command {str(msg)}")
+        return "UNRECOGNIZED"
+
+    def add_tool(self, msg = str, index = str):
+        tool_ref = copy.deepcopy(self.tool_reference_)
+        
+        info = msg.split('\n')
+        tool_ref['name'] = info[1]
+        pos = info[2].split(' ')
+        tool_ref['position']['x'] =  float(pos[0])
+        tool_ref['position']['y'] =  float(pos[1])
+        tool_ref['position']['z'] =  float(pos[2])
+        tool_ref['release_dir'] =  int(pos[3])
+
+        self.map_instance_['map_reference']['tools']['T' + index] = tool_ref
+        self.get_logger().info(str(self.map_instance_))
+        self.save_to_yaml(self.map_instance_, self.directory_, self.activeMap_, createIfNotExisting = True)
+
+    def get_release_direction(self, dir = int):
+        if dir < 1 or dir > 4: 
+            self.get_logger().error("Release direction for the tool unrecognized! Check configuration!")
+            return
+        if dir == 1:
+            return [-100.0, 0.0]
+        if dir == 1:
+            return [100.0, 0.0]
+        if dir == 1:
+            return [0.0, -100.0]
+        if dir == 1:
+            return [0.0, 100.0]
 
     def save_to_yaml(self, data = dict, path = '', fileName = '', createIfNotExisting = False):
         if not isinstance(data, dict):

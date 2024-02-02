@@ -4,7 +4,7 @@ from rclpy.node import Node
 from farmbot_interfaces.msg import GantryCommand, HomeCommand, ParameterCommand, StateCommand
 from std_msgs.msg import String
 from farmbot_interfaces.msg import ParameterList, MapCommand, PlantManage
-from farmbot_interfaces.srv import ParameterConfig, LoadParamConfig
+from farmbot_interfaces.srv import ParameterConfig, LoadParamConfig, StringRepReq
 
 import time
 
@@ -99,35 +99,42 @@ class KeyboardTeleOp(Node):
                 self.parameterConfigClient(cmd = 'SAVE')
             case 'p':
                 self.parameterConfigClient(cmd = 'MAP')
+            case 'T10': # new tool marked
+                self.tool_exchange_client(cmd = "T_1_0\nSeeder\n1198.0 332.4 -240.0 1")
+            case 'T11':
+                self.tool_exchange_client(cmd = "T_1_1")
+            case 'T12':
+                self.tool_exchange_client(cmd = "T_1_2")
+            case 'T30': # new tool marked
+                self.tool_exchange_client(cmd = "T_3_0\nWater\n1198.0 532.2 -240.0 1")
+            case 'T31':
+                self.tool_exchange_client(cmd = "T_3_1")
+            case 'T32':
+                self.tool_exchange_client(cmd = "T_3_2")
 
-                # self.writeParam(MOVEMENT_KEEP_ACTIVE_X, 1)*
-                # self.writeParam(MOVEMENT_KEEP_ACTIVE_Y, 1)*
-                # self.writeParam(MOVEMENT_KEEP_ACTIVE_Z, 1)*
-                # time.sleep(0.1)
-                # #self.writeParam(MOVEMENT_HOME_UP_Y, 1)*
-                # time.sleep(0.1)
-                # self.writeParam(ENCODER_ENABLED_X, 1)*
-                # self.writeParam(ENCODER_ENABLED_Y, 1)*
-                # self.writeParam(ENCODER_ENABLED_Z, 1)*
-                # time.sleep(0.1)
-                # self.writeParam(ENCODER_TYPE_X, 1)*
-                # self.writeParam(ENCODER_TYPE_Y, 1)*
-                # self.writeParam(ENCODER_TYPE_Z, 1)*
-                # time.sleep(0.1)
-                # self.writeParam(ENCODER_USE_FOR_POS_X, 1)*
-                # self.writeParam(ENCODER_USE_FOR_POS_Y, 1)*
-                # self.writeParam(ENCODER_USE_FOR_POS_Z, 1)*
-                # time.sleep(0.1)
-                # time.sleep(0.1)
-                # self.writeParam(MOVEMENT_CALIBRATION_RETRY_X, 1)*
-                # self.writeParam(MOVEMENT_CALIBRATION_RETRY_Y, 1)*
-                # self.writeParam(MOVEMENT_CALIBRATION_RETRY_Z, 1)*
-                # time.sleep(0.1)
-                # self.writeParam(MOVEMENT_CALIBRATION_DEADZONE_X, 15)*
-                # self.writeParam(MOVEMENT_CALIBRATION_DEADZONE_Y, 15)*
-                # self.writeParam(MOVEMENT_CALIBRATION_DEADZONE_Z, 15)*
-                # time.sleep(0.1)
-                # self.writeParam(PARAM_CONFIG_OK, 1)*
+    ## Tool Handling Client
+    def tool_exchange_client(self, cmd = str):
+        client = self.create_client(StringRepReq, 'map_cmd')
+        while not client.wait_for_service(1.0):
+            self.get_logger().warn("Waiting for Parameter Loading Server...")
+        
+        request = StringRepReq.Request()
+        request.data = cmd
+
+        future = client.call_async(request = request)
+        future.add_done_callback(self.tool_cmd_sequence_callback)
+
+    def tool_cmd_sequence_callback(self, future):
+        #self.get_logger().info(f"AAAAAAAAAAAA")
+        #self.get_logger().info(future.result().data)
+        
+        cmd = future.result().data.split('\n')
+        if cmd[0][:2] == 'CC':
+            for mvm in cmd[1:]:
+                coords = mvm.split(' ')
+                self.moveGantryAbsolute(x_coord = float(coords[0]), 
+                                        y_coord = float(coords[1]), 
+                                        z_coord = float(coords[2]))
 
 
     ## UART Handling Callback
