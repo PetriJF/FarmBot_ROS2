@@ -1,0 +1,8 @@
+name: ''        # The name of the tool
+position:       # The position of the tool
+  x: 0
+  y: 0
+  z: 0
+release_dir: 0  # The direction of the release.
+                # 1 - x neg, 2 - x pos,
+                # 3 - y neg, 4 - y pos

@@ -25,7 +25,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/LedPanelHandler.srv"
   "srv/ParameterConfig.srv"
   "srv/LoadParamConfig.srv"
-  "srv/MapInfo.srv"
+  "srv/StringRepReq.srv"
 )
 
 ament_package()

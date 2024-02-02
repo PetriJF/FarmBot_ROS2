@@ -50,7 +50,7 @@ class UARTController(Node):
         self.rxTimer_ = self.create_timer(1.0 / checkUartFreq, self.uartReceive)
         self.txTimer_ = self.create_timer(1.0 / txFreq, self.uartTransmit)
 
-
+        self.previous_cmd_ = ''
 
         # Log the initialization
         self.get_logger().info("State Controller Initialized..")
@@ -63,7 +63,7 @@ class UARTController(Node):
             if message[-1] != '\n':
                 message += "\n"
         
-
+            self.previous_cmd_ = message.split(' ')[0]
             self.log_uart(transmit = True, cmd = message)
             self.get_logger().info(f"Sent message: {message}")
             self.ser_.write(message.encode('utf-8'))
@@ -91,10 +91,13 @@ class UARTController(Node):
             self.handle_message(line)
 
     def handle_message(self, message):
+        movement_cmds = ['G00', 'G01', 'G28', 'F11', 'F12', 'F13',
+                         'F14', 'F15', 'F16']
         self.uart_cmd_.data = message
         
         reportCode = (message).split(' ')[0]
-        if reportCode in ['R08', 'R02', 'R03']:
+        if (self.previous_cmd_ in movement_cmds and reportCode in ['R02', 'R03']
+                or self.previous_cmd_ not in movement_cmds and reportCode in ['R08']):
             self.txBlocker_ = False
         
         self.uartRxPub_.publish(self.uart_cmd_)

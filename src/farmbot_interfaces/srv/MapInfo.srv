@@ -1,6 +1,0 @@
-int64 type
----
-int64 item_count
-float64[] x
-float64[] y
-float64[] z

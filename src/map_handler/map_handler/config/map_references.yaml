@@ -3,6 +3,9 @@ map_reference:
   y_len: 0.0
   z_len: 0.0
   tools:
+    T1:
+    T2:
+    T3:
 plant_details: 
   plant_count: 0
   plants:
