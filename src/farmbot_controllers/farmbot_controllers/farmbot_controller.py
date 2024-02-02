@@ -105,6 +105,12 @@ class KeyboardTeleOp(Node):
                 self.tool_exchange_client(cmd = "T_1_1")
             case 'T12':
                 self.tool_exchange_client(cmd = "T_1_2")
+            case 'T20': # new tool marked
+                self.tool_exchange_client(cmd = "T_2_0\nSoil\n1198.0 432.2 -240.0 1")
+            case 'T21':
+                self.tool_exchange_client(cmd = "T_2_1")
+            case 'T22':
+                self.tool_exchange_client(cmd = "T_2_2")
             case 'T30': # new tool marked
                 self.tool_exchange_client(cmd = "T_3_0\nWater\n1198.0 532.2 -240.0 1")
             case 'T31':
