@@ -22,6 +22,10 @@ class DeviceCmdHandler(Node):
 
     # Function handling the watering commands
     def waterCommandHandler(self, cmd = Int64MultiArray):
+        '''
+        Watering style command. Used to set the watering to be either time based (1) or
+        measured using a flow meter (2)
+        '''
         # Valid watering commands
         valid_commands = (1, 2)
 
@@ -38,6 +42,13 @@ class DeviceCmdHandler(Node):
 
     # Function handling the set or read on the I2C Bus
     def i2cCommandHandler(self, cmd = I2CCommand):
+        '''
+        I2C Command Handler. Used to read or write to the I2C devices connected
+        to the farmduino
+
+        Args:
+            cmd{I2CCommand}: contains the read or write command information
+        '''
         if cmd.mode:    # I2C SET
             self.uart_cmd_.data = "F51 E" + str(cmd.e) + " P" + str(cmd.p) + " V" + str(cmd.v)
         else:           # I2C READ
@@ -48,6 +59,13 @@ class DeviceCmdHandler(Node):
 
     # Function handling the pin set and read commands
     def pinCommandHandler(self, cmd = PinCommand):
+        '''
+        Pin Command Handler. Handles reading (F42) and setting (F41, F43, F44)
+        pins. Note that this covers both analog and digital pins, and the pin
+        mode needs to be set accordingly!
+
+        Args{PinCommand}: contains the pin command information
+        '''
         # Check if in set mode, but no set command selected
         if cmd.mode and not cmd.set_io and not cmd.set_value and not cmd.set_value2:
             self.get_logger().error("Pin is in SET mode, but no SET CASE was selected. Use set_io, set_value or set_value2 to indicate\
@@ -76,7 +94,9 @@ def main(args = None):
     try:
         rclpy.spin(deviceCmdHandlerNode)
     except KeyboardInterrupt:
-        pass
+        deviceCmdHandlerNode.destroy_node()
+
+    deviceCmdHandlerNode.destroy_node()
 
     rclpy.shutdown()
 
