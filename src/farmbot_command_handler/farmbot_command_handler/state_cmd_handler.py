@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from farmbot_interfaces.msg import ParameterCommand, StateCommand, StatusCommand
 from std_msgs.msg import String
+from farmbot_interfaces.msg import ParameterCommand, StateCommand, StatusCommand
 
 class StateCmdHandler(Node):
     # Node contructor
     def __init__(self):
         super().__init__("StateCmdHandler")
 
+        # String standard interface used for forming the uart message
         self.uart_cmd_ = String()
 
         # Node subscripters and publishers
@@ -22,6 +23,15 @@ class StateCmdHandler(Node):
     
     # Function handling the parameter commands
     def parameterCommandHandler(self, cmd = ParameterCommand):
+        '''
+        Parameter Command Handler. Used to manipulate the Farmduino
+        parameters by manipulating code friendly commands into the
+        GCode (FCode) commands utilized in the UART communication
+        scheme
+
+        Args:
+            cmd{ParameterCommand}: Interface containing all the parameter commands
+        '''
         if cmd.list:        # List all parameters 
             self.uart_cmd_.data = "F20"
         else:
@@ -37,9 +47,18 @@ class StateCmdHandler(Node):
 
     # Function covering the state commands for the farmbots
     def stateCommandHandler(self, cmd = StateCommand):
+        '''
+        State Command Handler. Used as the main pipeline for specific commands.
+        E - End Stop, @ - Abort Movement, F09 - Report Endstop, F81 - Report
+        Current Position and F83 - Report Software Version
+
+        Args:
+            cmd{StateCommand} - The state command.
+        '''
+        
         sumP = sum([cmd.estop, cmd.abort_movement, cmd.reset_estop,\
                    cmd.rep_end_stop, cmd.rep_curr_pos, cmd.rep_sw_ver])
-        # Check that only one staet command is in effect
+        # Check that only one start command is in effect
         if sumP != 1:
             self.get_logger().error("Make sure to include only 1 state handler command! Your input has " + str(sumP) + " commands")
         else:
@@ -61,6 +80,10 @@ class StateCmdHandler(Node):
 
     # Function covering the read and write of a status command 
     def statusCommandHandler(self, cmd = StatusCommand):
+        '''
+        Function that allows the read and write of a status command for the
+        Farmbot. Check documentation for more information on status commands
+        '''
         if cmd.mode:    # Write mode
             self.uart_cmd_.data = "F32 P" + str(cmd.p) + " V" + str(cmd.v)
         else:           # Read mode
