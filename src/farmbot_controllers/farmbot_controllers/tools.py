@@ -1,7 +1,7 @@
 from rclpy.node import Node
+from farmbot_interfaces.srv import StringRepReq
 from farmbot_controllers.movement import Movement
 
-from farmbot_interfaces.srv import StringRepReq
 
 class ToolCommands:
     def __init__(self, node: Node, mvm: Movement):
