@@ -29,7 +29,7 @@ class StateCmdHandler(Node):
                 self.uart_cmd_.data = "F21 P" + str(cmd.param)
             elif cmd.write: # Write to a parameter
                 self.uart_cmd_.data = "F22 P" + str(cmd.param) + " V" + str(cmd.value)
-            elif cmd.update:# Update a paramanter (in the calibration state)
+            elif cmd.update:# Update a parameter (in the calibration state)
                 self.uart_cmd_.data = "F23 P" + str(cmd.param) + " V" + str(cmd.value)
 
         self.uartTxPub_.publish(self.uart_cmd_)
