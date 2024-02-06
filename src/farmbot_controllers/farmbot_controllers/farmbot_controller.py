@@ -9,7 +9,6 @@ from farmbot_interfaces.srv import ParameterConfig, LoadParamConfig, StringRepRe
 from farmbot_controllers.tool_handler import ToolCommands
 from farmbot_controllers.movement import Movement
 from farmbot_controllers.states import State
-from farmbot_controllers.parameters import Parameters
 
 import time
 
@@ -22,19 +21,13 @@ class KeyboardTeleOp(Node):
         self.mvm_ = Movement(self)
         # Initializing the state module
         self.state_ = State(self)
+        # Initializing the tool module
+        self.tools_ = ToolCommands(self, self.mvm_)
 
         # Memory
         self.cur_x_ = 0.0
         self.cur_y_ = 0.0
         self.cur_z_ = 0.0
-
-        self.len_x_ = 1000.0
-        self.len_y_ = 1000.0
-        self.len_z_ = 1000.0
-
-        self.X_MAX_SPEED = 800.0
-        self.Y_MAX_SPEED = 800.0
-        self.Z_MAX_SPEED = 1000.0
 
         # Temporary Keyboard subscriber
         self.cur_increment_ = 10.0
@@ -98,44 +91,25 @@ class KeyboardTeleOp(Node):
             case 'p':
                 self.parameterConfigClient(cmd = 'MAP')
             case 'T10': # new tool marked
-                self.tool_exchange_client(cmd = "T_1_0\nSeeder\n1198.0 332.4 -240.0 1")
+                self.tools_.tool_exchange_client(cmd = "T_1_0\nSeeder\n1198.0 332.4 -240.0 1")
             case 'T11':
-                self.tool_exchange_client(cmd = "T_1_1")
+                self.tools_.tool_exchange_client(cmd = "T_1_1")
             case 'T12':
-                self.tool_exchange_client(cmd = "T_1_2")
+                self.tools_.tool_exchange_client(cmd = "T_1_2")
             case 'T20': # new tool marked
-                self.tool_exchange_client(cmd = "T_2_0\nSoil\n1198.0 432.2 -240.0 1")
+                self.tools_.tool_exchange_client(cmd = "T_2_0\nSoil\n1198.0 432.2 -240.0 1")
             case 'T21':
-                self.tool_exchange_client(cmd = "T_2_1")
+                self.tools_.tool_exchange_client(cmd = "T_2_1")
             case 'T22':
-                self.tool_exchange_client(cmd = "T_2_2")
+                self.tools_.tool_exchange_client(cmd = "T_2_2")
             case 'T30': # new tool marked
-                self.tool_exchange_client(cmd = "T_3_0\nWater\n1198.0 532.2 -240.0 1")
+                self.tools_.tool_exchange_client(cmd = "T_3_0\nWater\n1198.0 532.2 -240.0 1")
             case 'T31':
-                self.tool_exchange_client(cmd = "T_3_1")
+                self.tools_.tool_exchange_client(cmd = "T_3_1")
             case 'T32':
-                self.tool_exchange_client(cmd = "T_3_2")
+                self.tools_.tool_exchange_client(cmd = "T_3_2")
 
-    ## Tool Handling Client
-    def tool_exchange_client(self, cmd = str):
-        client = self.create_client(StringRepReq, 'map_cmd')
-        while not client.wait_for_service(1.0):
-            self.get_logger().warn("Waiting for Parameter Loading Server...")
-        
-        request = StringRepReq.Request()
-        request.data = cmd
 
-        future = client.call_async(request = request)
-        future.add_done_callback(self.tool_cmd_sequence_callback)
-
-    def tool_cmd_sequence_callback(self, future):     
-        cmd = future.result().data.split('\n')
-        if cmd[0][:2] == 'CC':
-            for mvm in cmd[1:]:
-                coords = mvm.split(' ')
-                self.mvm_.moveGantryAbsolute(x_coord = float(coords[0]), 
-                                        y_coord = float(coords[1]), 
-                                        z_coord = float(coords[2]))
 
 
     ## UART Handling Callback
