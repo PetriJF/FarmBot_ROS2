@@ -18,7 +18,7 @@ class KeyboardTeleOp(Node):
     def checkKeyPress(self):
         validKeys = ('e', 'E', 'w', 'a', 's', 'd', '1', '2', '3', 'i', 'h', 'j', 'k', 'l', 'fh',
                      'c', 'v', 'b', 'n', 'o', 'p', 'T10', 'T11', 'T12', 'T20', 'T21', 'T22',
-                     'T30', 'T31', 'T32')
+                     'T30', 'T31', 'T32', 'LED1', 'LED2', 'WAT1', 'WAT2', 'VAC1', 'VAC2')
         userInput = input("\nEnter command: ")
 
         if userInput in validKeys:
