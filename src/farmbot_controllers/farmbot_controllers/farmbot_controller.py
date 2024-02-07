@@ -6,9 +6,10 @@ from farmbot_interfaces.msg import PlantManage
 from farmbot_interfaces.srv import ParameterConfig, LoadParamConfig, StringRepReq
 
 # Modules
-from farmbot_controllers.farmbot_controllers.tools import ToolCommands
+from farmbot_controllers.tools import ToolCommands
 from farmbot_controllers.movement import Movement
 from farmbot_controllers.states import State
+from farmbot_controllers.devices import DeviceControl
 
 import time
 
@@ -21,8 +22,10 @@ class KeyboardTeleOp(Node):
         self.mvm_ = Movement(self)
         # Initializing the state module
         self.state_ = State(self)
+        # Initializing the devices and peripherals modules
+        self.devices_ = DeviceControl(self)
         # Initializing the tool module
-        self.tools_ = ToolCommands(self, self.mvm_)
+        self.tools_ = ToolCommands(self, self.mvm_, self.devices_)
 
         # Memory
         self.cur_x_ = 0.0
@@ -108,7 +111,18 @@ class KeyboardTeleOp(Node):
                 self.tools_.tool_exchange_client(cmd = "T_3_1")
             case 'T32':
                 self.tools_.tool_exchange_client(cmd = "T_3_2")
-
+            case 'LED1':
+                self.tools_.led_strip_on()
+            case 'LED2':
+                self.tools_.led_strip_off()
+            case 'VAC1':
+                self.tools_.vacuum_pump_on()
+            case 'VAC2':
+                self.tools_.vacuum_pump_off()
+            case 'WAT1':
+                self.tools_.water_pump_on()
+            case 'WAT2':
+                self.tools_.water_pump_off()
 
 
 

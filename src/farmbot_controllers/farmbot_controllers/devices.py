@@ -16,7 +16,6 @@ class DeviceControl:
         self.i2c_pub_ = self.node_.create_publisher(I2CCommand, 'i2c_command', 10)
         self.water_pub_ = self.node_.create_publisher(Int64MultiArray, 'water_command', 10)
 
-
     # I2C Control Handlers
 
     def i2c_read(self, pin: int, element: int):
@@ -72,9 +71,9 @@ class DeviceControl:
             value {int}: Value to set
             pin_mode {bool}: 0 for digital, 1 for analog
         '''
-        self.manipulate_pin(mode = True, set_value1 = True, pin = pin, value = value, pin_mode = pin_mode)
+        self.manipulate_pin(mode = True, set_value1 = True, pin = pin, value1 = value, pin_mode = pin_mode)
         
-    def set_pin_value(self, pin: int, value1: int, delay: int, value2: int, pin_mode: bool):
+    def set_pin_value_2(self, pin: int, value1: int, delay: int, value2: int, pin_mode: bool):
         '''
         Setting value1 to pin and waiting for delay milliseconds. After the delay,
         value2 is set. Both sets are done in the selected pin_mode (0 for digital
