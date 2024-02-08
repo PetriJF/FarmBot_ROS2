@@ -4,8 +4,12 @@
 import rclpy
 import serial
 from rclpy.node import Node
+from rclpy.action import ActionServer
+from rclpy.action.server import ServerGoalHandle
 from std_msgs.msg import String
+from farmbot_interfaces.action import GetUARTResponse
 from rclpy.clock import ROSClock
+from farmbot_interfaces.srv import StringRepReq
 
 # Standard Imports
 import os
@@ -52,8 +56,38 @@ class UARTController(Node):
 
         self.previous_cmd_ = ''
 
+        # Request Response Action Server
+        self.uart_received_cmd_ = ''
+        self.req_resp_server_ = ActionServer(
+            self, GetUARTResponse, 'uart_response',
+            execute_callback = self.request_response_server
+        )
+
         # Log the initialization
         self.get_logger().info("State Controller Initialized..")
+
+    ## NOT IN USE WIP
+    def request_response_server(self, goal_handle: ServerGoalHandle):
+        # Get the request from the goal
+        code = goal_handle.request.code
+        timeout = rclpy.duration.Duration(seconds = goal_handle.request.timeout_sec)
+
+
+        start_time = self.get_clock().now()
+        # Execute the request
+        while (self.get_clock().now() - start_time) < timeout or goal_handle.request.timeout_sec == -1:
+            if code == self.uart_received_cmd_.split(' ')[0]:
+                goal_handle.succeed()
+                result = GetUARTResponse.Result()
+                result.msg = self.uart_received_cmd_
+                result.success = True
+                result.cmd_type = goal_handle.request.cmd_type
+                return result
+            
+        goal_handle.abort()
+        return GetUARTResponse.Result()
+        
+
 
     def uartTransmit(self):
         if not self.txBlocker_ and self.txQueue_:
@@ -91,6 +125,7 @@ class UARTController(Node):
             self.handle_message(line)
 
     def handle_message(self, message):
+        self.uart_received_cmd_ = message
         movement_cmds = ['G00', 'G01', 'G28', 'F11', 'F12', 'F13',
                          'F14', 'F15', 'F16']
         self.uart_cmd_.data = message
