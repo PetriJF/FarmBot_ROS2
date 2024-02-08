@@ -1,4 +1,7 @@
 from rclpy.node import Node
+from rclpy.action import ActionClient
+from rclpy.action.client import ClientGoalHandle
+from farmbot_interfaces.action import GetUARTResponse
 from farmbot_interfaces.srv import StringRepReq
 from farmbot_controllers.movement import Movement
 from farmbot_controllers.devices import DeviceControl
@@ -13,19 +16,40 @@ class ToolCommands:
         self.devices_ = devices
 
         # The ID of the current tool mounted. Should be 0 when no tool mounted!
-        self.current_tool_id_ = 0
-
-    def check_if_used(self):
-        """
-        Check if the tool unit has a toolhead mounted to it
-
-        Returns:{bool}: True if a tool is mounted
-        """
-        # Check if there is continuity between pins B and C
+        self.current_tool_id_ = 0# Get UART Response to Request Client
         
+        self.get_response_client_ = ActionClient(self.node_, GetUARTResponse, 'uart_response')
 
-        pass
+    ## NOT IN USE WIP
+    def get_pin_response(self, code: str, timeout: int):
+        # Waiting for server to be ready
+        self.get_response_client_.wait_for_server()
 
+        # Create the goal
+        goal = GetUARTResponse.Goal()
+        goal.code = code
+        goal.timeout_sec = timeout
+
+        # Send the goal
+        self.get_response_client_. \
+            send_goal_async(goal). \
+                add_done_callback(self.goal_response_callback)
+    ## NOT IN USE WIP
+    def goal_response_callback(self, future):
+        self.goal_handle_: ClientGoalHandle = future.result()
+        if self.goal_handle_.accepted:
+            self.goal_handle_. \
+                get_result_async(). \
+                    add_done_callback(self.goal_result_callback)
+    ## NOT IN USE WIP
+    def goal_result_callback(self, future):
+        self.node_.get_logger().info("SS")
+        message = future.result().result.msg.split(' ')
+        self.node_.get_logger().info(future.result().result.msg)
+        if message[0] == 'R41' and message[1] == 'P63':
+            self.node_.get_logger().info(f"A tool is {'not ' if bool(message[2][-1]) else ''} mounted on the tool element")
+ 
+    
     # Peripheral control functions
 
     def vacuum_pump_on(self):
@@ -91,3 +115,7 @@ class ToolCommands:
                 self.mvm_.moveGantryAbsolute(x_coord = float(coords[0]), 
                                              y_coord = float(coords[1]), 
                                              z_coord = float(coords[2]))
+            # Check if tool is mounted properly
+            #self.devices_.read_pin(63, False)
+            
+            #self.get_pin_response('63', -1)

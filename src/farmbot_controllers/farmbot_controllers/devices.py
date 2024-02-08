@@ -16,6 +16,21 @@ class DeviceControl:
         self.i2c_pub_ = self.node_.create_publisher(I2CCommand, 'i2c_command', 10)
         self.water_pub_ = self.node_.create_publisher(Int64MultiArray, 'water_command', 10)
 
+        
+    # def wait_for_response(self, code: str):
+    #     client = self.node_.create_client(StringRepReq, 'uart_request_response')
+    #     while not client.wait_for_service(1.0):
+    #         self.node_.get_logger().warn("Waiting for Map Server...")
+        
+    #     # Set the command to the service request
+    #     request = StringRepReq.Request()
+    #     request.data = code
+
+    #     # Call async and add the response callback
+    #     future = client.call_async(request = request)
+    #     if future.done():
+    #         return future.result().data
+
     # I2C Control Handlers
 
     def i2c_read(self, pin: int, element: int):
