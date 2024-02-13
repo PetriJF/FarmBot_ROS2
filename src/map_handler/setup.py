@@ -14,6 +14,8 @@ setup(
         (os.path.join('share', package_name, 'config'), [os.path.join(package_name, 'config', 'plant_reference.yaml')]),
         (os.path.join('share', package_name, 'config'), [os.path.join(package_name, 'config', 'map_references.yaml')]),
         (os.path.join('share', package_name, 'config'), [os.path.join(package_name, 'config', 'tool_reference.yaml')]),
+        (os.path.join('share', package_name, 'config'), [os.path.join(package_name, 'config', 'tray_reference.yaml')]),
+        (os.path.join('share', package_name, 'config'), [os.path.join(package_name, 'config', '16_seed_tray.yaml')]),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

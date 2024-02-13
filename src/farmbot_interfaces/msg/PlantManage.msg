@@ -4,7 +4,7 @@ float64 x
 float64 y
 float64 z 
 float64 exclusion_radius
-float64 canipy_radius
+float64 canopy_radius
 float64 water_quantity
 float64 max_z
 string plant_name

@@ -77,7 +77,7 @@ class ToolCommands:
         self.devices_.set_pin_value(pin = light_pin, value = 0, pin_mode = False)
 
     ## Tool Exchanging Client
-    def tool_exchange_client(self, cmd = str):
+    def map_cmd_client(self, cmd = str):
         '''
         Tool command service client used to communicate between the farmbot
         controller and the map handler.
@@ -86,7 +86,7 @@ class ToolCommands:
             cmd {str}: The command that is sent to the map handler
         '''
         # Initializing the client and wait for map server confirmation
-        client = self.node_.create_client(StringRepReq, 'map_cmd')
+        client = self.node_.create_client(StringRepReq, 'map_info')
         while not client.wait_for_service(1.0):
             self.node_.get_logger().warn("Waiting for Map Server...")
         
@@ -96,9 +96,9 @@ class ToolCommands:
 
         # Call async and add the response callback
         future = client.call_async(request = request)
-        future.add_done_callback(self.tool_cmd_sequence_callback)
+        future.add_done_callback(self.cmd_sequence_callback)
 
-    def tool_cmd_sequence_callback(self, future):
+    def cmd_sequence_callback(self, future):
         '''
         Tool command service response callback from the map handler. Returns
         the processed information or task success state for the given request
@@ -109,8 +109,16 @@ class ToolCommands:
         # Register the response of the server
         cmd = future.result().data.split('\n')
         # For a coordinate command response
-        if cmd[0][:2] == 'CC':
-            for mvm in cmd[1:]: # move extruder to all coordinates in the string list
+     
+        self.node_.get_logger().info(future.result().data)
+
+        cmdType = ''
+        for mvm in cmd[1:]: # move extruder to all coordinates in the string list
+            if mvm[:2] == 'CC':
+                cmdType = 'CC'
+                continue
+
+            if cmdType == 'CC':
                 coords = mvm.split(' ')
                 self.mvm_.moveGantryAbsolute(x_coord = float(coords[0]), 
                                              y_coord = float(coords[1]), 

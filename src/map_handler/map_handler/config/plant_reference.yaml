@@ -7,7 +7,7 @@ position:               ### Representing the plant's XY position and the current
   z: 0.0
 plant_details:          ### Plant details used for planting and managing
   plant_radius: 0.0    # The separation radius to the closest plant
-  canipy_radius: 0.0   # Average canipy size for the plant
+  canopy_radius: 0.0   # Average canopy size for the plant
   water_quantity: 0.0  # Amount of water needed per watering state
   max_height: 0.0      # Average maximum height of the plant
 status:                 ### Plant status
