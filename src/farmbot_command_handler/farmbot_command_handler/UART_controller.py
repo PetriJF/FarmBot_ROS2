@@ -6,7 +6,7 @@ import serial
 from rclpy.node import Node
 from rclpy.action import ActionServer
 from rclpy.action.server import ServerGoalHandle
-from std_msgs.msg import String
+from std_msgs.msg import String, Bool
 from farmbot_interfaces.action import GetUARTResponse
 from rclpy.clock import ROSClock
 from farmbot_interfaces.srv import StringRepReq
@@ -41,6 +41,10 @@ class UARTController(Node):
 
         # UART receive publisher
         self.uartRxPub_ = self.create_publisher(String, 'uart_receive', 10)
+
+        # Farmbot state publisher
+        self.farmbot_busy_ = Bool()
+        self.farmbot_state_pub_ = self.create_publisher(Bool, 'busy_state', 10)
 
         # Node subscripters and publishers
         self.txBlocker_ = False
@@ -92,6 +96,8 @@ class UARTController(Node):
     def uartTransmit(self):
         if not self.txBlocker_ and self.txQueue_:
             self.txBlocker_ = True
+            self.farmbot_busy_.data = self.txBlocker_ 
+            self.farmbot_state_pub_.publish(self.farmbot_busy_)
             message = self.txQueue_.pop(0)
             
             if message[-1] != '\n':
@@ -112,6 +118,8 @@ class UARTController(Node):
             self.ser_.write(message.data.encode('utf-8'))
             self.txQueue_.clear()
             self.txBlocker_ = False
+            self.farmbot_busy_.data = self.txBlocker_ 
+            self.farmbot_state_pub_.publish(self.farmbot_busy_)
         else:
             self.txQueue_.append(message.data)
 
@@ -126,14 +134,16 @@ class UARTController(Node):
 
     def handle_message(self, message):
         self.uart_received_cmd_ = message
-        movement_cmds = ['G00', 'G01', 'G28', 'F11', 'F12', 'F13',
-                         'F14', 'F15', 'F16']
+        response_cmds = ['G00', 'G01', 'G28', 'F11', 'F12', 'F13',
+                         'F14', 'F15', 'F16', 'F44']
         self.uart_cmd_.data = message
         
         reportCode = (message).split(' ')[0]
-        if (self.previous_cmd_ in movement_cmds and reportCode in ['R02', 'R03']
-                or self.previous_cmd_ not in movement_cmds and reportCode in ['R08']):
+        if (self.previous_cmd_ in response_cmds and reportCode in ['R02', 'R03']
+                or self.previous_cmd_ not in response_cmds and reportCode in ['R08']):
             self.txBlocker_ = False
+            self.farmbot_busy_.data = self.txBlocker_ 
+            self.farmbot_state_pub_.publish(self.farmbot_busy_)
         
         self.uartRxPub_.publish(self.uart_cmd_)
         

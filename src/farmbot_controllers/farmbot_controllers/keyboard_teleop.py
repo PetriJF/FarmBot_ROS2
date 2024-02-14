@@ -17,11 +17,13 @@ class KeyboardTeleOp(Node):
 
     def checkKeyPress(self):
         validKeys = ('e', 'E', 'w', 'a', 's', 'd', '1', '2', '3', 'i', 'h', 'j', 'k', 'l', 'fh',
-                     'c', 'v', 'b', 'n', 'o', 'p', 'T10', 'T11', 'T12', 'T20', 'T21', 'T22',
-                     'T30', 'T31', 'T32', 'LED1', 'LED2', 'WAT1', 'WAT2', 'VAC1', 'VAC2')
+                     'c', 'v', 'b', 'n', 'o', 'p', 'T_1_0', 'T_1_1', 'T_1_2', 'T_2_0', 'T_2_1', 'T_2_2',
+                     'T_3_0', 'T_3_1', 'T_3_2', 'LED1', 'LED2', 'WAT1', 'WAT2', 'VAC1', 'VAC2', 
+                     'P_3', 'P_4', 'S_1_0', 'S_2_0', 'S_3_0')
+        compoundCmds = ('P_1')
         userInput = input("\nEnter command: ")
 
-        if userInput in validKeys:
+        if userInput in validKeys or userInput.split(' ')[0] in compoundCmds:
             self.cmd_.data = userInput
             self.inputPub_.publish(self.cmd_)
         else:

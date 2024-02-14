@@ -40,13 +40,16 @@ class KeyboardTeleOp(Node):
         self.uartRxSub_ = self.create_subscription(String, 'uart_receive', self.farmbotFeedbackCallback, 10)
 
         # Map publishers
-        self.plantMngPub_ = self.create_publisher(PlantManage, 'plant_mng', 10)
+        self.plant_conf_ = PlantManage()
+        self.plant_manage_pub_ = self.create_publisher(PlantManage, 'plant_mng', 10)
+        self.plant_cmd_pub_ = self.create_publisher(String, 'plant_cmd', 10)
 
         # Log the initialization
         self.get_logger().info("Farmbot Controller Initialized..")
 
     def commandInterpretationCallback(self, cmd = String):
-        match cmd.data:
+        code = cmd.data.split(' ')
+        match code[0]:
             case 'e':
                 self.state_.electronicStop()
             case 'E':
@@ -93,24 +96,14 @@ class KeyboardTeleOp(Node):
                 self.parameterConfigClient(cmd = 'SAVE')
             case 'p':
                 self.parameterConfigClient(cmd = 'MAP')
-            case 'T10': # new tool marked
-                self.tools_.tool_exchange_client(cmd = "T_1_0\nSeeder\n1198.0 332.4 -240.0 1")
-            case 'T11':
-                self.tools_.tool_exchange_client(cmd = "T_1_1")
-            case 'T12':
-                self.tools_.tool_exchange_client(cmd = "T_1_2")
-            case 'T20': # new tool marked
-                self.tools_.tool_exchange_client(cmd = "T_2_0\nSoil\n1198.0 432.2 -240.0 1")
-            case 'T21':
-                self.tools_.tool_exchange_client(cmd = "T_2_1")
-            case 'T22':
-                self.tools_.tool_exchange_client(cmd = "T_2_2")
-            case 'T30': # new tool marked
-                self.tools_.tool_exchange_client(cmd = "T_3_0\nWater\n1198.0 532.2 -240.0 1")
-            case 'T31':
-                self.tools_.tool_exchange_client(cmd = "T_3_1")
-            case 'T32':
-                self.tools_.tool_exchange_client(cmd = "T_3_2")
+            case 'T_1_0': # new tool marked
+                self.tools_.map_cmd_client(cmd = 'T_1_0\nSeeder\n1198.0 332.4 -240.0 1')
+            case 'T_2_0': # new tool marked
+                self.tools_.map_cmd_client(cmd = 'T_2_0\nSoil\n1198.0 432.2 -240.0 1')
+            case 'T_3_0': # new tool marked
+                self.tools_.map_cmd_client(cmd = 'T_3_0\nWater\n1198.0 532.2 -240.0 1')
+            case 'T_1_1' | 'T_1_2' | 'T_2_1' | 'T_2_2' | 'T_3_1' | 'T_3_2':
+                self.tools_.map_cmd_client(cmd = cmd.data)
             case 'LED1':
                 self.tools_.led_strip_on()
             case 'LED2':
@@ -123,7 +116,31 @@ class KeyboardTeleOp(Node):
                 self.tools_.water_pump_on()
             case 'WAT2':
                 self.tools_.water_pump_off()
+            case 'P_1':
+                self.plant_conf_.add = True
+                self.plant_conf_.autopos = False
+                self.plant_conf_.x = float(code[1])
+                self.plant_conf_.y = float(code[2])
+                self.plant_conf_.z = float(code[3])
+                self.plant_conf_.exclusion_radius = float(code[4])
+                self.plant_conf_.canopy_radius = float(code[5])
+                self.plant_conf_.water_quantity = float(code[6])
+                self.plant_conf_.max_z = float(code[7])
+                self.plant_conf_.plant_name = code[8]
+                self.plant_conf_.growth_stage = code[9]
+                self.plant_conf_.remove = False
+                self.plant_conf_.index = -1
 
+                self.plant_manage_pub_.publish(self.plant_conf_)
+            case 'P_3' | 'P_4': # Seed/water all plants in Planning stage
+                self.tools_.map_cmd_client(cmd = cmd.data)
+            
+            case 'S_1_0': # new tool marked
+                self.tools_.map_cmd_client(cmd = 'S_1_0_0\nTray1\nRadish\n1198.0 332.4 -240.0')
+            case 'S_2_0': # new tool marked
+                self.tools_.map_cmd_client(cmd = 'S_2_0_0\nTray2\nRadish\n1198.0 432.2 -240.0')
+            case 'S_3_0': # new tool marked
+                self.tools_.map_cmd_client(cmd = 'S_3_0_0\nTray3\nRadish\n1198.0 532.2 -240.0')
 
 
     ## UART Handling Callback
