@@ -75,6 +75,10 @@ class ToolCommands:
         water_pin = 8
         self.devices_.set_pin_value(pin = water_pin, value = 0, pin_mode = False)
 
+    def water_pulses(self, delay = 500):
+        water_pin = 8
+        self.devices_.set_pin_value_2(pin = water_pin, value1 = 1, delay = 500, value2 = 0, pin_mode = False)
+
     def led_strip_on(self):
         light_pin = 7
         self.devices_.set_pin_value(pin = light_pin, value = 1, pin_mode = False)
@@ -165,6 +169,8 @@ class ToolCommands:
                         self.vacuum_pump_off()
                     else:
                         self.node_.get_logger().warn("Vacuum pump command has a state other than on or off. Command ignored!")
+                if cmd[0] == 'WaterPulses':
+                    self.water_pulses(delay = int(cmd[1]))
                 self.sequence_.pop(0)
 
 

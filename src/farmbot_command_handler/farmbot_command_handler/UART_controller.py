@@ -134,13 +134,13 @@ class UARTController(Node):
 
     def handle_message(self, message):
         self.uart_received_cmd_ = message
-        movement_cmds = ['G00', 'G01', 'G28', 'F11', 'F12', 'F13',
-                         'F14', 'F15', 'F16']
+        response_cmds = ['G00', 'G01', 'G28', 'F11', 'F12', 'F13',
+                         'F14', 'F15', 'F16', 'F44']
         self.uart_cmd_.data = message
         
         reportCode = (message).split(' ')[0]
-        if (self.previous_cmd_ in movement_cmds and reportCode in ['R02', 'R03']
-                or self.previous_cmd_ not in movement_cmds and reportCode in ['R08']):
+        if (self.previous_cmd_ in response_cmds and reportCode in ['R02', 'R03']
+                or self.previous_cmd_ not in response_cmds and reportCode in ['R08']):
             self.txBlocker_ = False
             self.farmbot_busy_.data = self.txBlocker_ 
             self.farmbot_state_pub_.publish(self.farmbot_busy_)

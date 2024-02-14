@@ -132,8 +132,8 @@ class KeyboardTeleOp(Node):
                 self.plant_conf_.index = -1
 
                 self.plant_manage_pub_.publish(self.plant_conf_)
-            case 'P_3': # Seed all plants in Planning stage
-                self.tools_.map_cmd_client(cmd = 'P_3')
+            case 'P_3' | 'P_4': # Seed/water all plants in Planning stage
+                self.tools_.map_cmd_client(cmd = cmd.data)
             
             case 'S_1_0': # new tool marked
                 self.tools_.map_cmd_client(cmd = 'S_1_0_0\nTray1\nRadish\n1198.0 332.4 -240.0')

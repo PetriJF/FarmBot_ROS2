@@ -243,9 +243,46 @@ class MapController(Node):
             response.data == self.tray_cmd_interpreter(request.data)
         if request.data == 'P_3':
             response.data = self.seed_plants()
+        if request.data == 'P_4':
+            response.data = self.water_plants()
             
-
         return response
+
+    def water_plants(self):
+        cmd_sequence = ''
+        plants = self.map_instance_['plant_details']['plants']
+        for plant_index in plants:
+            plant = plants[plant_index]
+            
+            water_pulses = int(plant['plant_details']['water_quantity'])
+
+            cmd_sequence += self.water_plant(plant, water_pulses)
+
+        if cmd_sequence == '':
+            self.get_logger().warn("No plants found!")
+            return ''
+
+        if cmd_sequence[-1] == '\n':
+            cmd_sequence = cmd_sequence[:-1]
+        return cmd_sequence
+
+    def water_plant(self, plant: dict, pulses: int):
+        cmd = ''
+
+        plant_x = plant['position']['x']
+        plant_y = plant['position']['y']
+        plant_z = plant['position']['z']
+
+        cmd = f"CC_P_{plant['identifiers']['index']}_4\n"
+        # go to seed location
+        cmd += f"{plant_x} {plant_y} {-self.safe_z_increment_}\n"
+        # Turn on water pump pump
+        cmd += f"DC_P_{plant['identifiers']['index']}_4\n"
+        for i in range(pulses):
+            cmd += f"WaterPulses {1000}\n"
+
+        return cmd
+
 
     def tray_cmd_interpreter(self, msg: str):
         elem = msg.split('_')
