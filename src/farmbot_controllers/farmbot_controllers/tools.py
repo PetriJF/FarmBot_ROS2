@@ -1,6 +1,7 @@
 from rclpy.node import Node
 from rclpy.action import ActionClient
 from rclpy.action.client import ClientGoalHandle
+from std_msgs.msg import Bool 
 from farmbot_interfaces.action import GetUARTResponse
 from farmbot_interfaces.srv import StringRepReq
 from farmbot_controllers.movement import Movement
@@ -18,7 +19,13 @@ class ToolCommands:
         # The ID of the current tool mounted. Should be 0 when no tool mounted!
         self.current_tool_id_ = 0# Get UART Response to Request Client
         
+        self.sequence_ = []
+        self.command_type_ = ''
+        self.farmbot_busy_ = False
+
         self.get_response_client_ = ActionClient(self.node_, GetUARTResponse, 'uart_response')
+        self.busy_state_sub_ = self.node_.create_subscription(Bool, 'busy_state', self.status_callback, 10)
+        self.sequencing_timer_ = self.node_.create_timer(1.0, self.sequencing_timer)
 
     ## NOT IN USE WIP
     def get_pin_response(self, code: str, timeout: int):
@@ -112,18 +119,54 @@ class ToolCommands:
      
         self.node_.get_logger().info(future.result().data)
 
-        cmdType = ''
-        for mvm in cmd[1:]: # move extruder to all coordinates in the string list
-            if mvm[:2] == 'CC':
-                cmdType = 'CC'
-                continue
+        self.sequence_.extend(cmd)
+        # cmdType = ''
+        # for mvm in cmd: # move extruder to all coordinates in the string list
+        #     if mvm[:2] == 'CC':
+        #         cmdType = 'CC'
+        #         continue
 
-            if cmdType == 'CC':
-                coords = mvm.split(' ')
-                self.mvm_.moveGantryAbsolute(x_coord = float(coords[0]), 
-                                             y_coord = float(coords[1]), 
-                                             z_coord = float(coords[2]))
-            # Check if tool is mounted properly
+        #     if cmdType == 'CC':
+        #         coords = mvm.split(' ')
+        #         self.mvm_.moveGantryAbsolute(x_coord = float(coords[0]), 
+        #                                      y_coord = float(coords[1]), 
+        #                                      z_coord = float(coords[2]))
+        #     # Check if tool is mounted properly
             #self.devices_.read_pin(63, False)
             
             #self.get_pin_response('63', -1)
+
+    def sequencing_timer(self):
+        if not len(self.sequence_):
+            return
+
+        if self.sequence_[0][:2] in ['CC', 'DC']:
+            self.command_type_ = self.sequence_[0][:2]
+            self.sequence_.pop(0)
+
+        if not self.farmbot_busy_:
+            if self.command_type_ == '':
+                self.node_.get_logger().warn(f"Command type not set! Not enough context! Command '{self.sequence_[0]}' ignored")
+                return
+            
+            if self.command_type_ == 'CC':
+                coords = self.sequence_[0].split(' ')
+                self.mvm_.moveGantryAbsolute(x_coord = float(coords[0]), 
+                                             y_coord = float(coords[1]), 
+                                             z_coord = float(coords[2]))
+                self.sequence_.pop(0)
+                return
+            elif self.command_type_ == 'DC':
+                cmd = self.sequence_[0].split(' ')
+                if cmd[0] == 'Vacuum':
+                    if cmd[1] == '1':
+                        self.vacuum_pump_on()
+                    elif cmd[1] == '0':
+                        self.vacuum_pump_off()
+                    else:
+                        self.node_.get_logger().warn("Vacuum pump command has a state other than on or off. Command ignored!")
+                self.sequence_.pop(0)
+
+
+    def status_callback(self, state: Bool):
+        self.farmbot_busy_ = state.data

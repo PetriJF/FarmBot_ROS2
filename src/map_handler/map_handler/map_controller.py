@@ -15,7 +15,7 @@ class MapController(Node):
     def __init__(self):
         super().__init__("MapController")
 
-        self.safe_z_increment_ = 50.0
+        self.safe_z_increment_ = 80.0
 
 
         # Relevant directory and file names
@@ -179,7 +179,16 @@ class MapController(Node):
         return cmd_sequence
 
     def check_loaded_seeds(self, type: str):
-        return True, 2
+        trays = self.map_instance_['map_reference']['trays']
+        self.get_logger().info(str(trays))
+        for tray_index in trays:
+            tray = trays[tray_index]
+            if tray:
+                self.get_logger().info(str(tray))
+                if tray['seed_type'] == type:
+                    return True, tray_index
+
+        return False -1
     
     def seed_plant(self, plant: dict, tray: dict):
         '''
@@ -197,19 +206,27 @@ class MapController(Node):
 
         cmd = f"CC_P_{plant['identifiers']['index']}_3\n"
 
-        tray_clearance = 20
+        tray_clearance = 30
 
         # Go over seed tray at safe z
-        cmd += f"{tray_x} {tray_y} {tray_z + self.safe_z_increment_ + tray_clearance}\n"
+        cmd += f"{tray_x} {tray_y} {tray_z + self.safe_z_increment_}\n"
+        # Turn on vacuum pump
+        cmd += f"DC_P_{plant['identifiers']['index']}_3\n"
+        cmd += f"Vacuum 1\n"
         # Collect a seed
-        cmd += f"{tray_x} {tray_y} {tray_z}\n"
+        cmd += f"CC_P_{plant['identifiers']['index']}_3\n"
+        cmd += f"{tray_x} {tray_y} {tray_z + tray_clearance}\n"
         # Retract with the seed
-        cmd += f"{tray_x} {tray_y} {tray_z + self.safe_z_increment_ + tray_clearance}\n"
+        cmd += f"{tray_x} {tray_y} {tray_z + self.safe_z_increment_}\n"
         # Go to the plant at safe z
         cmd += f"{plant_x} {plant_y} {plant_z + self.safe_z_increment_}\n"
         # Plant the seed
         cmd += f"{plant_x} {plant_y} {plant_z}\n"
+        # Turn off vacuum pump
+        cmd += f"DC_P_{plant['identifiers']['index']}_3\n"
+        cmd += f"Vacuum 0\n"
         # Retract the empty seeder
+        cmd += f"CC_P_{plant['identifiers']['index']}_3\n"
         cmd += f"{plant_x} {plant_y} {plant_z + self.safe_z_increment_}\n"
 
         return cmd
