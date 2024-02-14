@@ -34,7 +34,9 @@ class ToolExchanger:
         # lower the z axis until the exact tool mounting position
         commandSequence += f"{cmd.x_pos} {cmd.y_pos} {cmd.z_pos}\n"
         # move towards the release position
-        commandSequence += f"{cmd.x_pos + cmd.release_x_inc} {cmd.y_pos + cmd.release_y_inc} {cmd.z_pos}"
+        commandSequence += f"{cmd.x_pos + cmd.release_x_inc} {cmd.y_pos + cmd.release_y_inc} {cmd.z_pos}\n"
+        # raise the tool head to a safe z-axis value
+        commandSequence += f"{cmd.x_pos + cmd.release_x_inc} {cmd.y_pos + cmd.release_y_inc} {cmd.z_pos + cmd.z_safe_inc}"
 
         return commandSequence
     
@@ -50,7 +52,9 @@ class ToolExchanger:
         # 2 - tool mount
         commandSequence = "CC_T_x_2\n"
 
-        # move towards the release position
+        # move over the release position
+        commandSequence += f"{cmd.x_pos + cmd.release_x_inc} {cmd.y_pos + cmd.release_y_inc} {cmd.z_pos + cmd.z_safe_inc}"
+        # lower towards the release position
         commandSequence += f"{cmd.x_pos + cmd.release_x_inc} {cmd.y_pos + cmd.release_y_inc} {cmd.z_pos}\n"
         # move to the tool's home position
         commandSequence += f"{cmd.x_pos} {cmd.y_pos} {cmd.z_pos}\n"
