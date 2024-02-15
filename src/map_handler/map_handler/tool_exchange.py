@@ -53,7 +53,7 @@ class ToolExchanger:
         commandSequence = "CC_T_x_2\n"
 
         # move over the release position
-        commandSequence += f"{cmd.x_pos + cmd.release_x_inc} {cmd.y_pos + cmd.release_y_inc} {cmd.z_pos + cmd.z_safe_inc}"
+        commandSequence += f"{cmd.x_pos + cmd.release_x_inc} {cmd.y_pos + cmd.release_y_inc} {cmd.z_pos + cmd.z_safe_inc}\n"
         # lower towards the release position
         commandSequence += f"{cmd.x_pos + cmd.release_x_inc} {cmd.y_pos + cmd.release_y_inc} {cmd.z_pos}\n"
         # move to the tool's home position
