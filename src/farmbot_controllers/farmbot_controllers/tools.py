@@ -23,6 +23,8 @@ class ToolCommands:
         self.command_type_ = ''
         self.farmbot_busy_ = False
 
+        self.wait_for_camera_ = False
+
         self.get_response_client_ = ActionClient(self.node_, GetUARTResponse, 'uart_response')
         self.busy_state_sub_ = self.node_.create_subscription(Bool, 'busy_state', self.status_callback, 10)
         self.sequencing_timer_ = self.node_.create_timer(1.0, self.sequencing_timer)
@@ -128,6 +130,8 @@ class ToolCommands:
         self.sequence_.extend(cmd)
 
     def sequencing_timer(self):
+        if self.wait_for_camera_:
+            return
         if not len(self.sequence_):
             return
 
@@ -159,7 +163,78 @@ class ToolCommands:
                 if cmd[0] == 'WaterPulses':
                     self.water_pulses(delay = int(cmd[1]))
                 self.sequence_.pop(0)
+            elif self.command_type_ == 'VC':
+                # Vision command
+                self.stitch_panorama_client()
 
+    def stitch_panorama_client(self):
+        '''
+        Tool command service client used to communicate between the farmbot
+        controller and the map handler.
+
+        Args:
+            cmd {str}: The command that is sent to the map handler
+        '''
+        # Block sequencing here async
+        self.wait_for_camera_ = True
+
+        # Initializing the client and wait for map server confirmation
+        client = self.node_.create_client(StringRepReq, 'form_panorama')
+        while not client.wait_for_service(1.0):
+            self.node_.get_logger().warn("Waiting for Camera Stitching Server...")
+        
+        # Set the command to the service request
+        request = StringRepReq.Request()
+        request.data = "ADD HERE ANY SETUP THAT MIGHT CHANGE"
+
+        # Call async and add the response callback
+        future = client.call_async(request = request)
+        future.add_done_callback(self.stitch_callback)
+
+    def stitch_callback(self):
+        self.wait_for_camera_ = False
+
+    def cam_calib_client(self):
+        '''
+        Tool command service client used to communicate between the farmbot
+        controller and the map handler.
+
+        Args:
+            cmd {str}: The command that is sent to the map handler
+        '''
+        # Initializing the client and wait for map server confirmation
+        client = self.node_.create_client(StringRepReq, 'calibrate_luxonis')
+        while not client.wait_for_service(1.0):
+            self.node_.get_logger().warn("Waiting for Camera Calibration Server...")
+        
+        # Set the command to the service request
+        request = StringRepReq.Request()
+        request.data = "ADD HERE ANY SETUP THAT MIGHT CHANGE"
+
+        # Call async and add the response callback
+        future = client.call_async(request = request)
+        future.add_done_callback(self.cmd_sequence_callback)
+    
+    def panorama_client(self):
+        '''
+        Tool command service client used to communicate between the farmbot
+        controller and the map handler.
+
+        Args:
+            cmd {str}: The command that is sent to the map handler
+        '''
+        # Initializing the client and wait for map server confirmation
+        client = self.node_.create_client(StringRepReq, 'panorama_sequence')
+        while not client.wait_for_service(1.0):
+            self.node_.get_logger().warn("Waiting for Panorama Sequencing Server...")
+        
+        # Set the command to the service request
+        request = StringRepReq.Request()
+        request.data = "ADD HERE ANY SETUP THAT MIGHT CHANGE"
+
+        # Call async and add the response callback
+        future = client.call_async(request = request)
+        future.add_done_callback(self.cmd_sequence_callback)
 
     def status_callback(self, state: Bool):
         self.farmbot_busy_ = state.data
