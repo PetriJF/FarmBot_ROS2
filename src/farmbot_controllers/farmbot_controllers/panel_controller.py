@@ -36,7 +36,7 @@ class PanelController(Node):
 
         
         self.cmd_ = String()
-        self.input_pub_ = self.create_publisher(String, 'input_topic', 10)
+        self.input_pub_ = self.create_publisher(String, 'uart_transmit', 10)
         self.input_sub_ = self.create_subscription(String, 'keyboard_topic', self.command_callback, 10)
 
         # LED Flasher Button
@@ -71,16 +71,17 @@ class PanelController(Node):
         if cmd.data == 'e':
             self.LED_client(FBPanel.ESTOP_LED, FBPanel.OFF)
             self.LED_client(FBPanel.UNLOCK_LED, FBPanel.FLASHING)
-            self.cmd_.data = 'e'
+            self.cmd_.data = 'E'
+            self.input_pub_.publish(self.cmd_)
             self.get_logger().info("ESTOP button pressed")
-        elif cmd.data == 'E' or cmd.data == 'i':
+        elif cmd.data == 'E':
             self.LED_client(FBPanel.ESTOP_LED, FBPanel.ON)
             self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
-            self.cmd_.data = 'E'
+            self.cmd_.data = 'F09'
+            self.input_pub_.publish(self.cmd_)
             self.get_logger().info("RESET button pressed")
 
-        self.input_pub_.publish(cmd)
-
+        
     ### Service Server
 
     def LED_server(self, request, response):
@@ -171,7 +172,7 @@ class PanelController(Node):
         if current_state == GPIO.LOW:
             self.LED_client(FBPanel.ESTOP_LED, FBPanel.OFF)
             self.LED_client(FBPanel.UNLOCK_LED, FBPanel.FLASHING)
-            self.cmd_.data = 'e'
+            self.cmd_.data = 'E'
             self.input_pub_.publish(self.cmd_)
             self.get_logger().info("ESTOP button pressed")
 
@@ -183,7 +184,7 @@ class PanelController(Node):
         if current_state == GPIO.LOW:
             self.LED_client(FBPanel.ESTOP_LED, FBPanel.ON)
             self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
-            self.cmd_.data = 'E'
+            self.cmd_.data = 'F09'
             self.input_pub_.publish(self.cmd_)
             self.get_logger().info("RESET button pressed")
     
@@ -196,7 +197,6 @@ class PanelController(Node):
     #         self.LED_client(FBPanel.LED3, FBPanel.FLASHING)
     #         self.LED_client(FBPanel.LED4, FBPanel.FLASHING)
     #         #self.cmd_.data = 'A'
-    #         #self.input_pub_.publish(self.cmd_)
     #         self.get_logger().info("Button A pressed")
 
     def destroy_node(self):
@@ -213,8 +213,8 @@ def main(args = None):
     panel_node = PanelController()
     
     # GPIO Button
-    GPIO.add_event_detect(FBPanel.BUTTON_ESTOP, GPIO.FALLING, callback=panel_node.estop_button_handler, bouncetime=1000)
-    GPIO.add_event_detect(FBPanel.BUTTON_UNLOCK, GPIO.FALLING, callback=panel_node.reset_button_handler, bouncetime=1000)
+    GPIO.add_event_detect(FBPanel.BUTTON_ESTOP, GPIO.FALLING, callback=panel_node.estop_button_handler, bouncetime=200)
+    GPIO.add_event_detect(FBPanel.BUTTON_UNLOCK, GPIO.FALLING, callback=panel_node.reset_button_handler, bouncetime=200)
     #GPIO.add_event_detect(FBPanel.BUTTON_A, GPIO.FALLING, callback=panel_node.buttonAHandler, bouncetime=1000)
 
     try:
