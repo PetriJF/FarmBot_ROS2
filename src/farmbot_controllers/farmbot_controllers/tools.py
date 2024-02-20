@@ -56,7 +56,9 @@ class ToolCommands:
         if message[0] == 'R41' and message[1] == 'P63':
             self.node_.get_logger().info(f"A tool is {'not ' if bool(message[2][-1]) else ''} mounted on the tool element")
  
-    
+    def clear_sequence(self):
+        self.sequence_ = []
+
     # Peripheral control functions
 
     def vacuum_pump_on(self):
@@ -124,21 +126,6 @@ class ToolCommands:
         self.node_.get_logger().info(future.result().data)
 
         self.sequence_.extend(cmd)
-        # cmdType = ''
-        # for mvm in cmd: # move extruder to all coordinates in the string list
-        #     if mvm[:2] == 'CC':
-        #         cmdType = 'CC'
-        #         continue
-
-        #     if cmdType == 'CC':
-        #         coords = mvm.split(' ')
-        #         self.mvm_.moveGantryAbsolute(x_coord = float(coords[0]), 
-        #                                      y_coord = float(coords[1]), 
-        #                                      z_coord = float(coords[2]))
-        #     # Check if tool is mounted properly
-            #self.devices_.read_pin(63, False)
-            
-            #self.get_pin_response('63', -1)
 
     def sequencing_timer(self):
         if not len(self.sequence_):

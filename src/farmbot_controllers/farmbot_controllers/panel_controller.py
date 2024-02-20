@@ -36,17 +36,17 @@ class PanelController(Node):
 
         
         self.cmd_ = String()
-        self.inputPub_ = self.create_publisher(String, 'input_topic', 10)
-        self.inputSub_ = self.create_subscription(String, 'keyboard_topic', self.cmdCallback, 10)
+        self.input_pub_ = self.create_publisher(String, 'uart_transmit', 10)
+        self.input_sub_ = self.create_subscription(String, 'keyboard_topic', self.command_callback, 10)
 
         # LED Flasher Button
-        self.flashState_ = False
-        flashingFrequency = 2.0
-        self.ledsToFlash_ = [FBPanel.ESTOP_LED, FBPanel.UNLOCK_LED]
+        self.flash_state_ = False
+        flashing_frequency = 2.0
+        self.leds_to_flash_ = []
         
-        self.ledFlashingTimer_ = self.create_timer(1.0 / flashingFrequency, self.ledFlasher)
+        self.led_flasher_timer_ = self.create_timer(1.0 / flashing_frequency, self.LED_flasher)
 
-        self.ledPinList_ = [
+        self.led_pin_list_ = [
             FBPanel.LED1,
             FBPanel.LED2,
             FBPanel.LED3,
@@ -57,32 +57,40 @@ class PanelController(Node):
             FBPanel.BUTTON_LED_B,
             FBPanel.BUTTON_LED_C
         ]
-        self.ledPanelServer_ = self.create_service(LedPanelHandler, 'set_led', self.ledHandlerCallback)
+        self.led_panel_server_ = self.create_service(LedPanelHandler, 'set_led', self.LED_server)
+
+        self.LED_client(FBPanel.ESTOP_LED, FBPanel.ON)
+        self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
 
         # Log the initialization
         self.get_logger().info("Panel Controller Initialized..")
 
     ### Verifying user input for E_STOPS and RESETS
 
-    def cmdCallback(self, cmd = String):
+    def command_callback(self, cmd = String):
         if cmd.data == 'e':
-            self.callLEDPanel(FBPanel.ESTOP_LED, FBPanel.OFF)
-            self.callLEDPanel(FBPanel.UNLOCK_LED, FBPanel.FLASHING)
-            self.cmd_.data = 'e'
-            self.get_logger().info("ESTOP button pressed")
-        elif cmd.data == 'E' or cmd.data == 'i':
-            self.callLEDPanel(FBPanel.ESTOP_LED, FBPanel.ON)
-            self.callLEDPanel(FBPanel.UNLOCK_LED, FBPanel.ON)
+            self.LED_client(FBPanel.ESTOP_LED, FBPanel.OFF)
+            self.LED_client(FBPanel.UNLOCK_LED, FBPanel.FLASHING)
             self.cmd_.data = 'E'
+            self.input_pub_.publish(self.cmd_)
+            self.get_logger().info("ESTOP button pressed")
+        elif cmd.data == 'E':
+            self.LED_client(FBPanel.ESTOP_LED, FBPanel.ON)
+            self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
+            self.cmd_.data = 'F09'
+            self.input_pub_.publish(self.cmd_)
             self.get_logger().info("RESET button pressed")
 
-        self.inputPub_.publish(cmd)
-
+        
     ### Service Server
 
-    def ledHandlerCallback(self, request, response):
+    def LED_server(self, request, response):
+        '''
+        Service Server handling LED State manipulation.
+        It sets the LEDS to ON, OFF or FLASHING.
+        '''
         # Check if the LED Pin is correct
-        if request.led_pin not in self.ledPinList_:
+        if request.led_pin not in self.led_pin_list_:
             self.get_logger().warn("Selected LED pin is not recorded as having an LED attached")
             response.success = False
             return response
@@ -94,27 +102,36 @@ class PanelController(Node):
         
         if request.state == FBPanel.ON:
             GPIO.output(request.led_pin, GPIO.HIGH)
-            self.removeFromFlashingLeds(request.led_pin)
+            self.remove_flashing_led(request.led_pin)
         elif request.state == FBPanel.OFF:
             GPIO.output(request.led_pin, GPIO.LOW)
-            self.removeFromFlashingLeds(request.led_pin)
+            self.remove_flashing_led(request.led_pin)
         elif request.state == FBPanel.FLASHING:
-            self.addToFlashingLeds(request.led_pin)
+            self.add_flashing_led(request.led_pin)
 
         response.success = True
         return response
 
-    def addToFlashingLeds(self, led_pin):
-        if led_pin not in self.ledsToFlash_:
-            self.ledsToFlash_.append(led_pin)
+    def add_flashing_led(self, led_pin):
+        '''
+        Add a LED from the flashing LED list
+        '''
+        if led_pin not in self.leds_to_flash_:
+            self.leds_to_flash_.append(led_pin)
     
-    def removeFromFlashingLeds(self, led_pin):
-        if led_pin in self.ledsToFlash_:
-            self.ledsToFlash_.remove(led_pin)
+    def remove_flashing_led(self, led_pin):
+        '''
+        Remove a LED from the flashing LED list
+        '''
+        if led_pin in self.leds_to_flash_:
+            self.leds_to_flash_.remove(led_pin)
 
     ### Service Client
 
-    def callLEDPanel(self, led_pin, state):
+    def LED_client(self, led_pin, state):
+        '''
+        Service client for switching an LED on or off
+        '''
         client = self.create_client(LedPanelHandler, 'set_led')
         while not client.wait_for_service(1.0):
             self.get_logger().warn("Waiting for LED Handling Server...")
@@ -124,9 +141,12 @@ class PanelController(Node):
         request.state = state
 
         future = client.call_async(request = request)
-        future.add_done_callback(self.callbackLEDPanel)
+        future.add_done_callback(self.LED_panel_callback)
 
-    def callbackLEDPanel(self, future):
+    def LED_panel_callback(self, future):
+        '''
+        Service client callback once the LED switching server ends.
+        '''
         try:
             response = future.result()
             if not response:
@@ -136,42 +156,53 @@ class PanelController(Node):
 
     ### LED states for the panel
 
-    def ledFlasher(self):
-        for led_pin in self.ledsToFlash_:
-            GPIO.output(led_pin, GPIO.HIGH if self.flashState_ else GPIO.LOW)
-        self.flashState_ = not self.flashState_
+    def LED_flasher(self):
+        '''
+        Timer Callback that flashes the LEDs in the self.leds_to_flash_ list.
+        '''
+        for led_pin in self.leds_to_flash_:
+            GPIO.output(led_pin, GPIO.HIGH if self.flash_state_ else GPIO.LOW)
+        self.flash_state_ = not self.flash_state_
     
-    def estopButtonHandler(self, channel):
+    def estop_button_handler(self, channel):
+        '''
+        EStop Button Event Handler for the panel controller
+        '''
         current_state = GPIO.input(FBPanel.BUTTON_ESTOP)
         if current_state == GPIO.LOW:
-            self.callLEDPanel(FBPanel.ESTOP_LED, FBPanel.OFF)
-            self.callLEDPanel(FBPanel.UNLOCK_LED, FBPanel.FLASHING)
-            self.cmd_.data = 'e'
-            self.inputPub_.publish(self.cmd_)
+            self.LED_client(FBPanel.ESTOP_LED, FBPanel.OFF)
+            self.LED_client(FBPanel.UNLOCK_LED, FBPanel.FLASHING)
+            self.cmd_.data = 'E'
+            self.input_pub_.publish(self.cmd_)
             self.get_logger().info("ESTOP button pressed")
 
-    def resetButtonHandler(self, channel):
+    def reset_button_handler(self, channel):
+        '''
+        Reset Button Event Handler for the panel controller
+        '''
         current_state = GPIO.input(FBPanel.BUTTON_UNLOCK)
         if current_state == GPIO.LOW:
-            self.callLEDPanel(FBPanel.ESTOP_LED, FBPanel.ON)
-            self.callLEDPanel(FBPanel.UNLOCK_LED, FBPanel.ON)
-            self.cmd_.data = 'E'
-            self.inputPub_.publish(self.cmd_)
+            self.LED_client(FBPanel.ESTOP_LED, FBPanel.ON)
+            self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
+            self.cmd_.data = 'F09'
+            self.input_pub_.publish(self.cmd_)
             self.get_logger().info("RESET button pressed")
     
     # Just for demonstration purposes
     # def buttonAHandler(self, channel):
     #     current_state = GPIO.input(FBPanel.BUTTON_A)
     #     if current_state == GPIO.LOW:
-    #         self.callLEDPanel(FBPanel.LED1, FBPanel.FLASHING)
-    #         self.callLEDPanel(FBPanel.LED2, FBPanel.FLASHING)
-    #         self.callLEDPanel(FBPanel.LED3, FBPanel.FLASHING)
-    #         self.callLEDPanel(FBPanel.LED4, FBPanel.FLASHING)
+    #         self.LED_client(FBPanel.LED1, FBPanel.FLASHING)
+    #         self.LED_client(FBPanel.LED2, FBPanel.FLASHING)
+    #         self.LED_client(FBPanel.LED3, FBPanel.FLASHING)
+    #         self.LED_client(FBPanel.LED4, FBPanel.FLASHING)
     #         #self.cmd_.data = 'A'
-    #         #self.inputPub_.publish(self.cmd_)
     #         self.get_logger().info("Button A pressed")
 
     def destroy_node(self):
+        '''
+        destroy_node overloading for cleaning up the GPIO
+        '''
         # gpio cleanup
         GPIO.cleanup()
 
@@ -179,23 +210,22 @@ class PanelController(Node):
 def main(args = None):
     rclpy.init(args = args)
 
-    panelControllerNode = PanelController()
+    panel_node = PanelController()
     
     # GPIO Button
-    GPIO.add_event_detect(FBPanel.BUTTON_ESTOP, GPIO.FALLING, callback=panelControllerNode.estopButtonHandler, bouncetime=1000)
-    GPIO.add_event_detect(FBPanel.BUTTON_UNLOCK, GPIO.FALLING, callback=panelControllerNode.resetButtonHandler, bouncetime=1000)
-    #GPIO.add_event_detect(FBPanel.BUTTON_A, GPIO.FALLING, callback=panelControllerNode.buttonAHandler, bouncetime=1000)
+    GPIO.add_event_detect(FBPanel.BUTTON_ESTOP, GPIO.FALLING, callback=panel_node.estop_button_handler, bouncetime=200)
+    GPIO.add_event_detect(FBPanel.BUTTON_UNLOCK, GPIO.FALLING, callback=panel_node.reset_button_handler, bouncetime=200)
+    #GPIO.add_event_detect(FBPanel.BUTTON_A, GPIO.FALLING, callback=panel_node.buttonAHandler, bouncetime=1000)
 
     try:
-        #rclpy.spin(keyboardTeleOpNode)
-        rclpy.spin(panelControllerNode)
+        rclpy.spin(panel_node)
     except KeyboardInterrupt:
         pass
     finally:
         GPIO.remove_event_detect(FBPanel.BUTTON_ESTOP)
         GPIO.remove_event_detect(FBPanel.BUTTON_UNLOCK)
         #GPIO.remove_event_detect(FBPanel.BUTTON_A)
-        panelControllerNode.destroy_node()
+        panel_node.destroy_node()
         rclpy.shutdown()
 
 

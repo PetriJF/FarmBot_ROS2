@@ -34,7 +34,7 @@ class KeyboardTeleOp(Node):
 
         # Temporary Keyboard subscriber
         self.cur_increment_ = 10.0
-        self.inputSub_ = self.create_subscription(String, 'input_topic', self.commandInterpretationCallback, 10)
+        self.inputSub_ = self.create_subscription(String, 'keyboard_topic', self.commandInterpretationCallback, 10)
 
         # UART Rx Subscriber
         self.uartRxSub_ = self.create_subscription(String, 'uart_receive', self.farmbotFeedbackCallback, 10)
@@ -51,9 +51,9 @@ class KeyboardTeleOp(Node):
         code = cmd.data.split(' ')
         match code[0]:
             case 'e':
-                self.state_.electronicStop()
-            case 'E':
-                self.state_.resetElectronicStop()
+                self.tools_.clear_sequence()
+            #case 'E':
+            #    self.state_.resetElectronicStop()
             case 'w':
                 self.cur_x_ += self.cur_increment_
                 self.mvm_.moveGantryAbsolute(x_coord = self.cur_x_ + self.cur_increment_, y_coord = self.cur_y_, z_coord = self.cur_z_)
