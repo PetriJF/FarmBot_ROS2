@@ -28,6 +28,7 @@ class LuxonisCameraController(Node):
             response.data = "WRITE THE COMMANDS HERE"
         # Sequencing constructed successfully and server returns it
         response.success = True
+        self.get_logger().info("Picture stitched to the panorama successfully")
         return response
     
     def luxonis_calibration(self, request, response):
@@ -36,6 +37,7 @@ class LuxonisCameraController(Node):
             response.data = "WRITE THE COMMANDS HERE"
         # Sequencing constructed successfully and server returns it
         response.success = True
+        self.get_logger().info("Luxonis camera calibrated successfully")
         return response
 
     def luxonis_panorama_sequence_server(self, request, response):
@@ -44,6 +46,7 @@ class LuxonisCameraController(Node):
             response.data = "WRITE THE COMMANDS HERE"
         # Sequencing constructed successfully and server returns it
         response.success = True
+        self.get_logger().info("Panorama sequence formed successfully")
         return response
 
 

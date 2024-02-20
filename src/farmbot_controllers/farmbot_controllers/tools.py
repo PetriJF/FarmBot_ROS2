@@ -161,5 +161,47 @@ class ToolCommands:
                 self.sequence_.pop(0)
 
 
+    def cam_calib_client(self):
+        '''
+        Tool command service client used to communicate between the farmbot
+        controller and the map handler.
+
+        Args:
+            cmd {str}: The command that is sent to the map handler
+        '''
+        # Initializing the client and wait for map server confirmation
+        client = self.node_.create_client(StringRepReq, 'calibrate_luxonis')
+        while not client.wait_for_service(1.0):
+            self.node_.get_logger().warn("Waiting for Camera Calibration Server...")
+        
+        # Set the command to the service request
+        request = StringRepReq.Request()
+        request.data = "ADD HERE ANY SETUP THAT MIGHT CHANGE"
+
+        # Call async and add the response callback
+        future = client.call_async(request = request)
+        future.add_done_callback(self.cmd_sequence_callback)
+    
+    def panorama_client(self):
+        '''
+        Tool command service client used to communicate between the farmbot
+        controller and the map handler.
+
+        Args:
+            cmd {str}: The command that is sent to the map handler
+        '''
+        # Initializing the client and wait for map server confirmation
+        client = self.node_.create_client(StringRepReq, 'panorama_sequence')
+        while not client.wait_for_service(1.0):
+            self.node_.get_logger().warn("Waiting for Panorama Sequencing Server...")
+        
+        # Set the command to the service request
+        request = StringRepReq.Request()
+        request.data = "ADD HERE ANY SETUP THAT MIGHT CHANGE"
+
+        # Call async and add the response callback
+        future = client.call_async(request = request)
+        future.add_done_callback(self.cmd_sequence_callback)
+
     def status_callback(self, state: Bool):
         self.farmbot_busy_ = state.data

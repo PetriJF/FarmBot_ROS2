@@ -134,14 +134,18 @@ class KeyboardTeleOp(Node):
                 self.plant_manage_pub_.publish(self.plant_conf_)
             case 'P_3' | 'P_4': # Seed/water all plants in Planning stage
                 self.tools_.map_cmd_client(cmd = cmd.data)
-            
-            case 'S_1_0': # new tool marked
+            ## Seed Tray commands
+            case 'S_1_0':
                 self.tools_.map_cmd_client(cmd = 'S_1_0_0\nTray1\nRadish\n1198.0 332.4 -240.0')
-            case 'S_2_0': # new tool marked
+            case 'S_2_0':
                 self.tools_.map_cmd_client(cmd = 'S_2_0_0\nTray2\nRadish\n1198.0 432.2 -240.0')
-            case 'S_3_0': # new tool marked
+            case 'S_3_0':
                 self.tools_.map_cmd_client(cmd = 'S_3_0_0\nTray3\nRadish\n1198.0 532.2 -240.0')
-
+            ## Imaging commands
+            case 'I_0': # Calibrate Camera
+                self.tools_.calibrate_luxonis_camera()
+            case 'I_1': # Panorama Sequencing
+                self.tools_.form_panorama_sequence()
 
     ## UART Handling Callback
     def farmbotFeedbackCallback(self, msg = String):
