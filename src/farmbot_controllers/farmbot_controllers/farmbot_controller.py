@@ -50,8 +50,8 @@ class KeyboardTeleOp(Node):
     def commandInterpretationCallback(self, cmd = String):
         code = cmd.data.split(' ')
         match code[0]:
-            #case 'e':
-            #    self.state_.electronicStop()
+            case 'e':
+                self.tools_.clear_sequence()
             #case 'E':
             #    self.state_.resetElectronicStop()
             case 'w':
