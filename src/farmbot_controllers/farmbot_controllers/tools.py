@@ -191,7 +191,7 @@ class ToolCommands:
         future = client.call_async(request = request)
         future.add_done_callback(self.stitch_callback)
 
-    def stitch_callback(self):
+    def stitch_callback(self, future):
         self.wait_for_camera_ = False
 
     def cam_calib_client(self):
