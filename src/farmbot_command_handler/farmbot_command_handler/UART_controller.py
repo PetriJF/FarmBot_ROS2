@@ -28,10 +28,10 @@ class UARTController(Node):
 
         # Farmbot state publisher
         self.farmbot_busy_ = Bool()
+        self.farmbot_busy_.data = False
         self.farmbot_state_pub_ = self.create_publisher(Bool, 'busy_state', 10)
 
         # Node subscripters and publishers
-        self.tx_blocker_ = False
         self.tx_queue_ = []
         self.uart_tx_sub_ = self.create_subscription(String, 'uart_transmit', self.uart_transmit_callback, 10)
         
@@ -45,7 +45,7 @@ class UARTController(Node):
         # Used for setting the busy status on the ROS2 arch. while a command is running
         self.previous_cmd_ = ''
 
-        # Request Response Action Server
+        # Request Response Action Server WIP
         self.uart_received_cmd_ = ''
         self.req_resp_server_ = ActionServer(
             self, GetUARTResponse, 'uart_response',
@@ -65,10 +65,9 @@ class UARTController(Node):
         '''
         
         # If the blocker is not up, and there are commands in the queue
-        if not self.tx_blocker_ and self.tx_queue_:
+        if not self.farmbot_busy_.data and self.tx_queue_:
             # Set the blocker flag
-            self.tx_blocker_ = True
-            self.farmbot_busy_.data = self.tx_blocker_ 
+            self.farmbot_busy_.data = True
             self.farmbot_state_pub_.publish(self.farmbot_busy_)
             # Clear the command from the queue
             message = self.tx_queue_.pop(0)
@@ -78,7 +77,7 @@ class UARTController(Node):
                 message += "\n"
 
             # Record the transmitted command
-            self.previous_cmd_ = message.split(' ')[0]
+            self.previous_cmd_ = message.split(' ')[0] if ' ' in message else message.split('\n')[0]
             self.get_logger().info(f"Sent message: {message}")
             # Send through UART the command
             self.ser_.write(message.encode('utf-8'))
@@ -103,8 +102,7 @@ class UARTController(Node):
             # Send command and reset everything
             self.ser_.write(message.data.encode('utf-8'))
             self.tx_queue_.clear()
-            self.tx_blocker_ = False
-            self.farmbot_busy_.data = self.tx_blocker_ 
+            self.farmbot_busy_.data = False
             self.farmbot_state_pub_.publish(self.farmbot_busy_)
         # Standard commands
         else:
@@ -148,8 +146,7 @@ class UARTController(Node):
         if (self.previous_cmd_ in response_cmds and rep_code in ['R02', 'R03']
                 or self.previous_cmd_ not in response_cmds and rep_code in ['R08']):
             # Lower the blocking flag
-            self.tx_blocker_ = False
-            self.farmbot_busy_.data = self.tx_blocker_ 
+            self.farmbot_busy_.data = False
             self.farmbot_state_pub_.publish(self.farmbot_busy_)
         
         # Send the reporting message for further processing by other nodes
