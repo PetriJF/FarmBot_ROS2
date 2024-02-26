@@ -4,7 +4,7 @@
 import rclpy
 from rclpy.node import Node
 from farmbot_interfaces.srv import StringRepReq
-
+from camera_handler.luxonis_publisher import CameraNode
 class LuxonisCameraController(Node):
     # Node contructor
     def __init__(self):
@@ -15,6 +15,7 @@ class LuxonisCameraController(Node):
         
         # Sequencing Service Server
         self.panorama_server_ = self.create_service(StringRepReq, 'form_panorama', self.luxonis_panorama_server)
+        self.take_picture_ = CameraNode(self)
 
         # Camera Calibration Server
         self.calibration_server_ = self.create_service(StringRepReq, 'calibrate_luxonis', self.luxonis_calibration)
@@ -26,8 +27,10 @@ class LuxonisCameraController(Node):
         ## Add here the coordinate commands and the camera picture commands
         if request.data: # USE THE .data TO READ FROM YOUR REQUEST STRING
             response.data = "WRITE THE COMMANDS HERE"
+        self.take_picture_.save_images()
+        response.data = "success"
         # Sequencing constructed successfully and server returns it
-        response.success = True
+        #response.success = True
         self.get_logger().info("Picture stitched to the panorama successfully")
         return response
     

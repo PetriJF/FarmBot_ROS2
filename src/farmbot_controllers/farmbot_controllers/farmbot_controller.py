@@ -143,9 +143,9 @@ class KeyboardTeleOp(Node):
                 self.tools_.map_cmd_client(cmd = 'S_3_0_0\nTray3\nRadish\n1198.0 532.2 -240.0')
             ## Imaging commands
             case 'I_0': # Calibrate Camera
-                self.tools_.calibrate_luxonis_camera()
+                self.tools_.cam_calib_client()
             case 'I_1': # Panorama Sequencing
-                self.tools_.form_panorama_sequence()
+                self.tools_.stitch_panorama_client()
 
     ## UART Handling Callback
     def farmbotFeedbackCallback(self, msg = String):
