@@ -9,8 +9,8 @@ class ImageSubscriber(Node):
     def __init__(self):
         super().__init__('image_subscriber')
         self.bridge = CvBridge()
-        self.rgb_sub = self.create_subscription(Image, '/rgb_image', self.rgb_callback, 10)
-        self.depth_sub = self.create_subscription(Image, '/depth_image', self.depth_callback, 10)
+        self.rgb_sub = self.create_subscription(Image, '/rgb_img', self.rgb_callback, 10)
+        self.depth_sub = self.create_subscription(Image, '/depth_img', self.depth_callback, 10)
         self.rgb_image = None
         self.depth_image = None
 

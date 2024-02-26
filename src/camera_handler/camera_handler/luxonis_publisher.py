@@ -5,23 +5,27 @@ from ament_index_python.packages import get_package_share_directory
 from cv_bridge import CvBridge
 import yaml
 import os
+import cv2
 import numpy as np
 import depthai as dai
 
-class CameraNode(Node):
-    def __init__(self):
-        super().__init__('camera_node')
+class CameraNode:
+    def __init__(self, node: Node):
+        self.node_= node
+        
         self.bridge = CvBridge()  # Bridge to convert between ROS and OpenCV images
         self.load_config()  # Load configuration from YAML file
         self.setup_camera()  # Initialize and configure the DepthAI camera
         
         # Initialize publishers for RGB and depth images
-        self.rgb_publisher = self.create_publisher(Image, 'rgb_image', 10)
-        self.depth_publisher = self.create_publisher(Image, 'depth_image', 10)
+        self.rgb_publisher = self.node_.create_publisher(Image, 'rgb_img', 10)
+        self.depth_publisher = self.node_.create_publisher(Image, 'depth_img', 10)
         
+        self.rgb_image_ = None
+        self.depth_image_ = None
         # Set a timer to process and publish images at a specified rate
         timer_period = 0.05  # seconds
-        self.timer = self.create_timer(timer_period, self.run)
+        self.timer = self.node_.create_timer(timer_period, self.run)
 
     def load_config(self):
         # Load configuration from YAML file
@@ -95,7 +99,7 @@ class CameraNode(Node):
         config.postProcessing.spatialFilter.enable = True
         stereo.initialConfig.set(config)
 
-    def publish_images(self, rgb_frame, depth_frame):
+    def publish_images(self, rgb_frame = None, depth_frame = None):
         # Publish RGB and depth frames if available
         if rgb_frame is not None:
             rgb_msg = self.bridge.cv2_to_imgmsg(rgb_frame, encoding='bgr8')
@@ -115,10 +119,11 @@ class CameraNode(Node):
                 latestPacket[queueName] = packets[-1]
 
         if latestPacket["rgb"] is not None:
-            self.publish_images(latestPacket["rgb"].getCvFrame(), None)
+            self.rgb_image_ = latestPacket["rgb"].getCvFrame()
+            self.publish_images(rgb_frame=self.rgb_image_)
         if latestPacket["stereo"] is not None:
-            depth_frame = self.process_depth_frame(latestPacket["stereo"].getFrame())
-            self.publish_images(None, depth_frame)
+            self.depth_image_ = self.process_depth_frame(latestPacket["stereo"].getFrame())
+            self.publish_images(depth_frame=self.depth_image_ )
 
     def process_depth_frame(self, disparity_frame):
         # Process disparity frame to generate a depth frame for publishing
@@ -132,15 +137,23 @@ class CameraNode(Node):
         # Load configuration data from a YAML file
         fullPath = os.path.join(path, fileName)
         if not os.path.exists(fullPath):
-            self.get_logger().warn(f"File path is invalid: {fullPath}")
+            self.node_.get_logger().warn(f"File path is invalid: {fullPath}")
             return None
         
         with open(fullPath, 'r') as yaml_file:
             try:
                 return yaml.safe_load(yaml_file)
             except yaml.YAMLError as e:
-                self.get_logger().warn(f"Error reading YAML file: {e}")
+                self.node_.get_logger().warn(f"Error reading YAML file: {e}")
                 return None
+            
+    def save_images(self):
+        if self.rgb_image_ is not None and self.depth_image_ is not None:
+            cv2.imwrite("saved_rgb_image.png", self.rgb_image_)
+            cv2.imwrite("saved_depth_image.png", self.depth_image_)
+            self.node_.get_logger().info('Images saved successfully.')
+        else:
+            self.node_.get_logger().info('No images to save.')
 
 
 def main(args=None):
