@@ -28,35 +28,6 @@ class ToolCommands:
         self.get_response_client_ = ActionClient(self.node_, GetUARTResponse, 'uart_response')
         self.busy_state_sub_ = self.node_.create_subscription(Bool, 'busy_state', self.status_callback, 10)
         self.sequencing_timer_ = self.node_.create_timer(1.0, self.sequencing_timer)
-
-    ## NOT IN USE WIP
-    def get_pin_response(self, code: str, timeout: int):
-        # Waiting for server to be ready
-        self.get_response_client_.wait_for_server()
-
-        # Create the goal
-        goal = GetUARTResponse.Goal()
-        goal.code = code
-        goal.timeout_sec = timeout
-
-        # Send the goal
-        self.get_response_client_. \
-            send_goal_async(goal). \
-                add_done_callback(self.goal_response_callback)
-    ## NOT IN USE WIP
-    def goal_response_callback(self, future):
-        self.goal_handle_: ClientGoalHandle = future.result()
-        if self.goal_handle_.accepted:
-            self.goal_handle_. \
-                get_result_async(). \
-                    add_done_callback(self.goal_result_callback)
-    ## NOT IN USE WIP
-    def goal_result_callback(self, future):
-        self.node_.get_logger().info("SS")
-        message = future.result().result.msg.split(' ')
-        self.node_.get_logger().info(future.result().result.msg)
-        if message[0] == 'R41' and message[1] == 'P63':
-            self.node_.get_logger().info(f"A tool is {'not ' if bool(message[2][-1]) else ''} mounted on the tool element")
  
     def clear_sequence(self):
         self.sequence_ = []
@@ -156,6 +127,7 @@ class ToolCommands:
                 if cmd[0] == 'Vacuum':
                     if cmd[1] == '1':
                         self.vacuum_pump_on()
+                        self.devices_.read_pin(9, False)
                     elif cmd[1] == '0':
                         self.vacuum_pump_off()
                     else:
