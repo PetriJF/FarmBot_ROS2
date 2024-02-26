@@ -135,16 +135,24 @@ class UARTController(Node):
         self.uart_received_cmd_ = message
         self.uart_cmd_.data = message
         
-        # Response codes that unblock the transmit method
-        response_cmds = ['G00', 'G01', 'G28', 'F11', 'F12', 'F13',
-                         'F14', 'F15', 'F16', 'F44']
+        # Blocking command codes
+        blocking_cmds = ['G00', 'G01', 'G28', 'F11', 'F12', 'F13',
+                         'F14', 'F15', 'F16', 'F20', 'F44']
+        blocking_responses = ['R02', 'R03']
+        # Commands that block until a response is reached
+        request_cmds = ['F42', 'F21']
+        response_cmds = ['R41']
+
         # Extract the command code
         rep_code = (message).split(' ')[0]
         
-        # If a running command has finished or the sent command was acknowledged by
-        # the farmbot
-        if (self.previous_cmd_ in response_cmds and rep_code in ['R02', 'R03']
-                or self.previous_cmd_ not in response_cmds and rep_code in ['R08']):
+        # If a running command has finished OR the response for a request was retrieved
+        # OR the sent command was acknowledged by the farmbot
+        if ((self.previous_cmd_ in blocking_cmds and rep_code in blocking_responses)
+                or (self.previous_cmd_ in request_cmds and rep_code in response_cmds)
+                or (self.previous_cmd_ not in blocking_cmds 
+                    and self.previous_cmd_ not in request_cmds
+                    and rep_code in ['R08'])):
             # Lower the blocking flag
             self.farmbot_busy_.data = False
             self.farmbot_state_pub_.publish(self.farmbot_busy_)
