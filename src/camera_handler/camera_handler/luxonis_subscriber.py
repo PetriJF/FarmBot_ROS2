@@ -1,61 +1,48 @@
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image, Imu
+from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
+from std_srvs.srv import Trigger
 import cv2
 
-class OakCameraSubscriber(Node):
+class ImageSubscriber(Node):
     def __init__(self):
-        super().__init__('oak_camera_subscriber')
+        super().__init__('image_subscriber')
         self.bridge = CvBridge()
-        self.subscription_color = self.create_subscription(
-            Image,
-            'color/image_raw',  # Update this topic name
-            self.listener_callback_color,
-            10)
-        self.subscription_left = self.create_subscription(
-            Image,
-            'left/image_raw',  # Update this topic name
-            self.listener_callback_left,
-            10)
-        self.subscription_right = self.create_subscription(
-            Image,
-            'right/image_raw',  # Update this topic name
-            self.listener_callback_right,
-            10)
-        self.subscription_imu = self.create_subscription(
-            Imu,
-            'imu/data',  # Update this topic name
-            self.listener_callback_imu,
-            10)
+        self.rgb_sub = self.create_subscription(Image, '/rgb_image', self.rgb_callback, 10)
+        self.depth_sub = self.create_subscription(Image, '/depth_image', self.depth_callback, 10)
+        self.rgb_image = None
+        self.depth_image = None
 
-    def listener_callback_color(self, msg):
-        cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
-        # Process color image here
-        cv2.imshow("Color Image", cv_image)
-        cv2.waitKey(1)
+        # Timer to wait a bit for the first images to arrive and then save
+        self.timer = self.create_timer(1.0, self.save_and_shutdown)  # Wait 1 second
 
-    def listener_callback_left(self, msg):
-        cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
-        # Process left image here
+    def rgb_callback(self, msg):
+        if self.rgb_image is None:  # Only save the first image
+            self.rgb_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
 
-    def listener_callback_right(self, msg):
-        cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
-        # Process right image here
+    def depth_callback(self, msg):
+        if self.depth_image is None:  # Only save the first image
+            self.depth_image = self.bridge.imgmsg_to_cv2(msg, "mono8")
 
-    def listener_callback_imu(self, msg):
-        # Process IMU data here
-        pass
+    def save_and_shutdown(self):
+        if self.rgb_image is not None and self.depth_image is not None:
+            cv2.imwrite("saved_rgb_image.png", self.rgb_image)
+            cv2.imwrite("saved_depth_image.png", self.depth_image)
+            self.get_logger().info('Images saved successfully.')
+        else:
+            self.get_logger().info('No images to save.')
+        
+        # Cancel the timer to prevent repeated saving
+        self.timer.cancel()
+        
+        # Shutdown the ROS 2 node
+        rclpy.shutdown()
 
 def main(args=None):
     rclpy.init(args=args)
-    oak_camera_subscriber = OakCameraSubscriber()
-    rclpy.spin(oak_camera_subscriber)
-    # Destroy the node explicitly
-    # (optional - otherwise it will be done automatically
-    # when the garbage collector destroys the node object)
-    oak_camera_subscriber.destroy_node()
-    rclpy.shutdown()
+    image_subscriber = ImageSubscriber()
+    rclpy.spin(image_subscriber)  # This will exit once `rclpy.shutdown()` is called
 
 if __name__ == '__main__':
     main()
