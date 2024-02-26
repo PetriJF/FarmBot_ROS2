@@ -11,53 +11,38 @@ from farmbot_interfaces.action import GetUARTResponse
 from rclpy.clock import ROSClock
 from farmbot_interfaces.srv import StringRepReq
 
-# Standard Imports
-import os
-import time
-
 class UARTController(Node):
     # Node contructor
     def __init__(self):
         super().__init__("UARTController")
 
-        # Get the path to the logging directory and 
-        #UART_LOG_PATH = os.path.join(self.get_namespace(), 'log', 'UART_Logs')
-        #os.makedirs(UART_LOG_PATH, exist_ok=True)
-
-        # Create a log file based on the node initialization date and time
-        #timestamp = ROSClock().now().to_msg()
-        #LOG_FILE_NAME = time.strftime("uart_log_%d_%m_%Y_%H_%M_%S.txt", time.localtime(timestamp.sec))
-        #LOG_FILE_PATH = os.path.join(UART_LOG_PATH, LOG_FILE_NAME)
-
-        # Open the log file in append mode
-        #self.uart_log_file_ = open(LOG_FILE_PATH, 'a')
-        
         self.uart_cmd_ = String()
 
-        serialPort = '/dev/ttyACM0'
-        serialSpeed = 115200
-        checkUartFreq = 100
-        txFreq = 10
+        serial_port = '/dev/ttyACM0'
+        serial_speed = 115200
+        check_uart_freq = 100
+        tx_freq = 10
 
         # UART receive publisher
-        self.uartRxPub_ = self.create_publisher(String, 'uart_receive', 10)
+        self.uart_rx_pub_ = self.create_publisher(String, 'uart_receive', 10)
 
         # Farmbot state publisher
         self.farmbot_busy_ = Bool()
         self.farmbot_state_pub_ = self.create_publisher(Bool, 'busy_state', 10)
 
         # Node subscripters and publishers
-        self.txBlocker_ = False
-        self.txQueue_ = []
-        self.uartTxSub_ = self.create_subscription(String, 'uart_transmit', self.uartTransmitCallback, 10)
+        self.tx_blocker_ = False
+        self.tx_queue_ = []
+        self.uart_tx_sub_ = self.create_subscription(String, 'uart_transmit', self.uart_transmit_callback, 10)
         
         # Initialize Serial Communication
-        self.ser_ = serial.Serial(serialPort, serialSpeed, timeout=1)
+        self.ser_ = serial.Serial(serial_port, serial_speed, timeout=1)
         self.ser_.reset_input_buffer()
         # Create a timer to periodically check for incoming serial messages
-        self.rxTimer_ = self.create_timer(1.0 / checkUartFreq, self.uartReceive)
-        self.txTimer_ = self.create_timer(1.0 / txFreq, self.uartTransmit)
+        self.rx_timer_ = self.create_timer(1.0 / check_uart_freq, self.uart_receive)
+        self.tx_timer_ = self.create_timer(1.0 / tx_freq, self.uart_transmit)
 
+        # Used for setting the busy status on the ROS2 arch. while a command is running
         self.previous_cmd_ = ''
 
         # Request Response Action Server
@@ -68,7 +53,107 @@ class UARTController(Node):
         )
 
         # Log the initialization
-        self.get_logger().info("State Controller Initialized..")
+        self.get_logger().info("UART Controller Initialized..")
+
+    def uart_transmit(self):
+        '''
+        Takes commands from the queue (tx_queue_) and sends them
+        to the farmbot through UART.
+        The command is popped from the queue only if the blocker
+        is not active (i.e. a command is not in the process of
+        running or a response is not expected).
+        '''
+        
+        # If the blocker is not up, and there are commands in the queue
+        if not self.tx_blocker_ and self.tx_queue_:
+            # Set the blocker flag
+            self.tx_blocker_ = True
+            self.farmbot_busy_.data = self.tx_blocker_ 
+            self.farmbot_state_pub_.publish(self.farmbot_busy_)
+            # Clear the command from the queue
+            message = self.tx_queue_.pop(0)
+            
+            # Ensure the command has an endline character at the end
+            if message[-1] != '\n':
+                message += "\n"
+
+            # Record the transmitted command
+            self.previous_cmd_ = message.split(' ')[0]
+            self.get_logger().info(f"Sent message: {message}")
+            # Send through UART the command
+            self.ser_.write(message.encode('utf-8'))
+
+    def uart_transmit_callback(self, message: String):
+        '''
+        Callback handling the commands that are queued to be sent
+        to the farmbot through UART.
+        Two cases:
+            a) the command has priority (e.g. electronic-stop):
+                The command bypasses the queue and the queue is reset
+            b) standard command:
+                The command is added at the end of the queue
+        '''
+        # Priority commands
+        if message.data in ['E', 'F09', '@']:
+            self.get_logger().info(f"Sent message: {message.data}")
+            # Ensure the endline char at the end of the command
+            if message.data[-1] != '\n':
+                message.data += "\n"
+
+            # Send command and reset everything
+            self.ser_.write(message.data.encode('utf-8'))
+            self.tx_queue_.clear()
+            self.tx_blocker_ = False
+            self.farmbot_busy_.data = self.tx_blocker_ 
+            self.farmbot_state_pub_.publish(self.farmbot_busy_)
+        # Standard commands
+        else:
+            # Add the command to the queue
+            self.tx_queue_.append(message.data)
+
+    def uart_receive(self):
+        '''
+        Timer callback that reads from UART and handles the response
+        codes and commands.
+        '''
+        # Read from serial
+        line = self.ser_.readline().decode('utf-8').rstrip()
+        
+        # If a command is read, handle it
+        if line:
+            self.get_logger().info(f"Received message: {line}")
+
+            # Call the callback function
+            self.handle_message(line)
+
+    def handle_message(self, message: str):
+        '''
+        Handles the command lines that are received through serial
+        
+        Args:
+            message {str}: the command string
+        '''
+        # Record the message
+        self.uart_received_cmd_ = message
+        self.uart_cmd_.data = message
+        
+        # Response codes that unblock the transmit method
+        response_cmds = ['G00', 'G01', 'G28', 'F11', 'F12', 'F13',
+                         'F14', 'F15', 'F16', 'F44']
+        # Extract the command code
+        rep_code = (message).split(' ')[0]
+        
+        # If a running command has finished or the sent command was acknowledged by
+        # the farmbot
+        if (self.previous_cmd_ in response_cmds and rep_code in ['R02', 'R03']
+                or self.previous_cmd_ not in response_cmds and rep_code in ['R08']):
+            # Lower the blocking flag
+            self.tx_blocker_ = False
+            self.farmbot_busy_.data = self.tx_blocker_ 
+            self.farmbot_state_pub_.publish(self.farmbot_busy_)
+        
+        # Send the reporting message for further processing by other nodes
+        self.uart_rx_pub_.publish(self.uart_cmd_)
 
     ## NOT IN USE WIP
     def request_response_server(self, goal_handle: ServerGoalHandle):
@@ -90,94 +175,22 @@ class UARTController(Node):
             
         goal_handle.abort()
         return GetUARTResponse.Result()
-        
 
-
-    def uartTransmit(self):
-        if not self.txBlocker_ and self.txQueue_:
-            self.txBlocker_ = True
-            self.farmbot_busy_.data = self.txBlocker_ 
-            self.farmbot_state_pub_.publish(self.farmbot_busy_)
-            message = self.txQueue_.pop(0)
-            
-            if message[-1] != '\n':
-                message += "\n"
-        
-            self.previous_cmd_ = message.split(' ')[0]
-            self.log_uart(transmit = True, cmd = message)
-            self.get_logger().info(f"Sent message: {message}")
-            self.ser_.write(message.encode('utf-8'))
-
-    def uartTransmitCallback(self, message = String):
-        if message.data in ['E', 'F09', '@']:
-            self.get_logger().info(f"Sent message: {message.data}")
-            
-            if message.data[-1] != '\n':
-                message.data += "\n"
-
-            self.ser_.write(message.data.encode('utf-8'))
-            self.txQueue_.clear()
-            self.txBlocker_ = False
-            self.farmbot_busy_.data = self.txBlocker_ 
-            self.farmbot_state_pub_.publish(self.farmbot_busy_)
-        else:
-            self.txQueue_.append(message.data)
-
-    def uartReceive(self):
-        line = self.ser_.readline().decode('utf-8').rstrip()
-        
-        if line:
-            self.get_logger().info(f"Received message: {line}")
-
-            # Call the callback function
-            self.handle_message(line)
-
-    def handle_message(self, message):
-        self.uart_received_cmd_ = message
-        response_cmds = ['G00', 'G01', 'G28', 'F11', 'F12', 'F13',
-                         'F14', 'F15', 'F16', 'F44']
-        self.uart_cmd_.data = message
-        
-        reportCode = (message).split(' ')[0]
-        if (self.previous_cmd_ in response_cmds and reportCode in ['R02', 'R03']
-                or self.previous_cmd_ not in response_cmds and reportCode in ['R08']):
-            self.txBlocker_ = False
-            self.farmbot_busy_.data = self.txBlocker_ 
-            self.farmbot_state_pub_.publish(self.farmbot_busy_)
-        
-        self.uartRxPub_.publish(self.uart_cmd_)
-        
-        self.log_uart(receive = True, cmd = message)
-
-
-    def log_uart(self, transmit = False, receive = False, cmd = String):
-        pass
-        #if transmit and receive:
-        #    self.get_logger().error("A command can't be logged as both transmitted and received at the same time")
-        #elif not transmit and not receive:
-        #    self.get_logger().error("You need to choose whether the command was transmitted or received")
-        #else:
-        #    timestamp = ROSClock().now().to_msg()
-        #    message_type = "Sent" if transmit else "Received"
-        #    self.uart_log_file_.write(f"{timestamp.sec:02d}_{timestamp.nanosec:09d} - \
-        #                                   {message_type}: {cmd}\n")
-
+    
     def destroy_node(self):
-        # Close the UART and log file when the node is destroyed
+        # Close the UART when the node is destroyed
         self.ser_.close()
-        self.uart_log_file_.close()
-
 
 # Main Function called on the initialization of the ROS2 Node
 def main(args = None):
     rclpy.init(args = args)
 
-    uartControlNode = UARTController()
+    uart_node = UARTController()
     
     try:
-        rclpy.spin(uartControlNode)
+        rclpy.spin(uart_node)
     except KeyboardInterrupt:
-        pass
+        uart_node.destroy_node()
 
     rclpy.shutdown()
 
