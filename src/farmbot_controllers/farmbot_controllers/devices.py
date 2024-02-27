@@ -3,6 +3,10 @@ from farmbot_interfaces.msg import PinCommand, I2CCommand
 from std_msgs.msg import Int64MultiArray
 
 class DeviceControl:
+    '''
+    ROS2 Python Module that enables the control of the different devices
+    that are connected to the Farmbot
+    '''
     def __init__(self, node: Node):
         self.node_ = node
         # Variables used to store the device commands
@@ -16,27 +20,18 @@ class DeviceControl:
         self.i2c_pub_ = self.node_.create_publisher(I2CCommand, 'i2c_command', 10)
         self.water_pub_ = self.node_.create_publisher(Int64MultiArray, 'water_command', 10)
 
-        
-    # def wait_for_response(self, code: str):
-    #     client = self.node_.create_client(StringRepReq, 'uart_request_response')
-    #     while not client.wait_for_service(1.0):
-    #         self.node_.get_logger().warn("Waiting for Map Server...")
-        
-    #     # Set the command to the service request
-    #     request = StringRepReq.Request()
-    #     request.data = code
-
-    #     # Call async and add the response callback
-    #     future = client.call_async(request = request)
-    #     if future.done():
-    #         return future.result().data
-
-    # I2C Control Handlers
-
+    ## I2C Control Handlers
+    
     def i2c_read(self, pin: int, element: int):
+        '''
+        Reading from an I2C device
+        '''
         self.i2c_handler(self, mode = False, pin = pin, element = element, value = 0)
 
     def i2c_set(self, pin: int, element: int, value: int):
+        '''
+        Setting a value to an I2C device
+        '''
         self.i2c_handler(self, mode = True, pin = pin, element = element, value = value)
 
     def i2c_handler(self, mode: bool, element: int, pin: int, value: int):
@@ -57,7 +52,7 @@ class DeviceControl:
 
         self.i2c_pub_.publish(self.i2c_cmd_)
 
-    # Water Control Handlers
+    ## Water Control Handlers
     ## NOTE: The documentation mentions that the commands are not implemented. Need to invesigate
     
     def water_command(self, mode: bool, unit: int):
@@ -75,7 +70,7 @@ class DeviceControl:
         self.water_cmd_.data = [int(mode), unit]
         self.water_pub_.publish(self.water_cmd_)
 
-    # Pin Control Handlers
+    ## Pin Control Handlers
 
     def set_pin_value(self, pin: int, value: int, pin_mode: bool):
         '''
