@@ -146,6 +146,8 @@ class KeyboardTeleOp(Node):
                 self.tools_.cam_calib_client()
             case 'I_1': # Panorama Sequencing
                 self.tools_.stitch_panorama_client()
+            case 'D_1':
+                self.devices_.read_pin(63, False)
 
     ## UART Handling Callback
     def farmbotFeedbackCallback(self, msg = String):
@@ -157,6 +159,8 @@ class KeyboardTeleOp(Node):
             self.cur_x_ = float(msgSplit[1][1:])
             self.cur_y_ = float(msgSplit[2][1:])
             self.cur_z_ = float(msgSplit[3][1:])
+        if reportCode == 'R41':
+            self.tools_.uart_message(msg.data)
         
     
     ## Parameter Loading Service Client
