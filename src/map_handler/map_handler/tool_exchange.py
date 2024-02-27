@@ -37,6 +37,8 @@ class ToolExchanger:
         commandSequence += f"{cmd.x_pos + cmd.release_x_inc} {cmd.y_pos + cmd.release_y_inc} {cmd.z_pos}\n"
         # raise the tool head to a safe z-axis value
         commandSequence += f"{cmd.x_pos + cmd.release_x_inc} {cmd.y_pos + cmd.release_y_inc} {cmd.z_pos + cmd.z_safe_inc}"
+        # check if tool was mounted properly
+        commandSequence += 'CHECK 0'
 
         return commandSequence
     
@@ -60,6 +62,8 @@ class ToolExchanger:
         commandSequence += f"{cmd.x_pos} {cmd.y_pos} {cmd.z_pos}\n"
         # raise the z axis to the safe z distance
         commandSequence += f"{cmd.x_pos} {cmd.y_pos} {cmd.z_pos + cmd.z_safe_inc}"
+        # check if tool was unmounted properly
+        commandSequence += 'CHECK 1'
 
         return commandSequence
     
