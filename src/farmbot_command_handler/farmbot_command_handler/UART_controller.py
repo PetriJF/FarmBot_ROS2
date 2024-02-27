@@ -141,7 +141,7 @@ class UARTController(Node):
         blocking_responses = ['R02', 'R03']
         # Commands that block until a response is reached
         request_cmds = ['F42', 'F21']
-        response_cmds = ['R41']
+        response_cmds = ['R41', 'R21']
 
         # Extract the command code
         rep_code = (message).split(' ')[0]
