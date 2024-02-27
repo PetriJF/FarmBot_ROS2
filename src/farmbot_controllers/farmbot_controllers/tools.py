@@ -30,6 +30,9 @@ class ToolCommands:
         self.sequencing_timer_ = self.node_.create_timer(1.0, self.sequencing_timer)
  
     def clear_sequence(self):
+        '''
+        Clearing the sequence in cases such as an electronic stop
+        '''
         self.sequence_ = []
 
     # Peripheral control functions
@@ -74,7 +77,7 @@ class ToolCommands:
         # Initializing the client and wait for map server confirmation
         client = self.node_.create_client(StringRepReq, 'map_info')
         while not client.wait_for_service(1.0):
-            self.node_.get_logger().warn("Waiting for Map Server...")
+            self.node_.get_logger().warn('Waiting for Map Server...')
         
         # Set the command to the service request
         request = StringRepReq.Request()
@@ -127,11 +130,11 @@ class ToolCommands:
                 if cmd[0] == 'Vacuum':
                     if cmd[1] == '1':
                         self.vacuum_pump_on()
-                        self.devices_.read_pin(9, False)
+                        self.devices_.read_pin(63, False)
                     elif cmd[1] == '0':
                         self.vacuum_pump_off()
                     else:
-                        self.node_.get_logger().warn("Vacuum pump command has a state other than on or off. Command ignored!")
+                        self.node_.get_logger().warn(f'Vacuum pump command has a state other than on or off. Command ignored!')
                 if cmd[0] == 'WaterPulses':
                     self.water_pulses(delay = int(cmd[1]))
                 self.sequence_.pop(0)
@@ -153,17 +156,20 @@ class ToolCommands:
         # Initializing the client and wait for map server confirmation
         client = self.node_.create_client(StringRepReq, 'form_panorama')
         while not client.wait_for_service(1.0):
-            self.node_.get_logger().warn("Waiting for Camera Stitching Server...")
+            self.node_.get_logger().warn('Waiting for Camera Stitching Server...')
         
         # Set the command to the service request
         request = StringRepReq.Request()
-        request.data = "ADD HERE ANY SETUP THAT MIGHT CHANGE"
+        request.data = 'ADD HERE ANY SETUP THAT MIGHT CHANGE'
 
         # Call async and add the response callback
         future = client.call_async(request = request)
         future.add_done_callback(self.stitch_callback)
 
     def stitch_callback(self, future):
+        '''
+        Camera Service Server callback
+        '''
         self.wait_for_camera_ = False
 
     def cam_calib_client(self):
@@ -177,11 +183,11 @@ class ToolCommands:
         # Initializing the client and wait for map server confirmation
         client = self.node_.create_client(StringRepReq, 'calibrate_luxonis')
         while not client.wait_for_service(1.0):
-            self.node_.get_logger().warn("Waiting for Camera Calibration Server...")
+            self.node_.get_logger().warn('Waiting for Camera Calibration Server...')
         
         # Set the command to the service request
         request = StringRepReq.Request()
-        request.data = "ADD HERE ANY SETUP THAT MIGHT CHANGE"
+        request.data = 'ADD HERE ANY SETUP THAT MIGHT CHANGE'
 
         # Call async and add the response callback
         future = client.call_async(request = request)
@@ -198,15 +204,18 @@ class ToolCommands:
         # Initializing the client and wait for map server confirmation
         client = self.node_.create_client(StringRepReq, 'panorama_sequence')
         while not client.wait_for_service(1.0):
-            self.node_.get_logger().warn("Waiting for Panorama Sequencing Server...")
+            self.node_.get_logger().warn('Waiting for Panorama Sequencing Server...')
         
         # Set the command to the service request
         request = StringRepReq.Request()
-        request.data = "ADD HERE ANY SETUP THAT MIGHT CHANGE"
+        request.data = 'ADD HERE ANY SETUP THAT MIGHT CHANGE'
 
         # Call async and add the response callback
         future = client.call_async(request = request)
         future.add_done_callback(self.cmd_sequence_callback)
 
     def status_callback(self, state: Bool):
+        '''
+        Callback from the UART Handler that transmits the busy state of the farmbot
+        '''
         self.farmbot_busy_ = state.data
