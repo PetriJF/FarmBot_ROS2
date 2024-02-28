@@ -4,17 +4,32 @@
 import rclpy
 import serial
 from rclpy.node import Node
-from rclpy.action import ActionServer
-from rclpy.action.server import ServerGoalHandle
 from std_msgs.msg import String, Bool
-from farmbot_interfaces.action import GetUARTResponse
-from rclpy.clock import ROSClock
-from farmbot_interfaces.srv import StringRepReq
 
 class UARTController(Node):
+    '''
+    Farmbot ROS2 node that handles the UART messages going to and from the Farmduino.
+    
+    The Node receives commands through the /uart_transmit topic and sends them to the
+    Farmduino. If the Farmduino is busy with another task, the node populates a queue
+    that is manipulated using FIFO structure.
+
+    When the node receives feedback from the Farmduino through Serial, the message is
+    decoded and carried on to the relevant nodes. Also, by utilizing the serial 
+    feedback, the node sets the ROS2 Farmbot busy state.
+
+    Input Topics:
+        - /uart_transmit {String} -> the information that is to be transmitted to the farmduino through Serial.
+    Output Topics:
+        - /uart_receive {String} -> Tinformation that is received from serial and is carried on through the system.
+        - /busy_state {Bool} -> used to set the busy state of the system.
+    '''
     # Node contructor
     def __init__(self):
-        super().__init__("UARTController")
+        '''
+        Node Constructor
+        '''
+        super().__init__('UARTController')
 
         self.uart_cmd_ = String()
 
@@ -45,15 +60,8 @@ class UARTController(Node):
         # Used for setting the busy status on the ROS2 arch. while a command is running
         self.previous_cmd_ = ''
 
-        # Request Response Action Server WIP
-        self.uart_received_cmd_ = ''
-        self.req_resp_server_ = ActionServer(
-            self, GetUARTResponse, 'uart_response',
-            execute_callback = self.request_response_server
-        )
-
         # Log the initialization
-        self.get_logger().info("UART Controller Initialized..")
+        self.get_logger().info('UART Controller Initialized..')
 
     def uart_transmit(self):
         '''
@@ -78,7 +86,7 @@ class UARTController(Node):
 
             # Record the transmitted command
             self.previous_cmd_ = message.split(' ')[0] if ' ' in message else message.split('\n')[0]
-            self.get_logger().info(f"Sent message: {message}")
+            self.get_logger().info(f'Sent message: {message}')
             # Send through UART the command
             self.ser_.write(message.encode('utf-8'))
 
@@ -94,7 +102,7 @@ class UARTController(Node):
         '''
         # Priority commands
         if message.data in ['E', 'F09', '@']:
-            self.get_logger().info(f"Sent message: {message.data}")
+            self.get_logger().info(f'Sent message: {message.data}')
             # Ensure the endline char at the end of the command
             if message.data[-1] != '\n':
                 message.data += "\n"
@@ -119,7 +127,7 @@ class UARTController(Node):
         
         # If a command is read, handle it
         if line:
-            self.get_logger().info(f"Received message: {line}")
+            self.get_logger().info(f'Received message: {line}')
 
             # Call the callback function
             self.handle_message(line)
@@ -132,7 +140,6 @@ class UARTController(Node):
             message {str}: the command string
         '''
         # Record the message
-        self.uart_received_cmd_ = message
         self.uart_cmd_.data = message
         
         # Blocking command codes
@@ -159,28 +166,6 @@ class UARTController(Node):
         
         # Send the reporting message for further processing by other nodes
         self.uart_rx_pub_.publish(self.uart_cmd_)
-
-    ## NOT IN USE WIP
-    def request_response_server(self, goal_handle: ServerGoalHandle):
-        # Get the request from the goal
-        code = goal_handle.request.code
-        timeout = rclpy.duration.Duration(seconds = goal_handle.request.timeout_sec)
-
-
-        start_time = self.get_clock().now()
-        # Execute the request
-        while (self.get_clock().now() - start_time) < timeout or goal_handle.request.timeout_sec == -1:
-            if code == self.uart_received_cmd_.split(' ')[0]:
-                goal_handle.succeed()
-                result = GetUARTResponse.Result()
-                result.msg = self.uart_received_cmd_
-                result.success = True
-                result.cmd_type = goal_handle.request.cmd_type
-                return result
-            
-        goal_handle.abort()
-        return GetUARTResponse.Result()
-
     
     def destroy_node(self):
         # Close the UART when the node is destroyed
