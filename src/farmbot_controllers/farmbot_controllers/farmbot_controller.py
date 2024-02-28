@@ -104,18 +104,6 @@ class KeyboardTeleOp(Node):
                 self.tools_.map_cmd_client(cmd = 'T_3_0\nWater\n1198.0 532.2 -240.0 1')
             case 'T_1_1' | 'T_1_2' | 'T_2_1' | 'T_2_2' | 'T_3_1' | 'T_3_2':
                 self.tools_.map_cmd_client(cmd = cmd.data)
-            case 'LED1':
-                self.tools_.led_strip_on()
-            case 'LED2':
-                self.tools_.led_strip_off()
-            case 'VAC1':
-                self.tools_.vacuum_pump_on()
-            case 'VAC2':
-                self.tools_.vacuum_pump_off()
-            case 'WAT1':
-                self.tools_.water_pump_on()
-            case 'WAT2':
-                self.tools_.water_pump_off()
             case 'P_1':
                 self.plant_conf_.add = True
                 self.plant_conf_.autopos = False
@@ -146,7 +134,13 @@ class KeyboardTeleOp(Node):
                 self.tools_.cam_calib_client()
             case 'I_1': # Panorama Sequencing
                 self.tools_.stitch_panorama_client()
-            case 'D_1':
+            case 'D_L_1' | 'D_L_0':
+                self.tools_.led_strip(state = int(code[0][4]))
+            case 'D_V_0' | 'D_V_1':
+                self.tools_.vacuum_pump(state = int(code[0][4]))
+            case 'D_W_0' | 'D_W_1':
+                self.tools_.water_pump(state = int(code[0][4]))
+            case 'D_C':
                 self.devices_.read_pin(63, False)
 
     ## UART Handling Callback
