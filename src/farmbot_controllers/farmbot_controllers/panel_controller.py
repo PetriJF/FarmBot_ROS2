@@ -12,7 +12,7 @@ class PanelController(Node):
     
     # Node contructor
     def __init__(self):
-        super().__init__("PanelController")
+        super().__init__('PanelController')
 
         GPIO.setmode(GPIO.BCM)
 
@@ -36,8 +36,9 @@ class PanelController(Node):
 
         
         self.cmd_ = String()
-        self.input_pub_ = self.create_publisher(String, 'uart_transmit', 10)
+        self.priority_pub_ = self.create_publisher(String, 'uart_transmit', 10)
         self.input_sub_ = self.create_subscription(String, 'keyboard_topic', self.command_callback, 10)
+        self.input_pub_ = self.create_publisher(String, 'input_topic', 10)
 
         # LED Flasher Button
         self.flash_state_ = False
@@ -63,7 +64,7 @@ class PanelController(Node):
         self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
 
         # Log the initialization
-        self.get_logger().info("Panel Controller Initialized..")
+        self.get_logger().info('Panel Controller Initialized..')
 
     ### Verifying user input for E_STOPS and RESETS
 
@@ -72,14 +73,15 @@ class PanelController(Node):
             self.LED_client(FBPanel.ESTOP_LED, FBPanel.OFF)
             self.LED_client(FBPanel.UNLOCK_LED, FBPanel.FLASHING)
             self.cmd_.data = 'E'
-            self.input_pub_.publish(self.cmd_)
-            self.get_logger().info("ESTOP button pressed")
+            self.priority_pub_.publish(self.cmd_)
+            self.get_logger().info('ESTOP button pressed')
         elif cmd.data == 'E':
             self.LED_client(FBPanel.ESTOP_LED, FBPanel.ON)
             self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
             self.cmd_.data = 'F09'
-            self.input_pub_.publish(self.cmd_)
-            self.get_logger().info("RESET button pressed")
+            self.priority_pub_.publish(self.cmd_)
+            self.get_logger().info('RESET button pressed')
+        self.input_pub_.publish(cmd)
 
         
     ### Service Server
@@ -91,12 +93,12 @@ class PanelController(Node):
         '''
         # Check if the LED Pin is correct
         if request.led_pin not in self.led_pin_list_:
-            self.get_logger().warn("Selected LED pin is not recorded as having an LED attached")
+            self.get_logger().warn('Selected LED pin is not recorded as having an LED attached')
             response.success = False
             return response
         # Check if an existing state was selected
         if request.state not in [FBPanel.ON, FBPanel.OFF, FBPanel.FLASHING]:
-            self.get_logger().warn("Selected LED status is not recognized")
+            self.get_logger().warn('Selected LED status is not recognized')
             response.success = False
             return response
         
@@ -134,7 +136,7 @@ class PanelController(Node):
         '''
         client = self.create_client(LedPanelHandler, 'set_led')
         while not client.wait_for_service(1.0):
-            self.get_logger().warn("Waiting for LED Handling Server...")
+            self.get_logger().warn('Waiting for LED Handling Server...')
         
         request = LedPanelHandler.Request()
         request.led_pin = led_pin
@@ -150,9 +152,9 @@ class PanelController(Node):
         try:
             response = future.result()
             if not response:
-                self.get_logger().warn("Failure in LED Panel Handling!")
+                self.get_logger().warn('Failure in LED Panel Handling!')
         except Exception as e:
-            self.get_logger().error("Service call failed %r" % (e, ))
+            self.get_logger().error('Service call failed %r' % (e, ))
 
     ### LED states for the panel
 
@@ -174,7 +176,7 @@ class PanelController(Node):
             self.LED_client(FBPanel.UNLOCK_LED, FBPanel.FLASHING)
             self.cmd_.data = 'E'
             self.input_pub_.publish(self.cmd_)
-            self.get_logger().info("ESTOP button pressed")
+            self.get_logger().info('ESTOP button pressed')
 
     def reset_button_handler(self, channel):
         '''
@@ -186,7 +188,7 @@ class PanelController(Node):
             self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
             self.cmd_.data = 'F09'
             self.input_pub_.publish(self.cmd_)
-            self.get_logger().info("RESET button pressed")
+            self.get_logger().info('RESET button pressed')
     
     # Just for demonstration purposes
     # def buttonAHandler(self, channel):

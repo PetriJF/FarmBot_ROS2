@@ -34,7 +34,7 @@ class KeyboardTeleOp(Node):
 
         # Temporary Keyboard subscriber
         self.cur_increment_ = 10.0
-        self.inputSub_ = self.create_subscription(String, 'keyboard_topic', self.commandInterpretationCallback, 10)
+        self.inputSub_ = self.create_subscription(String, 'input_topic', self.commandInterpretationCallback, 10)
 
         # UART Rx Subscriber
         self.uartRxSub_ = self.create_subscription(String, 'uart_receive', self.farmbotFeedbackCallback, 10)
