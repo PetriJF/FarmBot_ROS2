@@ -46,34 +46,26 @@ class ToolCommands:
 
     # Peripheral control functions TODO: Improve
 
-    def vacuum_pump_on(self):
+    # Turning on or off the vacuum pump
+    def vacuum_pump(self, state: int):
         vacuum_pin = 9
-        self.devices_.set_pin_value(pin = vacuum_pin, value = 1, pin_mode = False)
-    
-    def vacuum_pump_off(self):
-        vacuum_pin = 9
-        self.devices_.set_pin_value(pin = vacuum_pin, value = 0, pin_mode = False)
+        self.devices_.set_pin_value(pin = vacuum_pin, value = state, pin_mode = False)
 
-    def water_pump_on(self):
+    # Turning on or off the water pump
+    def water_pump(self, state: int):
         water_pin = 8
-        self.devices_.set_pin_value(pin = water_pin, value = 1, pin_mode = False)
-    
-    def water_pump_off(self):
-        water_pin = 8
-        self.devices_.set_pin_value(pin = water_pin, value = 0, pin_mode = False)
+        self.devices_.set_pin_value(pin = water_pin, value = state, pin_mode = False)
 
+    # Turning the water pump on, waiting for the specified time in ms and turning it off
     def water_pulses(self, delay = 500):
         water_pin = 8
-        self.devices_.set_pin_value_2(pin = water_pin, value1 = 1, delay = 500, value2 = 0, pin_mode = False)
+        self.devices_.set_pin_value_2(pin = water_pin, value1 = 1, delay = delay, value2 = 0, pin_mode = False)
 
-    def led_strip_on(self):
+    # Turning on or off the LED strip
+    def led_strip(self, state: int):
         light_pin = 7
-        self.devices_.set_pin_value(pin = light_pin, value = 1, pin_mode = False)
+        self.devices_.set_pin_value(pin = light_pin, value = state, pin_mode = False)
     
-    def led_strip_off(self):
-        light_pin = 7
-        self.devices_.set_pin_value(pin = light_pin, value = 0, pin_mode = False)
-
     ## Tool Exchanging Client
     def map_cmd_client(self, cmd = str):
         '''
@@ -171,14 +163,13 @@ class ToolCommands:
                     self.wait_for_request_.wait_for = 63
                     self.wait_for_request_.expected = int(cmd[1])
                 if cmd[0] == 'Vacuum':
-                    if cmd[1] == '1':
-                        self.vacuum_pump_on()
-                    elif cmd[1] == '0':
-                        self.vacuum_pump_off()
+                    if cmd[1] in ['0', '1']:
+                        self.vacuum_pump(state = int(cmd[1]))
                     else:
                         self.node_.get_logger().warn(f'Vacuum pump command has a state other than on or off. Command ignored!')
                 if cmd[0] == 'WaterPulses':
-                    self.water_pulses(delay = int(cmd[1]))
+                    if int(cmd[1]):
+                        self.water_pulses(delay = int(cmd[1]))
                 self.sequence_.pop(0)
             # Handle Vision Commands
             elif self.command_type_ == 'VC':
