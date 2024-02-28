@@ -16,7 +16,7 @@ import time
 class KeyboardTeleOp(Node):
     # Node contructor
     def __init__(self):
-        super().__init__("FarmBotController")
+        super().__init__('FarmBotController')
 
         # Initializing movemement module
         self.mvm_ = Movement(self)
@@ -45,27 +45,28 @@ class KeyboardTeleOp(Node):
         self.plant_cmd_pub_ = self.create_publisher(String, 'plant_cmd', 10)
 
         # Log the initialization
-        self.get_logger().info("Farmbot Controller Initialized..")
+        self.get_logger().info('Farmbot Controller Initialized..')
 
     def commandInterpretationCallback(self, cmd = String):
         code = cmd.data.split(' ')
         match code[0]:
             case 'e':
+                self.get_logger().info('CLEARING SEQUENCE')
                 self.tools_.clear_sequence()
             #case 'E':
             #    self.state_.resetElectronicStop()
             case 'w':
                 self.cur_x_ += self.cur_increment_
-                self.mvm_.moveGantryAbsolute(x_coord = self.cur_x_ + self.cur_increment_, y_coord = self.cur_y_, z_coord = self.cur_z_)
+                self.mvm_.move_gantry_abs(x_coord = self.cur_x_ + self.cur_increment_, y_coord = self.cur_y_, z_coord = self.cur_z_)
             case 'a':
                 self.cur_y_ -= self.cur_increment_
-                self.mvm_.moveGantryAbsolute(x_coord = self.cur_x_, y_coord = self.cur_y_ - self.cur_increment_, z_coord = self.cur_z_)
+                self.mvm_.move_gantry_abs(x_coord = self.cur_x_, y_coord = self.cur_y_ - self.cur_increment_, z_coord = self.cur_z_)
             case 's':
                 self.cur_x_ -= self.cur_increment_
-                self.mvm_.moveGantryAbsolute(x_coord = self.cur_x_ - self.cur_increment_, y_coord = self.cur_y_, z_coord = self.cur_z_)
+                self.mvm_.move_gantry_abs(x_coord = self.cur_x_ - self.cur_increment_, y_coord = self.cur_y_, z_coord = self.cur_z_)
             case 'd':
                 self.cur_y_ += self.cur_increment_
-                self.mvm_.moveGantryAbsolute(x_coord = self.cur_x_, y_coord = self.cur_y_ + self.cur_increment_, z_coord = self.cur_z_)
+                self.mvm_.move_gantry_abs(x_coord = self.cur_x_, y_coord = self.cur_y_ + self.cur_increment_, z_coord = self.cur_z_)
             case '1':
                 self.cur_increment_ = 10.0
             case '2':
@@ -75,23 +76,23 @@ class KeyboardTeleOp(Node):
             case 'i':
                 self.configLoaderClient(standard = False, ver = "labFB")
             case 'h': 
-                self.mvm_.goHome()
+                self.mvm_.go_home()
             case 'j':
-                self.mvm_.findAxisHome(x = True)
+                self.mvm_.find_axis_home(x = True)
             case 'k':
-                self.mvm_.findAxisHome(y = True)
+                self.mvm_.find_axis_home(y = True)
             case 'l':
-                self.mvm_.findAxisHome(z = True)
+                self.mvm_.find_axis_home(z = True)
             case 'fh':
-                self.mvm_.findAllHomes()
+                self.mvm_.find_all_homes()
             case 'c':
-                self.mvm_.calibrateAllLens()
+                self.mvm_.calibrate_all_axis()
             case 'v':
-                self.mvm_.calibrateAxisLen(x = True)
+                self.mvm_.calibrate_axis(x = True)
             case 'b':
-                self.mvm_.calibrateAxisLen(y = True)
+                self.mvm_.calibrate_axis(y = True)
             case 'n':
-                self.mvm_.calibrateAxisLen(z = True)
+                self.mvm_.calibrate_axis(z = True)
             case 'o':
                 self.parameterConfigClient(cmd = 'SAVE')
             case 'p':

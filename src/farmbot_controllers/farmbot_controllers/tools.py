@@ -148,7 +148,7 @@ class ToolCommands:
             # Move the gantry to the parsed coordinates
             if self.command_type_ == 'CC':
                 coords = self.sequence_[0].split(' ')
-                self.mvm_.moveGantryAbsolute(x_coord = float(coords[0]), 
+                self.mvm_.move_gantry_abs(x_coord = float(coords[0]), 
                                              y_coord = float(coords[1]), 
                                              z_coord = float(coords[2]))
                 self.sequence_.pop(0)
