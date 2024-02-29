@@ -2,55 +2,65 @@ from rclpy.node import Node
 from farmbot_interfaces.msg import StateCommand
 
 class State:
+    '''
+    ROS2 Farmbot State module
+    Forms the commands that are sent to the command handling package
+    '''
     def __init__(self, node: Node):
+        '''
+        ROS2 Farmbot State Module Constructor
+        
+        Args:
+            node {Node}: The node the module extends
+        '''
         self.node = node
 
         # The state interface object
         self.state_ = StateCommand()
         # The publisher for the state commands
-        self.statePub_ = self.node.create_publisher(StateCommand, 'state_command', 10)
+        self.state_pub_ = self.node.create_publisher(StateCommand, 'state_command', 10)
     
     ## State handling functions
     
-    def electronicStop(self):
-        """
+    def estop(self):
+        '''
         Imposes the electronic stop, turning off all the motors 
-        """
-        self.defineState(estop = True)
+        '''
+        self.define_state(estop = True)
 
-    def abortMovement(self):
-        """
+    def abort_movement(self):
+        '''
         Aborts the current movement command
-        """
-        self.defineState(abort_movement = True)
+        '''
+        self.define_state(abort_movement = True)
 
-    def resetElectronicStop(self):
-        """
+    def reset_estop(self):
+        '''
         Resets the electronic stop
-        """
-        self.defineState(reset_estop = True)
+        '''
+        self.define_state(reset_estop = True)
 
-    def requestEndStop(self):
-        """
+    def request_end_stop(self):
+        '''
         Requests the end stops
-        """
-        self.defineState(rep_end_stop = True)
+        '''
+        self.define_state(rep_end_stop = True)
 
-    def requestSoftwareVersion(self):
-        """
+    def request_sw_version(self):
+        '''
         Requests the software version
-        """
-        self.defineState(rep_sw_ver = True)
+        '''
+        self.define_state(rep_sw_ver = True)
     
-    def requestCurrentPosition(self):
-        """
+    def request_curr_pos(self):
+        '''
         Requests the current position of the extruder
-        """
-        self.defineState(rep_curr_pos = True)
+        '''
+        self.define_state(rep_curr_pos = True)
 
-    def defineState(self, estop = False, abort_movement = False, reset_estop = False,
+    def define_state(self, estop = False, abort_movement = False, reset_estop = False,
                     rep_end_stop = False, rep_curr_pos = False, rep_sw_ver = False):
-        """
+        '''
         Creates the state definition request.
 
         Args:
@@ -60,7 +70,7 @@ class State:
             rep_end_stop {Bool}: Requests the end stops
             rep_curr_pos {Bool}: Requests the current position of the gantry
             rep_sw_ver   {Bool}: Requests the software version
-        """
+        '''
         
         self.state_.estop = estop
         self.state_.abort_movement = abort_movement
@@ -69,4 +79,4 @@ class State:
         self.state_.rep_curr_pos = rep_curr_pos
         self.state_.rep_sw_ver = rep_sw_ver
 
-        self.statePub_.publish(self.state_)
+        self.state_pub_.publish(self.state_)

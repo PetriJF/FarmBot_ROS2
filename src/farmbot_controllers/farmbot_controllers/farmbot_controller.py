@@ -56,8 +56,6 @@ class KeyboardTeleOp(Node):
             case 'e':
                 self.get_logger().info('CLEARING SEQUENCE')
                 self.tools_.clear_sequence()
-            #case 'E':
-            #    self.state_.resetElectronicStop()
             case 'w':
                 self.cur_x_ += self.cur_increment_
                 self.mvm_.move_gantry_abs(x_coord = self.cur_x_ + self.cur_increment_, y_coord = self.cur_y_, z_coord = self.cur_z_)
