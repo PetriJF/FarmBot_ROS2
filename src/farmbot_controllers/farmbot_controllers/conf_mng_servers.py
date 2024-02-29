@@ -16,6 +16,10 @@ class ConfigServer(Node):
     '''
     # Node contructor
     def __init__(self):
+        '''
+         Config Handling Node Constructor
+         Sets up all the paths, servers, publishers and subscribers for the node
+        '''
         super().__init__('ConfigServer')
         # Flag waiting for initialization to be done before the config is loaded
         self.firmware_init_done_ = False
@@ -140,6 +144,7 @@ class ConfigServer(Node):
             ParameterList.PIN_GUARD_5_ACTIVE_STATE : 0
         }
         
+        # The share directory path and the file names for all the files
         self.default_path_ = os.path.join(
             get_package_share_directory('farmbot_controllers'),
             'config'
@@ -148,10 +153,14 @@ class ConfigServer(Node):
         self.default_config_ = 'defaultParameterConfig.yaml'
         self.lab_fb_config_ = 'labFB.yaml'
         self.active_config_ = 'activeConfig.yaml'
+        
+        # TODO: Add more default configurations other than the labFB one
 
+        # Config Service Servers
         self.config_server_ = self.create_service(ParameterConfig, 'manage_param_config', self.config_request_server)
         self.config_loading_server_ = self.create_service(LoadParamConfig, 'load_param_config', self.param_loading_server)
 
+        # Parameter Command publisher (Used for loading up parameters)
         self.param_cmd_ = ParameterCommand()
         self.param_cmd_pub_ = self.create_publisher(ParameterCommand, 'parameter_command', 10)
 
@@ -165,8 +174,11 @@ class ConfigServer(Node):
         # Log the initialization
         self.get_logger().info('Config Server Initialized..')
 
-    ## UART Handling Callback
     def uart_rx_callback(self, msg: String):
+        '''
+        Subscriber to the Serial Response from the Farmduino.
+        Checks for parameter value updates and for when the farmduino startup completes 
+        '''
         msg_split = (msg.data).split(' ')
         reportCode = msg_split[0]
         if msg.data == 'R99 ARDUINO STARTUP COMPLETE' and not self.firmware_init_done_:
@@ -177,6 +189,10 @@ class ConfigServer(Node):
             self.get_logger().info(f'Updated parameter {msg_split[1]} to {msg_split[2]}')
 
     def retrieve_config(self):
+        '''
+        If it exists, the active parameter configuration file is loaded in and
+        written to the Farmduino
+        '''
         active_config_path = os.path.join(self.default_path_, self.active_config_)
         if os.path.exists(active_config_path):
             self.load_from_yaml(self.default_path_, self.active_config_)
@@ -186,6 +202,9 @@ class ConfigServer(Node):
             self.get_logger().warn('Previous config could not be found! You will need to initialize the appropriate parameter config')
 
     def save_to_yaml(self, path = '', file_name = ''):
+        '''
+        Saves a yaml file to a specified path and with a specified file name
+        '''
         if path == '':
             self.get_logger().warn('Path not set for retrieving the parameter config file')
             return
@@ -202,6 +221,9 @@ class ConfigServer(Node):
             yaml.dump(self.param_vals, yaml_file, default_flow_style = False)
 
     def load_from_yaml(self, path = '', file_name = ''):
+        '''
+        Reads the file with the specified file_name from the path as a dictionary
+        '''
         if path == '':
             self.get_logger().warn('Path not set for retrieving the parameter config file')
             return
@@ -220,13 +242,23 @@ class ConfigServer(Node):
                 self.get_logger().warn('Invalid YAML file format..')
 
     def set_value(self, param, value):
+        '''
+        Sets the selected parameter to the parsed value
+        '''
         self.get_logger().info(f'Set parameter {param} to {value}')
         self.param_vals[param] = value
     
     def get_value(self, param):
+        '''
+        Returns a value of a selected parameter
+        '''
         return self.param_vals[param]
 
     def param_loading_server(self, request, response):
+        '''
+        Service Server that loads the parameter configurations onto the Farmduino.
+        
+        '''
         # A standard config that works for all farmbots
         if request.standard: 
             self.load_from_yaml(path = self.default_path_, file_name = self.default_config_)
@@ -241,6 +273,9 @@ class ConfigServer(Node):
         return response
 
     def load_params(self):
+        '''
+        Loading all the parameters on the farmduino
+        '''
         self.param_cmd_.list = False
         self.param_cmd_.write = True
         self.param_cmd_.read = False
@@ -259,6 +294,10 @@ class ConfigServer(Node):
         self.get_logger().info('Parameter loading complete!')
 
     def config_request_server(self, request, response):
+        '''
+        Service Server that receives a command and returns the appropriate response
+        and executes and instructions attributed to the commands
+        '''
         response.success = True    # success until proven otherwise
         response.cmd = request.data
         msg_split = (request.data).split(' ')
@@ -314,14 +353,14 @@ class ConfigServer(Node):
 def main(args = None):
     rclpy.init(args = args)
 
-    configServer = ConfigServer()
+    config_server = ConfigServer()
 
     try:
-        rclpy.spin(configServer)
+        rclpy.spin(config_server)
     except KeyboardInterrupt:
         pass
     finally:
-        configServer.destroy_node()
+        config_server.destroy_node()
         rclpy.shutdown()
 
 if __name__ == '__main__':
