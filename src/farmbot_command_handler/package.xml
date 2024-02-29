@@ -2,9 +2,16 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>farmbot_command_handler</name>
-  <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="jamespetri28@gmail.com">farmbotdev</maintainer>
+  <version>1.0.0</version>
+  <description>
+    Package specifically designed for the ROS2 Farmbot Architecture.
+    Deals with command handling from the input nodes by translating
+    them to the FCode that is used to communicate with the Farmbot's
+    Farmduino.
+
+    Dependency on the farmbot_interfaces package!
+  </description>
+  <maintainer email="james.petri@mu.ie">James</maintainer>
   <license>TODO: License declaration</license>
 
   <depend>rclpy</depend>
