@@ -26,7 +26,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/ParameterConfig.srv"
   "srv/LoadParamConfig.srv"
   "srv/StringRepReq.srv"
-  "action/GetUARTResponse.action"
 )
 
 ament_package()
