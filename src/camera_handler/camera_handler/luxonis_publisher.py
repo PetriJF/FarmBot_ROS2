@@ -24,14 +24,14 @@ class CameraNode:
         self.rgb_image_ = None
         self.depth_image_ = None
         # Set a timer to process and publish images at a specified rate
-        timer_period = 0.05  # seconds
+        timer_period = 0.1  # seconds
         self.timer = self.node_.create_timer(timer_period, self.run)
 
     def load_config(self):
         # Load configuration from YAML file
-        directory = os.path.join(get_package_share_directory('camera_handler'), 'config')
+        self.config_directory_ = os.path.join(get_package_share_directory('camera_handler'), 'config')
         config_file = 'camera_config.yaml'
-        self.config_data = self.load_from_yaml(directory, config_file)
+        self.config_data = self.load_from_yaml(self.config_directory_, config_file)
         # Extract relevant configuration values
         self.HOST = self.config_data['server_constants']['HOST']
         self.PORT = self.config_data['server_constants']['PORT']
@@ -121,9 +121,12 @@ class CameraNode:
         if latestPacket["rgb"] is not None:
             self.rgb_image_ = latestPacket["rgb"].getCvFrame()
             self.publish_images(rgb_frame=self.rgb_image_)
+            self.save_image(rgb=True)
         if latestPacket["stereo"] is not None:
             self.depth_image_ = self.process_depth_frame(latestPacket["stereo"].getFrame())
             self.publish_images(depth_frame=self.depth_image_ )
+            self.save_image(depth=True)
+        
 
     def process_depth_frame(self, disparity_frame):
         # Process disparity frame to generate a depth frame for publishing
@@ -149,11 +152,24 @@ class CameraNode:
             
     def save_images(self):
         if self.rgb_image_ is not None and self.depth_image_ is not None:
-            cv2.imwrite("saved_rgb_image.png", self.rgb_image_)
-            cv2.imwrite("saved_depth_image.png", self.depth_image_)
-            self.node_.get_logger().info('Images saved successfully.')
+            cv2.imwrite(os.path.join(self.config_directory_,"saved_rgb_image.png"), self.rgb_image_)
+            self.node_.get_logger().info('RGB image saved successfully.')
+            cv2.imwrite(os.path.join(self.config_directory_,"saved_depth_image.png"), self.depth_image_)
+            self.node_.get_logger().info('Depth image saved successfully.')
         else:
             self.node_.get_logger().info('No images to save.')
+            
+    def save_images(self, rgb = False, depth = False):
+        if self.rgb_image_ is not None and rgb == True: 
+            cv2.imwrite(os.path.join(self.config_directory_,"saved_rgb_image.png"), self.rgb_image_)
+            self.node_.get_logger().info('RGB image saved successfully.')
+        elif self.depth_image_ is not None and depth == True:
+            cv2.imwrite(os.path.join(self.config_directory_,"saved_depth_image.png"), self.depth_image_)
+            self.node_.get_logger().info('Depth image saved successfully.')
+        else:
+            self.node_.get_logger().info('No images to save.')
+    
+
 
 
 def main(args=None):
