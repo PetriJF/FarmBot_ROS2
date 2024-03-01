@@ -63,7 +63,7 @@ def generate_launch_description():
         already_started_nodes.update([event.process_name])
         if len(already_started_nodes) == 7:
             print(f'all required nodes are up, starting uart_controller')
-            time.sleep(2)
+            time.sleep(5)
             return uart_ctrl_node
 
     return LaunchDescription([

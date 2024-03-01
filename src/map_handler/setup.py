@@ -19,9 +19,9 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='farmbotdev',
+    maintainer='James',
     maintainer_email='jamespetri28@gmail.com',
-    description='TODO: Package description',
+    description='Package handling map information and seed mapping. Also handles sequencing for some tasks',
     license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={

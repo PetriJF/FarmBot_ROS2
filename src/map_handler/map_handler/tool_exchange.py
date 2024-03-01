@@ -43,13 +43,13 @@ class ToolExchanger:
         cmd_seq = 'CC_T_x_1\n'
 
         # go to tool position at a safe z distance over it
-        cmd_seq += f'{cmd.x_pos} {cmd.y_pos} {cmd.z_pos + cmd.z_safe_inc}\n'
+        cmd_seq += f"{cmd.x_pos} {cmd.y_pos} {cmd.z_pos + cmd.z_safe_inc}\n"
         # lower the z axis until the exact tool mounting position
-        cmd_seq += f'{cmd.x_pos} {cmd.y_pos} {cmd.z_pos}\n'
+        cmd_seq += f"{cmd.x_pos} {cmd.y_pos} {cmd.z_pos}\n"
         # move towards the release position
-        cmd_seq += f'{cmd.x_pos + cmd.release_x_inc} {cmd.y_pos + cmd.release_y_inc} {cmd.z_pos}\n'
+        cmd_seq += f"{cmd.x_pos + cmd.release_x_inc} {cmd.y_pos + cmd.release_y_inc} {cmd.z_pos}\n"
         # raise the tool head to a safe z-axis value
-        cmd_seq += f'{cmd.x_pos + cmd.release_x_inc} {cmd.y_pos + cmd.release_y_inc} {cmd.z_pos + cmd.z_safe_inc}\n'
+        cmd_seq += f"{cmd.x_pos + cmd.release_x_inc} {cmd.y_pos + cmd.release_y_inc} {cmd.z_pos + cmd.z_safe_inc}\n"
         # check if tool was mounted properly
         cmd_seq += 'DC_T_x_1\n'
         cmd_seq += 'CHECK 0'
@@ -75,13 +75,13 @@ class ToolExchanger:
         cmd_seq = 'CC_T_x_2\n'
 
         # move over the release position
-        cmd_seq += f'{cmd.x_pos + cmd.release_x_inc} {cmd.y_pos + cmd.release_y_inc} {cmd.z_pos + cmd.z_safe_inc}\n'
+        cmd_seq += f"{cmd.x_pos + cmd.release_x_inc} {cmd.y_pos + cmd.release_y_inc} {cmd.z_pos + cmd.z_safe_inc}\n"
         # lower towards the release position
-        cmd_seq += f'{cmd.x_pos + cmd.release_x_inc} {cmd.y_pos + cmd.release_y_inc} {cmd.z_pos}\n'
+        cmd_seq += f"{cmd.x_pos + cmd.release_x_inc} {cmd.y_pos + cmd.release_y_inc} {cmd.z_pos}\n"
         # move to the tool's home position
-        cmd_seq += f'{cmd.x_pos} {cmd.y_pos} {cmd.z_pos}\n'
+        cmd_seq += f"{cmd.x_pos} {cmd.y_pos} {cmd.z_pos}\n"
         # raise the z axis to the safe z distance
-        cmd_seq += f'{cmd.x_pos} {cmd.y_pos} {cmd.z_pos + cmd.z_safe_inc}\n'
+        cmd_seq += f"{cmd.x_pos} {cmd.y_pos} {cmd.z_pos + cmd.z_safe_inc}\n"
         # check if tool was unmounted properly
         cmd_seq += 'DC_T_x_2\n'
         cmd_seq += 'CHECK 1'
@@ -95,7 +95,7 @@ class ToolExchanger:
         # Check if the tool position is reachable
         if not self.__outside_bounds(x_min = 0.0, x_max = self.map_max_x, y_min = 0.0, y_max = self.map_max_y, 
                                      z_min = self.map_max_z, z_max = 0.0, x = cmd.x_pos, y = cmd.y_pos, z = cmd.z_pos):
-            self.node_.get_logger().warn(f'Max pos {self.map_max_x}  {self.map_max_y}  {self.map_max_z} ')
+            self.node_.get_logger().warn(f"Max pos {self.map_max_x}  {self.map_max_y}  {self.map_max_z} ")
             self.node_.get_logger().warn(f"Tool home position {cmd.x_pos} {cmd.y_pos} {cmd.z_pos} is outside of the farmbot's reach!")
             return False
         # Check if the release position is valid

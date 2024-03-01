@@ -4,7 +4,7 @@
   <name>map_handler</name>
   <version>1.0.0</version>
   <description>Package handling map information and seed mapping. Also handles sequencing for some tasks</description>
-  <maintainer email="james.petri@mu.ie">James</maintainer>
+  <maintainer email="jamespetri28@gmail.com">James</maintainer>
   <license>TODO: License declaration</license>
 
   <depend>rclpy</depend>

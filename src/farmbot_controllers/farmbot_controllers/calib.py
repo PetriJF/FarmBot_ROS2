@@ -1,8 +1,5 @@
 from rclpy.node import Node
-from rclpy.action import ActionClient
-from rclpy.action.client import ClientGoalHandle
 from std_msgs.msg import Bool 
-from farmbot_interfaces.action import GetUARTResponse
 from farmbot_interfaces.srv import StringRepReq
 from farmbot_controllers.movement import Movement
 from farmbot_controllers.devices import DeviceControl
@@ -30,9 +27,9 @@ RELATIVE_MOVEMENTS = [
 
 class CalibrateCamera:
     def __init__(self, node: Node, mvm: Movement):
-        self.x_
-        self.y_
-        self.z_
+        self.x_ = 0.0
+        self.y_ = 0.0
+        self.z_ = 0.0
         self.node_ = node
         self.mvm_ = mvm
     

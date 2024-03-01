@@ -2,7 +2,6 @@ from rclpy.node import Node
 from rclpy.action import ActionClient
 from rclpy.action.client import ClientGoalHandle
 from std_msgs.msg import Bool 
-from farmbot_interfaces.action import GetUARTResponse
 from farmbot_interfaces.srv import StringRepReq
 from farmbot_controllers.movement import Movement
 from farmbot_controllers.devices import DeviceControl
@@ -33,7 +32,6 @@ class ToolCommands:
         self.farmbot_busy_ = False
         self.wait_for_camera_ = False
 
-        self.get_response_client_ = ActionClient(self.node_, GetUARTResponse, 'uart_response')
         self.busy_state_sub_ = self.node_.create_subscription(Bool, 'busy_state', self.status_callback, 10)
         self.sequencing_timer_ = self.node_.create_timer(1.0, self.sequencing_timer)
  
@@ -46,23 +44,31 @@ class ToolCommands:
 
     # Peripheral control functions TODO: Improve
 
-    # Turning on or off the vacuum pump
     def vacuum_pump(self, state: int):
+        '''
+        Turning on or off the vacuum pump
+        '''
         vacuum_pin = 9
         self.devices_.set_pin_value(pin = vacuum_pin, value = state, pin_mode = False)
 
-    # Turning on or off the water pump
     def water_pump(self, state: int):
+        '''
+        Turning on or off the water pump
+        '''
         water_pin = 8
         self.devices_.set_pin_value(pin = water_pin, value = state, pin_mode = False)
 
-    # Turning the water pump on, waiting for the specified time in ms and turning it off
     def water_pulses(self, delay = 500):
+        '''
+        Turning the water pump on, waiting for the specified time in ms and turning it off
+        '''
         water_pin = 8
         self.devices_.set_pin_value_2(pin = water_pin, value1 = 1, delay = delay, value2 = 0, pin_mode = False)
 
-    # Turning on or off the LED strip
     def led_strip(self, state: int):
+        '''
+        Turning on or off the LED strip
+        '''
         light_pin = 7
         self.devices_.set_pin_value(pin = light_pin, value = state, pin_mode = False)
     
