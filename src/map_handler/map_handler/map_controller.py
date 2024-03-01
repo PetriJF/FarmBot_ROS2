@@ -119,7 +119,7 @@ class MapController(Node):
         '''
         # Check command validity
         if (cmd.add and cmd.remove) or (not cmd.add and not cmd.remove):
-            self.get_logger().warn(f"You must select either to add or remove a plant! Can't do both/none in a commmand")
+            self.get_logger().warn('You must select either to add or remove a plant! Cannot do both/none in a commmand')
             return
         
         if cmd.add:
@@ -171,7 +171,7 @@ class MapController(Node):
             if plant['identifiers']['index'] == index:
                 plants.remove(plant)
                 self.map_instance_ ['plant_details']['plants'] -= 1
-                self.get_logger().info(f'Removed {[plant['identifiers']['name']]} with index {index} from the map')
+                self.get_logger().info(f"Removed {plant['identifiers']['name']} with index {index} from the map")
                 break
     
         self.save_to_yaml(self.map_instance_, self.directory_, self.active_map_file_)
@@ -193,8 +193,7 @@ class MapController(Node):
                 plant_type = plant['identifiers']['plant_name']
                 available, tray_index = self.__check_loaded_seeds(plant_type)
                 if not available:
-                    self.get_logger().warn(f'{plant['identifiers']['plant_name']} (index = {plant['identifiers']['index']}) could not be planted\
-                                           as {plant['identifiers']['plant_name']} seeds were not found to be loaded into the seed trays')
+                    self.get_logger().warn(f"{plant['identifiers']['plant_name']} (index = {plant['identifiers']['index']}) could not be planted as {plant['identifiers']['plant_name']} seeds were not found to be loaded into the seed trays")
                     continue
 
                 cmd_sequence += self.seed_plant(plant, self.map_instance_['map_reference']['trays'][tray_index])
@@ -239,30 +238,30 @@ class MapController(Node):
         tray_y = tray['position']['y']
         tray_z = tray['position']['z']
 
-        cmd = f'CC_P_{plant['identifiers']['index']}_3\n'
+        cmd = f"CC_P_{plant['identifiers']['index']}_3\n"
 
         tray_clearance = 30
 
         # Go over seed tray at safe z
-        cmd += f'{tray_x} {tray_y} {tray_z + self.safe_z_increment_}\n'
+        cmd += f"{tray_x} {tray_y} {tray_z + self.safe_z_increment_}\n"
         # Turn on vacuum pump
-        cmd += f'DC_P_{plant['identifiers']['index']}_3\n'
-        cmd += f'Vacuum 1\n'
+        cmd += f"DC_P_{plant['identifiers']['index']}_3\n"
+        cmd += 'Vacuum 1\n'
         # Collect a seed
-        cmd += f'CC_P_{plant['identifiers']['index']}_3\n'
-        cmd += f'{tray_x} {tray_y} {tray_z + tray_clearance}\n'
+        cmd += f"CC_P_{plant['identifiers']['index']}_3\n"
+        cmd += f"{tray_x} {tray_y} {tray_z + tray_clearance}\n"
         # Retract with the seed
-        cmd += f'{tray_x} {tray_y} {tray_z + self.safe_z_increment_}\n'
+        cmd += f"{tray_x} {tray_y} {tray_z + self.safe_z_increment_}\n"
         # Go to the plant at safe z
-        cmd += f'{plant_x} {plant_y} {plant_z + self.safe_z_increment_}\n'
+        cmd += f"{plant_x} {plant_y} {plant_z + self.safe_z_increment_}\n"
         # Plant the seed
-        cmd += f'{plant_x} {plant_y} {plant_z}\n'
+        cmd += f"{plant_x} {plant_y} {plant_z}\n"
         # Turn off vacuum pump
-        cmd += f'DC_P_{plant['identifiers']['index']}_3\n'
-        cmd += f'Vacuum 0\n'
+        cmd += f"DC_P_{plant['identifiers']['index']}_3\n"
+        cmd += 'Vacuum 0\n'
         # Retract the empty seeder
-        cmd += f'CC_P_{plant['identifiers']['index']}_3\n'
-        cmd += f'{plant_x} {plant_y} {plant_z + self.safe_z_increment_}\n'
+        cmd += f"CC_P_{plant['identifiers']['index']}_3\n"
+        cmd += f"{plant_x} {plant_y} {plant_z + self.safe_z_increment_}\n"
 
         return cmd
 
@@ -316,13 +315,13 @@ class MapController(Node):
         plant_y = plant['position']['y']
         plant_z = plant['position']['z']
 
-        cmd = f'CC_P_{plant['identifiers']['index']}_4\n'
+        cmd = f"CC_P_{plant['identifiers']['index']}_4\n"
         # go to seed location
-        cmd += f'{plant_x} {plant_y} {-self.safe_z_increment_}\n'
+        cmd += f"{plant_x} {plant_y} {-self.safe_z_increment_}\n"
         # Turn on water pump pump
-        cmd += f'DC_P_{plant['identifiers']['index']}_4\n'
+        cmd += f"DC_P_{plant['identifiers']['index']}_4\n"
         for i in range(pulses):
-            cmd += f'WaterPulses {2000}\n'
+            cmd += f"WaterPulses {2000}\n"
 
         return cmd
 
@@ -377,7 +376,7 @@ class MapController(Node):
             [self.tool_details_.release_x_inc, self.tool_details_.release_y_inc] = \
                     self.get_release_direction(self.map_instance_['map_reference']['tools']['T' + index]['release_dir'])
         
-            self.get_logger().info(f'Mounting {self.map_instance_['map_reference']['tools']['T' + index]['name']}')
+            self.get_logger().info(f"Mounting {self.map_instance_['map_reference']['tools']['T' + index]['name']}")
 
             if cmd == 1:
                 return self.tool_exchanger_.mount_tool(self.tool_details_)
