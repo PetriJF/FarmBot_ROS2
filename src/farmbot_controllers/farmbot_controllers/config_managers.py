@@ -9,7 +9,7 @@ from farmbot_interfaces.srv import ParameterConfig, LoadParamConfig
 import os
 import time
 import yaml
-from farmbot_controllers.farmbot_controllers.param_info import ParameterList
+from farmbot_controllers.param_info import ParameterList
 
 class ConfigServer(Node):
     '''

@@ -41,8 +41,8 @@ class MapController(Node):
 
         # Loading the map instance from memory
         self.map_instance_ = self.retrieve_map(directory = self.directory_,
-                                              fileName1 = self.active_map_file_,
-                                              fileName2 = reference_map_file_)
+                                               file_name1 = self.active_map_file_,
+                                               file_name2 = reference_map_file_)
         
         # Loading the tool exhanging module and the tool command object
         self.tool_exchanger_ = ToolExchanger(node = self, 

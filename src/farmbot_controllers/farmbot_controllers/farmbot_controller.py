@@ -3,7 +3,7 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 from farmbot_interfaces.msg import PlantManage
-from farmbot_interfaces.srv import ParameterConfig, LoadParamConfig, StringRepReq
+from farmbot_interfaces.srv import ParameterConfig, LoadParamConfig
 
 # Modules
 from farmbot_controllers.tools import ToolCommands

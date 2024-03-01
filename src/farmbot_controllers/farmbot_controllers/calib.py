@@ -27,9 +27,9 @@ RELATIVE_MOVEMENTS = [
 
 class CalibrateCamera:
     def __init__(self, node: Node, mvm: Movement):
-        self.x_
-        self.y_
-        self.z_
+        self.x_ = 0.0
+        self.y_ = 0.0
+        self.z_ = 0.0
         self.node_ = node
         self.mvm_ = mvm
     
