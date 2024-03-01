@@ -3,10 +3,13 @@ from std_msgs.msg import Bool
 from farmbot_interfaces.srv import StringRepReq
 from farmbot_controllers.movement import Movement
 from farmbot_controllers.devices import DeviceControl
+from ament_index_python.packages import get_package_share_directory
 import os
 import math
 import cv2
 import numpy as np
+import time
+import yaml
 
 
 """Calibrate camera using a grid of circles calibration card."""
@@ -32,6 +35,31 @@ class CalibrateCamera:
         self.z_ = 0.0
         self.node_ = node
         self.mvm_ = mvm
+        """Set initial attributes.
+
+        Arguments:
+            calibration_data: P2C().calibration_params JSON
+        """
+        self.calibration_data = None
+        self.config_directory_ = os.path.join(get_package_share_directory('camera_handler'), 'config')
+        self.rgb_dir_ = os.path.join(self.config_directory_,"saved_rgb_image.png")
+        self.depth_dir_ = os.path.join(self.config_directory_,"saved_depth_image.png")
+        self.pattern = {
+            'size': (5, 7),
+            'type': cv2.CALIB_CB_ASYMMETRIC_GRID,
+            'row_circle_separation': 30,
+        }
+        self.dot_images = {
+            AXIS_INDEX['init']: {},
+            AXIS_INDEX['x']: {},
+            AXIS_INDEX['y']: {},
+        }
+        self.output_img = None
+        self.center = None
+        self.axis_points = None
+        self.rotation_angles = []
+        self.success_flag = True
+        self.relative_starting_position = None
     
     def update_position(self, x: float, y: float, z: float):
         self.x_ = x
@@ -39,10 +67,12 @@ class CalibrateCamera:
         self.z_ = z
         
     def calibrate_camera(self):
-        pass
+        calibration_results = {}
+        success = self.move_and_capture()
+        if success:
+            self.calibrate()
+            self.save_image()
     
-
-class PatternCalibration(object):
     """Determine camera calibration data using a circle grid calibration card.
 
     # Card details
@@ -81,33 +111,6 @@ class PatternCalibration(object):
     | 2 < 1
     '-----
     """
-
-    def __init__(self, calibration_data):
-        """Set initial attributes.
-
-        Arguments:
-            calibration_data: P2C().calibration_params JSON
-        """
-        self.calibration_data = calibration_data
-        self.rgb_dir_ = os.path.join(self.config_directory_,"saved_rgb_image.png")
-        self.depth_dir_ = os.path.join(self.config_directory_,"saved_depth_image.png")
-        self.pattern = {
-            'size': (5, 7),
-            'type': cv2.CALIB_CB_ASYMMETRIC_GRID,
-            'row_circle_separation': 30,
-        }
-        self.dot_images = {
-            AXIS_INDEX['init']: {},
-            AXIS_INDEX['x']: {},
-            AXIS_INDEX['y']: {},
-        }
-        self.output_img = None
-        self.center = None
-        self.axis_points = None
-        self.rotation_angles = []
-        self.success_flag = True
-        self.relative_starting_position = None
-
     def count_circles(self):
         """Total number of circles in pattern."""
         return self.pattern['size'][0] * self.pattern['size'][1]
@@ -116,7 +119,6 @@ class PatternCalibration(object):
         """Length of circle row in millimeters."""
         return (self.pattern['size'][0] - 1) * self.pattern['row_circle_separation']
 
-    @staticmethod
     def _move(self, amount):
         target_x = self.x_ + amount['x']
         target_y = self.y_ + amount['y']
@@ -130,21 +132,20 @@ class PatternCalibration(object):
                 if self.relative_starting_position is None:
                     self.relative_starting_position = {'x': 0, 'y': 0, 'z': 0}
                 self.node_.get_logger().info('Moving to next camera calibration photo location.')
-                self._move(movement)
+                self._move( movement)
                 for axis in movement:
                     self.relative_starting_position[axis] -= movement[axis]
             self.node_.get_logger().info('Taking camera calibration photo. ({}/3)'.format(i + 1))
-            img_filename = self.capture()
             coordinates = {'x':self.x_,'y':self.y_,'z':self.z_}
-            img = cv2.imread(img_filename, 1)
-            os.remove(img_filename)
-            ret, centers = self.find_pattern(img, True)
+            print(f"Trying to load image from: {self.rgb_dir_}")
+            img_rgb = cv2.imread(self.rgb_dir_, 1)
+            ret, centers = self.find_pattern(img_rgb)
             if not self.success_flag:
-                self.save_image(img, str(i + 1))
+                self.save_image(img_rgb, str(i + 1))
                 return self.success_flag
             self.dot_images[i]['circles'] = centers
             self.dot_images[i]['found'] = ret
-            self.dot_images[i]['image'] = img
+            self.dot_images[i]['image'] = img_rgb
             self.dot_images[i]['coordinates'] = coordinates
         self.return_to_start()
         return self.success_flag
@@ -152,8 +153,7 @@ class PatternCalibration(object):
     def return_to_start(self):
         """Move back to starting position."""
         if self.relative_starting_position is not None:
-            log('Returning to starting location...',
-                message_type='info', title='camera-calibration')
+            self.node_.get_logger().info('Returning to starting location...')
             self._move(self.relative_starting_position)
 
     def get_initial_img_info(self):
@@ -163,7 +163,6 @@ class PatternCalibration(object):
         self.center = (int(cols / 2), int(rows / 2))
         self.axis_points = [[self.center] * self.count_circles(), [], []]
 
-    @staticmethod
     def preprocess(img, basic=False):
         'Pre-process image in preparation for pattern detection.'
         def _divide_size_by(factor):
@@ -214,8 +213,7 @@ class PatternCalibration(object):
     def find_pattern(self, img, move_back=False, save_output=None):
         """Find calibration pattern circles in single image."""
         if img is None:
-            log('ERROR: Calibration failed. Image missing.',
-                message_type='error', title='camera-calibration')
+            self.node_.get_logger().error('ERROR: Calibration failed. Image missing.')
             self.success_flag = False
         original = img.copy()
         # first pass with basic pre-processing
@@ -231,9 +229,7 @@ class PatternCalibration(object):
         if not ret and save_output is None:
             if move_back:
                 self.return_to_start()
-            log('ERROR: Calibration failed, calibration object not ' +
-                'detected in image. Check recent photos.',
-                message_type='error', title='camera-calibration')
+            self.node_.get_logger().error('ERROR: Calibration failed, calibration object not detected in image. Check recent photos.')
             self.success_flag = False
         return ret, centers
 
@@ -348,13 +344,31 @@ class PatternCalibration(object):
         self.calibration_data['total_rotation_angle'] = round(rotation, 2)
         self.calibration_data['camera_z'] = z_coordinate
         self.calibration_data['coord_scale'] = round(scale, 4)
+        calibration_data_yaml = {
+            'center_pixel_location': list(self.center),
+            'image_bot_origin_location': origin,
+            'total_rotation_angle': round(rotation, 2),
+            'camera_z': z_coordinate,
+            'coord_scale': round(scale, 4)
+        }
+        config_file = 'camera_config.yaml'
+
+        # Write the dictionary to a YAML file
+        with open(config_file, 'w') as file:
+            try:
+                yaml.dump(calibration_data_yaml, file, default_flow_style=False)
+            except yaml.YAMLError as e:
+                self.node_.get_logger().warn(f"Error reading YAML file: {e}")
+                return None
+            
+        print(f'Calibration data saved to {config_file}')
 
     def save_image(self, img=None, name='output'):
         """Save output image."""
         if img is None:
             img = self.output_img
         title = 'pattern_calibration'
-        filename = '{}_{}_{}.jpg'.format(title, int(time()), name)
+        filename = '{}_{}_{}.jpg'.format(title, int(time.time()), name)
         cv2.imwrite(filename, img)
         cv2.imwrite('/tmp/images/{}'.format(filename), img)
 
@@ -369,11 +383,3 @@ class PatternCalibration(object):
         self.draw_origin()
         return self.success_flag
 
-
-if __name__ == '__main__':
-    calibration_results = {}
-    pattern_calibration = PatternCalibration(calibration_results)
-    success = pattern_calibration.move_and_capture()
-    if success:
-        pattern_calibration.calibrate()
-        pattern_calibration.save_image()

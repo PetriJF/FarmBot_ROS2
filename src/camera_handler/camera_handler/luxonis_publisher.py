@@ -121,11 +121,11 @@ class CameraNode:
         if latestPacket["rgb"] is not None:
             self.rgb_image_ = latestPacket["rgb"].getCvFrame()
             self.publish_images(rgb_frame=self.rgb_image_)
-            self.save_image(rgb=True)
+            self.save_images(rgb=True)
         if latestPacket["stereo"] is not None:
             self.depth_image_ = self.process_depth_frame(latestPacket["stereo"].getFrame())
             self.publish_images(depth_frame=self.depth_image_ )
-            self.save_image(depth=True)
+            self.save_images(depth=True)
         
 
     def process_depth_frame(self, disparity_frame):
@@ -170,8 +170,6 @@ class CameraNode:
             self.node_.get_logger().info('No images to save.')
     
 
-
-
 def main(args=None):
     rclpy.init(args=args)
     camera_node = CameraNode()
@@ -182,6 +180,7 @@ def main(args=None):
     finally:
         camera_node.destroy_node()
         rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
