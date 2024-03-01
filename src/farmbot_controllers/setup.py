@@ -28,7 +28,7 @@ setup(
             "farmbot_controller = farmbot_controllers.farmbot_controller:main",
             "keyboard_controller = farmbot_controllers.keyboard_teleop:main",
             "panel_controller = farmbot_controllers.panel_controller:main",
-            "param_conf_server = farmbot_controllers.conf_mng_servers:main"
+            "param_conf_server = farmbot_controllers.config_managers:main"
         ],
     },
 )
