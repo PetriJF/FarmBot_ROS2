@@ -5,7 +5,7 @@ package_name = 'farmbot_controllers'
 
 setup(
     name=package_name,
-    version='0.0.0',
+    version='1.0.0',
     packages=find_packages(exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages',
@@ -18,9 +18,9 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='farmbotdev',
+    maintainer='James',
     maintainer_email='jamespetri28@gmail.com',
-    description='TODO: Package description',
+    description='Package containing the main controllers and modules for the ROS2 Farmbot',
     license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={

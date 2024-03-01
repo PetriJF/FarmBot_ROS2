@@ -13,7 +13,7 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='farmbotdev',
+    maintainer='James',
     maintainer_email='jamespetri28@gmail.com',
     description='This Package deals with the command interpreter that encodes the tasks in the FarmBot GCode.',
     license='TODO: License declaration',

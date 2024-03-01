@@ -11,7 +11,7 @@
 
     Dependency on the farmbot_interfaces package!
   </description>
-  <maintainer email="james.petri@mu.ie">James</maintainer>
+  <maintainer email="jamespetri28@gmail.com">James</maintainer>
   <license>TODO: License declaration</license>
 
   <depend>rclpy</depend>
