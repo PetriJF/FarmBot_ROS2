@@ -23,7 +23,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/MapCommand.msg"
   "srv/LedPanelHandler.srv"
   "srv/ParameterConfig.srv"
-  "srv/LoadParamConfig.srv"
   "srv/StringRepReq.srv"
 )
 
