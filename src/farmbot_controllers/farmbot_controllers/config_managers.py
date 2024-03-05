@@ -4,7 +4,7 @@ from farmbot_interfaces.msg import MapCommand
 from ament_index_python.packages import get_package_share_directory
 from std_msgs.msg import String
 from farmbot_interfaces.msg import ParameterCommand
-from farmbot_interfaces.srv import ParameterConfig, LoadParamConfig
+from farmbot_interfaces.srv import ParameterConfig, StringRepReq
 
 import os
 import time
@@ -38,16 +38,17 @@ class ConfigServer(Node):
             get_package_share_directory('farmbot_controllers'),
             'config'
         )
-        self.base_config_ = 'firmwareDefault.yaml'          # default config loaded by the firmware
-        self.default_config_ = 'defaultParameterConfig.yaml'
-        self.lab_fb_config_ = 'labFB.yaml'
-        self.active_config_ = 'activeConfig.yaml'
+        self.base_config_ = 'firmwareDefault.yaml'  # default config loaded by the firmware
+        self.custom1_config_ = 'Custom1.yaml'       # custom configuration. modify in source directory and build
+        self.genesis_config_ = 'Genesis.yaml'       # farmbot genesis config
+        self.express_config_ = 'Express.yaml'       # farmbot express config
+        self.active_config_ = 'activeConfig.yaml'   # configuration loaded from previous run
         
         # TODO: Add more default configurations other than the labFB one
 
         # Config Service Servers
         self.config_server_ = self.create_service(ParameterConfig, 'manage_param_config', self.config_request_server)
-        self.config_loading_server_ = self.create_service(LoadParamConfig, 'load_param_config', self.param_loading_server)
+        self.config_loading_server_ = self.create_service(StringRepReq, 'load_param_config', self.param_loading_server)
 
         # Parameter Command publisher (Used for loading up parameters)
         self.param_cmd_ = ParameterCommand()
@@ -92,20 +93,27 @@ class ConfigServer(Node):
 
     def param_loading_server(self, request, response):
         '''
-        Service Server that loads the parameter configurations onto the Farmduino.
-        
+        Service Server that loads the default parameter configurations onto the Farmduino.
         '''
-        # A standard config that works for all farmbots
-        if request.standard: 
-            self.load_from_yaml(path = self.default_path_, file_name = self.default_config_)
+        if request.data in ['Genesis', 'genesis', 'Gen', 'gen']: 
+            self.load_from_yaml(path = self.default_path_, file_name = self.genesis_config_)
+            self.get_logger().info("Loading the genesis configuration")
+            self.load_params()
+        elif request.data in ['Express', 'express', 'exp', 'Exp']: 
+            self.load_from_yaml(path = self.default_path_, file_name = self.express_config_)
+            self.get_logger().info("Loading the express configuration")
             self.load_params()
         # A configuration more specific to the model you are running
-        else:
-            ver = request.ver ## TODO add support for multiple configurations
-            self.load_from_yaml(path = self.default_path_, file_name = self.lab_fb_config_)
+        elif request.data in ['Custom', 'custom']:
+            self.load_from_yaml(path = self.default_path_, file_name = self.custom1_config_)
+            self.get_logger().info("Loading the custom configuration")
             self.load_params()
+        else:
+            self.get_logger().warning("Config type unrecognized or not set. Nothing Loaded!")
+            response.data = 'FAILED'
+            return response
 
-        response.success = True
+        response.data = 'LOADED'
         return response
 
     def load_params(self):
