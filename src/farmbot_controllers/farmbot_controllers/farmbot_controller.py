@@ -3,7 +3,7 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 from farmbot_interfaces.msg import PlantManage
-from farmbot_interfaces.srv import ParameterConfig, LoadParamConfig
+from farmbot_interfaces.srv import ParameterConfig, StringRepReq
 
 # Modules
 from farmbot_controllers.tools import ToolCommands
@@ -74,8 +74,11 @@ class KeyboardTeleOp(Node):
                 self.cur_increment_ = 100.0
             case '3':
                 self.cur_increment_ = 500.0
-            case 'i':
-                self.configLoaderClient(standard = False, ver = "labFB")
+            case 'C_1': # Load config
+                if code[1]:
+                    self.config_loader_client(ver = code[1])
+                else:
+                    self.get_logger().warn("No parameter config set")
             case 'h': 
                 self.mvm_.go_home()
             case 'j':
@@ -162,28 +165,32 @@ class KeyboardTeleOp(Node):
         
     
     ## Parameter Loading Service Client
-    def configLoaderClient(self, standard = True, ver = ""):
-        if not standard and ver == "":
-            self.get_logger().warn("Can't set non standard configuration if the version of the farmbot is not set!")
+    def config_loader_client(self, ver: str):
+        if ver == '':
+            self.get_logger().warn("IGNORED. Can't set configuration if the version of the farmbot is not set!")
+            return
+        if ver not in ['Genesis', 'genesis', 'Gen', 'gen',
+                       'Express', 'express', 'Exp', 'exp',
+                       'Custom', 'custom']:
+            self.get_logger().warn("IGNORED. Config type unrecognized")
+            return
         
-        client = self.create_client(LoadParamConfig, 'load_param_config')
+
+        client = self.create_client(StringRepReq, 'load_param_config')
         while not client.wait_for_service(1.0):
             self.get_logger().warn("Waiting for Parameter Loading Server...")
         
-        request = LoadParamConfig.Request()
-        request.standard = standard
-        request.ver = ver
+        request = StringRepReq.Request()
+        request.data = ver
 
         future = client.call_async(request = request)
-        future.add_done_callback(self.callbackConfigLoading)
+        future.add_done_callback(self.config_loading_future_callback)
 
-    def callbackConfigLoading(self, future):
+    def config_loading_future_callback(self, future):
         try:
-            response = future.result()
-            if not response:
+            response = future.result().data
+            if response == 'FAILED':
                 self.get_logger().warn("Failure in Parameter Config Loading!")
-            
-            ## TODO: Add a response to the future
         except Exception as e:
             self.get_logger().error("Service call failed %r" % (e, ))
 
