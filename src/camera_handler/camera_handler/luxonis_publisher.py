@@ -175,6 +175,14 @@ class CameraNode:
                 self.node_.get_logger().warn(f"Error reading YAML file: {e}")
                 return None
             
+    def save_images(self):
+        if self.rgb_image_ is not None and self.depth_image_ is not None:
+            cv2.imwrite(os.path.join(self.config_directory_,"saved_rgb_image.png"), self.rgb_image_)
+            #self.node_.get_logger().info('RGB image saved successfully.')
+            cv2.imwrite(os.path.join(self.config_directory_,"saved_depth_image.png"), self.depth_image_)
+            #self.node_.get_logger().info('Depth image saved successfully.')
+        else:
+            self.node_.get_logger().info('No images to save.')
     # def save_images(self):
     #     if self.rgb_image_ is not None and self.depth_image_ is not None:
     #         cv2.imwrite(os.path.join(self.config_directory_,"saved_rgb_image.png"), self.rgb_image_)
@@ -184,6 +192,15 @@ class CameraNode:
     #     else:
     #         self.node_.get_logger().info('No images to save.')
             
+    def save_images(self, rgb = False, depth = False):
+        if self.rgb_image_ is not None and rgb == True: 
+            cv2.imwrite(os.path.join(self.config_directory_,"saved_rgb_image.png"), self.rgb_image_)
+            #self.node_.get_logger().info('RGB image saved successfully.')
+        elif self.depth_image_ is not None and depth == True:
+            cv2.imwrite(os.path.join(self.config_directory_,"saved_depth_image.png"), self.depth_image_)
+            #self.node_.get_logger().info('Depth image saved successfully.')
+        else:
+            self.node_.get_logger().info('No images to save.')
     # def save_images(self, rgb = False, depth = False):
     #     if self.rgb_image_ is not None and rgb == True: 
     #         cv2.imwrite(os.path.join(self.config_directory_,"saved_rgb_image.png"), self.rgb_image_)
@@ -194,18 +211,3 @@ class CameraNode:
     #     else:
     #         self.node_.get_logger().info('No images to save.')
     
-
-def main(args=None):
-    rclpy.init(args=args)
-    camera_node = CameraNode()
-    try:
-        rclpy.spin(camera_node)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        camera_node.destroy_node()
-        rclpy.shutdown()
-
-
-if __name__ == '__main__':
-    main()

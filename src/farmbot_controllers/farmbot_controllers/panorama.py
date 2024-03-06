@@ -5,8 +5,8 @@ import numpy as np
 import os
 import yaml
 from ament_index_python.packages import get_package_share_directory
-from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
+from sensor_msgs.msg import Image
 
 #TODO get these values from map config file
 MAP_X = 2000
@@ -19,6 +19,18 @@ class Panorama:
         self.z_ = 0.0
         self.node_ = node
         self.mvm_ = mvm
+        self.bridge = CvBridge()
+        self.rgb_image_ = None
+        self.depth_image_ = None
+        self.rgb_sub = self.node_.create_subscription(Image, '/rgb_img', self.rgb_callback, 10)
+        self.depth_sub = self.node_.create_subscription(Image, '/depth_img', self.depth_callback, 10)
+
+    def rgb_callback(self, msg):
+        self.rgb_image_ = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+
+    def depth_callback(self, msg):
+        self.depth_image_ = self.bridge.imgmsg_to_cv2(msg, "mono8")
+        
         self.bridge = CvBridge()
         self.rgb_sub = self.node_.create_subscription(Image, '/rgb_img', self.rgb_callback, 10)
         self.depth_sub = self.node_.create_subscription(Image, '/depth_img', self.depth_callback, 10)
@@ -58,6 +70,7 @@ class Panorama:
             except yaml.YAMLError as e:
                 self.node_.get_logger().warn(f"Error reading YAML file: {e}")
                 return None
+    
 
     def stitch_image_onto_map(self):
         self.config_directory_ = os.path.join(get_package_share_directory('camera_handler'), 'config')
@@ -70,7 +83,7 @@ class Panorama:
         self.y_ = self.map_size_y_px - int(self.y_/self.config_data_['coord_scale'])
         
         # Load the new image
-        new_image = self.rgb_img_
+        new_image = self.rgb_image_
         rotation_angle = self.config_data_['total_rotation_angle']
         new_image = self.rotate_image(new_image, rotation_angle)
         map_path = os.path.join(self.config_directory_,'rgb_map.png')
