@@ -175,7 +175,7 @@ class PanelController(Node):
             self.LED_client(FBPanel.ESTOP_LED, FBPanel.OFF)
             self.LED_client(FBPanel.UNLOCK_LED, FBPanel.FLASHING)
             self.cmd_.data = 'E'
-            self.input_pub_.publish(self.cmd_)
+            self.priority_pub_.publish(self.cmd_)
             self.get_logger().info('ESTOP button pressed')
 
     def reset_button_handler(self, channel):
@@ -187,7 +187,7 @@ class PanelController(Node):
             self.LED_client(FBPanel.ESTOP_LED, FBPanel.ON)
             self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
             self.cmd_.data = 'F09'
-            self.input_pub_.publish(self.cmd_)
+            self.priority_pub_.publish(self.cmd_)
             self.get_logger().info('RESET button pressed')
     
     # Just for demonstration purposes
