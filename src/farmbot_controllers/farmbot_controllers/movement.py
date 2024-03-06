@@ -14,9 +14,9 @@ class Movement:
         '''
         self.node_ = node
 
-        self.X_MAX_SPEED = 800.0
-        self.Y_MAX_SPEED = 800.0
-        self.Z_MAX_SPEED = 1000.0
+        self.X_MAX_SPEED = 400.0
+        self.Y_MAX_SPEED = 400.0
+        self.Z_MAX_SPEED = 400.0
 
         self.gantry_config_ = HomeCommand()    # Used for gantry configuration (homing, calibration)
         self.move_gantry_ = GantryCommand()  # Used for moving the gantry along the 3 axis
@@ -122,7 +122,7 @@ class Movement:
         self.move_gantry(x_coord = x_coord, y_coord = y_coord, z_coord = z_coord,\
                         x_speed = 100.0, y_speed = 100.0, z_speed = 100.0)
 
-    def move_gantry(self, x_coord = float, y_coord = float, z_coord = float, speed = float):
+    def move_gantry_s(self, x_coord = float, y_coord = float, z_coord = float, speed = float):
         '''
         Moves the Gantry to the desired coordinates at the the speed specified
 
