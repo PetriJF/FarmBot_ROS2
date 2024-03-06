@@ -24,7 +24,7 @@ class CameraNode:
         self.rgb_image_ = None
         self.depth_image_ = None
         # Set a timer to process and publish images at a specified rate
-        timer_period = 0.1  # seconds
+        timer_period = 0.5  # seconds
         self.timer = self.node_.create_timer(timer_period, self.run)
 
     def load_config(self):
@@ -68,8 +68,8 @@ class CameraNode:
         
         # RGB camera settings
         cam_rgb.setBoardSocket(dai.CameraBoardSocket.RGB)
-        cam_rgb.setPreviewSize(416, 416)
         cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
+        cam_rgb.setPreviewSize(416,416)
         cam_rgb.setInterleaved(False)
         cam_rgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
         cam_rgb.setFps(40)
@@ -120,10 +120,14 @@ class CameraNode:
 
         if latestPacket["rgb"] is not None:
             self.rgb_image_ = latestPacket["rgb"].getCvFrame()
+            #self.rgb_image_ = cv2.rotate(self.rgb_image_, cv2.ROTATE_180)
+            #self.rgb_image_ = cv2.flip(self.rgb_image_, 1)
             self.publish_images(rgb_frame=self.rgb_image_)
             self.save_images(rgb=True)
         if latestPacket["stereo"] is not None:
             self.depth_image_ = self.process_depth_frame(latestPacket["stereo"].getFrame())
+            #self.depth_image_ = cv2.rotate(self.depth_image_, cv2.ROTATE_180)
+            #self.depth_image_ = cv2.flip(self.depth_image_, 1)
             self.publish_images(depth_frame=self.depth_image_ )
             self.save_images(depth=True)
         

@@ -11,6 +11,7 @@ from farmbot_controllers.movement import Movement
 from farmbot_controllers.states import State
 from farmbot_controllers.devices import DeviceControl
 from farmbot_controllers.calib import CalibrateCamera
+from farmbot_controllers.panorama import Panorama
 
 import time
 
@@ -29,7 +30,8 @@ class KeyboardTeleOp(Node):
         self.tools_ = ToolCommands(self, self.mvm_, self.devices_)
         # Initializing the camera calibration module
         self.calib_ = CalibrateCamera(self, self.mvm_)
-
+        # Initializing the panorama module
+        self.panorama_ = Panorama(self, self.mvm_)
         # Memory
         self.cur_x_ = 0.0
         self.cur_y_ = 0.0
@@ -139,7 +141,8 @@ class KeyboardTeleOp(Node):
                 #self.tools_.cam_calib_client()
                 self.calib_.calibrate_camera()
             case 'I_1': # Panorama Sequencing
-                self.tools_.stitch_panorama_client()
+                #self.tools_.stitch_panorama_client()
+                self.panorama_.stitch_image_onto_map()
             case 'D_L_1' | 'D_L_0':
                 self.tools_.led_strip(state = int(code[0][4]))
             case 'D_V_0' | 'D_V_1':
@@ -160,6 +163,7 @@ class KeyboardTeleOp(Node):
             self.cur_y_ = float(msgSplit[2][1:])
             self.cur_z_ = float(msgSplit[3][1:])
             self.calib_.update_position(self.cur_x_, self.cur_y_, self.cur_z_)
+            self.panorama_.update_position(self.cur_x_, self.cur_y_, self.cur_z_)
         if reportCode == 'R41':
             self.tools_.uart_message(msg.data)
         

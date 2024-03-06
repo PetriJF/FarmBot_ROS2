@@ -49,6 +49,12 @@ def generate_launch_description():
         executable = 'map_controller',
         name = 'map_controller'
     )
+    
+    luxonis_publisher_node = Node(
+        package = 'camera_handler',
+        executable = 'luxonis_publisher',
+        name = 'luxonis_publisher'
+    )
 
     uart_ctrl_node = Node(
         package = 'farmbot_command_handler',
@@ -61,7 +67,7 @@ def generate_launch_description():
     def start_next_node(event: ProcessStarted, context: LaunchContext):
         print(f'node {event.process_name} started.')
         already_started_nodes.update([event.process_name])
-        if len(already_started_nodes) == 7:
+        if len(already_started_nodes) == 8:
             print(f'all required nodes are up, starting uart_controller')
             time.sleep(5)
             return uart_ctrl_node
@@ -81,6 +87,8 @@ def generate_launch_description():
                                                             on_start = start_next_node)),
         RegisterEventHandler(event_handler = OnProcessStart(target_action = map_ctrl_node,
                                                             on_start = start_next_node)),
+        RegisterEventHandler(event_handler = OnProcessStart(target_action = luxonis_publisher_node,
+                                                            on_start = start_next_node)),
         param_conf_srv_node,
         panel_node,
         controller_node,
@@ -88,6 +96,7 @@ def generate_launch_description():
         state_interp_node,
         device_interp_node,
         map_ctrl_node,
+        luxonis_publisher_node,
     ])
 
 if __name__ == '__main__':

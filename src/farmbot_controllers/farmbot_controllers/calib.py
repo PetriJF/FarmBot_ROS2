@@ -1,8 +1,5 @@
 from rclpy.node import Node
-from std_msgs.msg import Bool 
-from farmbot_interfaces.srv import StringRepReq
 from farmbot_controllers.movement import Movement
-from farmbot_controllers.devices import DeviceControl
 from ament_index_python.packages import get_package_share_directory
 import os
 import math
@@ -40,7 +37,7 @@ class CalibrateCamera:
         Arguments:
             calibration_data: P2C().calibration_params JSON
         """
-        self.calibration_data = None
+        self.calibration_data = {}
         self.config_directory_ = os.path.join(get_package_share_directory('camera_handler'), 'config')
         self.rgb_dir_ = os.path.join(self.config_directory_,"saved_rgb_image.png")
         self.depth_dir_ = os.path.join(self.config_directory_,"saved_depth_image.png")
@@ -124,6 +121,9 @@ class CalibrateCamera:
         target_y = self.y_ + amount['y']
         target_z = self.z_ + amount['z']
         self.mvm_.move_gantry_abs(x_coord = target_x, y_coord = target_y, z_coord = target_z)
+        self.x_ = self.x_ + amount['x']
+        self.y_ = self.y_ + amount['y']
+        self.z_ = self.z_ + amount['z']
 
     def move_and_capture(self):
         """Move the bot along x and y axes, take photos, and detect circles."""
@@ -133,12 +133,23 @@ class CalibrateCamera:
                     self.relative_starting_position = {'x': 0, 'y': 0, 'z': 0}
                 self.node_.get_logger().info('Moving to next camera calibration photo location.')
                 self._move( movement)
+                time.sleep(15)
                 for axis in movement:
                     self.relative_starting_position[axis] -= movement[axis]
             self.node_.get_logger().info('Taking camera calibration photo. ({}/3)'.format(i + 1))
             coordinates = {'x':self.x_,'y':self.y_,'z':self.z_}
-            print(f"Trying to load image from: {self.rgb_dir_}")
-            img_rgb = cv2.imread(self.rgb_dir_, 1)
+            self.node_.get_logger().info(f"Trying to load image from: {self.rgb_dir_}")
+            for _ in range(5):
+                try:
+                    img_rgb = cv2.imread(self.rgb_dir_, 1)
+                    if img_rgb is not None:
+                        break  # Image successfully read, exit the loop
+                except Exception as e:
+                    print(f"Error reading image: {e}")
+            else:
+                # If the loop completes without successfully reading the image, raise an error
+                raise RuntimeError("Failed to read the image after multiple attempts")
+            
             ret, centers = self.find_pattern(img_rgb)
             if not self.success_flag:
                 self.save_image(img_rgb, str(i + 1))
@@ -147,7 +158,8 @@ class CalibrateCamera:
             self.dot_images[i]['found'] = ret
             self.dot_images[i]['image'] = img_rgb
             self.dot_images[i]['coordinates'] = coordinates
-        self.return_to_start()
+            
+        #self.return_to_start()
         return self.success_flag
 
     def return_to_start(self):
@@ -163,7 +175,7 @@ class CalibrateCamera:
         self.center = (int(cols / 2), int(rows / 2))
         self.axis_points = [[self.center] * self.count_circles(), [], []]
 
-    def preprocess(img, basic=False):
+    def preprocess(self, img, basic):
         'Pre-process image in preparation for pattern detection.'
         def _divide_size_by(factor):
             height = img.shape[0]
@@ -204,7 +216,7 @@ class CalibrateCamera:
         try:
             ret, centers = cv2.findCirclesGrid(img, pattern_size, flags=flags)
         except Exception as exception:
-            print(exception)
+            self.node_.get_logger().error(exception)
             ret, centers = False, None
         if large and downsample and ret:
             centers *= 2
@@ -217,11 +229,11 @@ class CalibrateCamera:
             self.success_flag = False
         original = img.copy()
         # first pass with basic pre-processing
-        img = self.preprocess(original, basic=True)
+        img = self.preprocess(original, True)
         ret, centers = self.detect_circles(img)
         if not ret:
             # second pass with heavier pre-processing
-            img = self.preprocess(original)
+            img = self.preprocess(original, False)
             ret, centers = self.detect_circles(img, downsample=True)
         if save_output is not None:
             cv2.drawChessboardCorners(img, self.pattern['size'], centers, ret)
@@ -296,15 +308,14 @@ class CalibrateCamera:
         self.output_img = cv2.warpAffine(
             self.output_img, rotation_matrix, size)
 
-    @staticmethod
-    def calculate_origin(rotated_axis_points):
+    def calculate_origin(self, rotated_axis_points):
         """Determine image origin location from dot axis compasses."""
         origin = []
         for i in range(2):
             diffs = rotated_axis_points[i] - rotated_axis_points[i + 1]
             avg_diffs = np.mean(diffs[:, 1 - i])
             if abs(avg_diffs) < 10:
-                print('Warning: small deltas.')
+                self.node_.get_logger().info('Warning: small deltas.')
             origin.append(1 if avg_diffs > 0 else 0)
         both = sum(origin) % 2 == 0
         origin = [1 - o for o in origin] if both else origin
@@ -346,12 +357,12 @@ class CalibrateCamera:
         self.calibration_data['coord_scale'] = round(scale, 4)
         calibration_data_yaml = {
             'center_pixel_location': list(self.center),
-            'image_bot_origin_location': origin,
-            'total_rotation_angle': round(rotation, 2),
-            'camera_z': z_coordinate,
-            'coord_scale': round(scale, 4)
+            'image_bot_origin_location': list (origin),
+            'total_rotation_angle': float(rotation),
+            'camera_z': float(z_coordinate),
+            'coord_scale': float(scale)
         }
-        config_file = 'camera_config.yaml'
+        config_file = os.path.join(self.config_directory_,'camera_calibration.yaml')
 
         # Write the dictionary to a YAML file
         with open(config_file, 'w') as file:
@@ -361,7 +372,7 @@ class CalibrateCamera:
                 self.node_.get_logger().warn(f"Error reading YAML file: {e}")
                 return None
             
-        print(f'Calibration data saved to {config_file}')
+        self.node_.get_logger().info(f'Calibration data saved to {config_file}')
 
     def save_image(self, img=None, name='output'):
         """Save output image."""
@@ -369,6 +380,7 @@ class CalibrateCamera:
             img = self.output_img
         title = 'pattern_calibration'
         filename = '{}_{}_{}.jpg'.format(title, int(time.time()), name)
+        filename = os.path.join(self.config_directory_,filename)
         cv2.imwrite(filename, img)
         cv2.imwrite('/tmp/images/{}'.format(filename), img)
 
