@@ -167,12 +167,8 @@ class MapController(Node):
         Removes the plant of the represented index
         '''
         plants = self.map_instance_['plant_details']['plants']
-        for plant in plants:
-            if plant['identifiers']['index'] == index:
-                plants.remove(plant)
-                self.map_instance_ ['plant_details']['plants'] -= 1
-                self.get_logger().info(f"Removed {plant['identifiers']['name']} with index {index} from the map")
-                break
+        if index in plants:
+            del plants[index]
     
         self.save_to_yaml(self.map_instance_, self.directory_, self.active_map_file_)
 
