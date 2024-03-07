@@ -127,6 +127,22 @@ class KeyboardTeleOp(Node):
                 self.plant_conf_.index = -1
 
                 self.plant_manage_pub_.publish(self.plant_conf_)
+            case 'P_2':
+                self.plant_conf_.add = False
+                self.plant_conf_.autopos = False
+                self.plant_conf_.x = -1.0
+                self.plant_conf_.y = -1.0
+                self.plant_conf_.z = -1.0
+                self.plant_conf_.exclusion_radius = -1.0
+                self.plant_conf_.canopy_radius = -1.0
+                self.plant_conf_.water_quantity = -1.0
+                self.plant_conf_.max_z = -1.0
+                self.plant_conf_.plant_name = ''
+                self.plant_conf_.growth_stage = ''
+                self.plant_conf_.remove = True
+                self.plant_conf_.index = int(code[1])
+
+                self.plant_manage_pub_.publish(self.plant_conf_)
             case 'P_3' | 'P_4': # Seed/water all plants in Planning stage
                 self.tools_.map_cmd_client(cmd = cmd.data)
             ## Seed Tray commands
