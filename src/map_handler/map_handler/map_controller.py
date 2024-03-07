@@ -7,7 +7,7 @@ from rclpy.node import Node
 from ament_index_python.packages import get_package_share_directory
 from farmbot_interfaces.msg import MapCommand, PlantManage
 from farmbot_interfaces.srv import StringRepReq
-from map_handler.tool_exchange import ToolDetails, ToolExchanger
+from map_handler.tool_sequencer import ToolDetails, ToolExchanger
 
 class MapController(Node):
     '''
@@ -391,8 +391,7 @@ class MapController(Node):
             self.tool_details_.y_pos = self.map_instance_['map_reference']['tools']['T' + index]['position']['y']
             self.tool_details_.z_pos = self.map_instance_['map_reference']['tools']['T' + index]['position']['z']
             self.tool_details_.z_safe_inc = self.safe_z_increment_
-            [self.tool_details_.release_x_inc, self.tool_details_.release_y_inc] = \
-                    self.get_release_direction(self.map_instance_['map_reference']['tools']['T' + index]['release_dir'])
+            self.tool_details_.release_dir = self.map_instance_['map_reference']['tools']['T' + index]['release_dir']
         
             self.get_logger().info(f"Mounting {self.map_instance_['map_reference']['tools']['T' + index]['name']}")
 
@@ -427,22 +426,7 @@ class MapController(Node):
         self.get_logger().info(str(self.map_instance_))
         self.save_to_yaml(self.map_instance_, self.directory_, self.active_map_file_, create_if_empty = True)
 
-    def get_release_direction(self, dir: int):
-        '''
-        Gets the coordinate increments for the release of each tool based 
-        on the mounting orientation
-        '''
-        if dir < 1 or dir > 4: 
-            self.get_logger().error('Release direction for the tool unrecognized! Check configuration!')
-            return
-        if dir == 1:
-            return [-100.0, 0.0]
-        if dir == 1:
-            return [100.0, 0.0]
-        if dir == 1:
-            return [0.0, -100.0]
-        if dir == 1:
-            return [0.0, 100.0]
+
 
     def save_to_yaml(self, data: dict, path = '', file_name = '', create_if_empty = False):
         '''
