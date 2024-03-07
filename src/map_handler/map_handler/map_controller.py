@@ -169,8 +169,26 @@ class MapController(Node):
         plants = self.map_instance_['plant_details']['plants']
         if index in plants:
             del plants[index]
+            self.reindex_plants()
+            self.save_to_yaml(self.map_instance_, self.directory_, self.active_map_file_)
+
+            self.get_logger().info(f'Removed plant with index {index}')
+        else:
+            self.get_logger().info(f"Couldn't find plant with index '{index}' to remove")
     
-        self.save_to_yaml(self.map_instance_, self.directory_, self.active_map_file_)
+    def reindex_plants(self):
+        '''
+        Reindex all the plants after the removal of one in the list
+        '''
+        index = 1
+        plants = self.map_instance_['plant_details']['plants']
+        for plant_index in plants:
+            if int(plant_index) != index:
+                plants[index] = plants.pop(plant_index)
+                plant = plants[index]
+                plant['identifiers']['index'] = copy.deepcopy(index)
+
+            index += 1
 
     def seed_plants(self):
         '''
