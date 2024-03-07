@@ -1,12 +1,5 @@
-# from rclpy.node import Node
-# from launch_ros.actions import Node
-# from launch import LaunchDescription, LaunchContext, LaunchService
-# from launch.actions import RegisterEventHandler
-# from launch.events.process import ProcessStarted
-# from launch.event_handlers.on_process_start import OnProcessStart
-
 import launch
-from launch import LaunchDescription
+from launch import LaunchDescription, LaunchService
 from launch_ros.actions import Node
 from launch.actions import TimerAction
 
