@@ -366,8 +366,9 @@ class MapController(Node):
             self.get_logger().info(str(self.map_instance_))
             self.save_to_yaml(self.map_instance_, self.directory_, self.active_map_file_, create_if_empty = True)
         if cmd == 1:
-            # TODO: Remove tool of index index
-            pass
+            trays = self.map_instance_['map_reference']['trays']
+            if index in trays:
+                del trays[index]
         if cmd == 2:
             # TODO: populate the 16 seed slot tray
             pass
@@ -385,7 +386,7 @@ class MapController(Node):
         if cmd == 0:
             self.add_tool(msg, index)
             return 'T_x_0 SUCCESS'
-        if cmd == 1 or cmd == 2:
+        elif cmd == 1 or cmd == 2:
             self.tool_details_.x_pos = self.map_instance_['map_reference']['tools']['T' + index]['position']['x']
             self.tool_details_.y_pos = self.map_instance_['map_reference']['tools']['T' + index]['position']['y']
             self.tool_details_.z_pos = self.map_instance_['map_reference']['tools']['T' + index]['position']['z']
@@ -399,6 +400,10 @@ class MapController(Node):
                 return self.tool_exchanger_.mount_tool(self.tool_details_)
             else:
                 return self.tool_exchanger_.unmount_tool(self.tool_details_)
+        elif cmd == 9:
+            tools = self.map_instance_['map_reference']['tools']
+            if ('T' + index) in tools:
+                del tools['T' + index]
 
         # Start the appropriate command
         self.get_logger().warn(f'Unrecognized command {str(msg)}')
