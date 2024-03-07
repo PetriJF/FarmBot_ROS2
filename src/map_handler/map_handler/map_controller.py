@@ -197,6 +197,7 @@ class MapController(Node):
                     continue
 
                 cmd_sequence += self.seed_plant(plant, self.map_instance_['map_reference']['trays'][tray_index])
+                plant['status']['growth_stage'] = 'Seedling'
 
         if cmd_sequence == '':
             self.get_logger().warn('No seeds needed planting!')
@@ -204,6 +205,8 @@ class MapController(Node):
 
         if cmd_sequence[-1] == '\n':
             cmd_sequence = cmd_sequence[:-1]
+        
+        self.save_to_yaml(self.map_instance_, self.directory_, self.active_map_file_, create_if_empty = True)
         return cmd_sequence
 
     def __check_loaded_seeds(self, type: str):
