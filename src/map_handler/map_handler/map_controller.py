@@ -167,14 +167,28 @@ class MapController(Node):
         Removes the plant of the represented index
         '''
         plants = self.map_instance_['plant_details']['plants']
-        for plant in plants:
-            if plant['identifiers']['index'] == index:
-                plants.remove(plant)
-                self.map_instance_ ['plant_details']['plants'] -= 1
-                self.get_logger().info(f"Removed {plant['identifiers']['name']} with index {index} from the map")
-                break
+        if index in plants:
+            del plants[index]
+            self.reindex_plants()
+            self.save_to_yaml(self.map_instance_, self.directory_, self.active_map_file_)
+
+            self.get_logger().info(f'Removed plant with index {index}')
+        else:
+            self.get_logger().info(f"Couldn't find plant with index '{index}' to remove")
     
-        self.save_to_yaml(self.map_instance_, self.directory_, self.active_map_file_)
+    def reindex_plants(self):
+        '''
+        Reindex all the plants after the removal of one in the list
+        '''
+        index = 1
+        plants = self.map_instance_['plant_details']['plants']
+        for plant_index in plants:
+            if int(plant_index) != index:
+                plants[index] = plants.pop(plant_index)
+                plant = plants[index]
+                plant['identifiers']['index'] = copy.deepcopy(index)
+
+            index += 1
 
     def seed_plants(self):
         '''
@@ -197,6 +211,7 @@ class MapController(Node):
                     continue
 
                 cmd_sequence += self.seed_plant(plant, self.map_instance_['map_reference']['trays'][tray_index])
+                plant['status']['growth_stage'] = 'Seedling'
 
         if cmd_sequence == '':
             self.get_logger().warn('No seeds needed planting!')
@@ -204,6 +219,8 @@ class MapController(Node):
 
         if cmd_sequence[-1] == '\n':
             cmd_sequence = cmd_sequence[:-1]
+        
+        self.save_to_yaml(self.map_instance_, self.directory_, self.active_map_file_, create_if_empty = True)
         return cmd_sequence
 
     def __check_loaded_seeds(self, type: str):
@@ -349,8 +366,9 @@ class MapController(Node):
             self.get_logger().info(str(self.map_instance_))
             self.save_to_yaml(self.map_instance_, self.directory_, self.active_map_file_, create_if_empty = True)
         if cmd == 1:
-            # TODO: Remove tool of index index
-            pass
+            trays = self.map_instance_['map_reference']['trays']
+            if index in trays:
+                del trays[index]
         if cmd == 2:
             # TODO: populate the 16 seed slot tray
             pass
@@ -368,7 +386,7 @@ class MapController(Node):
         if cmd == 0:
             self.add_tool(msg, index)
             return 'T_x_0 SUCCESS'
-        if cmd == 1 or cmd == 2:
+        elif cmd == 1 or cmd == 2:
             self.tool_details_.x_pos = self.map_instance_['map_reference']['tools']['T' + index]['position']['x']
             self.tool_details_.y_pos = self.map_instance_['map_reference']['tools']['T' + index]['position']['y']
             self.tool_details_.z_pos = self.map_instance_['map_reference']['tools']['T' + index]['position']['z']
@@ -382,6 +400,10 @@ class MapController(Node):
                 return self.tool_exchanger_.mount_tool(self.tool_details_)
             else:
                 return self.tool_exchanger_.unmount_tool(self.tool_details_)
+        elif cmd == 9:
+            tools = self.map_instance_['map_reference']['tools']
+            if ('T' + index) in tools:
+                del tools['T' + index]
 
         # Start the appropriate command
         self.get_logger().warn(f'Unrecognized command {str(msg)}')
