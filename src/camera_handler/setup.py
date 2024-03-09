@@ -22,7 +22,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "luxonis_node = camera_handler.luxonis_camera:main",
+            'luxonis_node = camera_handler.luxonis_camera:main',
         ],
     },
 )

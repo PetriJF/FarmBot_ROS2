@@ -7,9 +7,8 @@ import cv2
 import numpy as np
 import time
 import yaml
-from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
-
+from sensor_msgs.msg import Image
 
 """Calibrate camera using a grid of circles calibration card."""
 
@@ -60,18 +59,16 @@ class CalibrateCamera:
         self.success_flag = True
         self.relative_starting_position = None
         self.bridge = CvBridge()
+        self.rgb_image_ = None
+        self.depth_image_ = None
         self.rgb_sub = self.node_.create_subscription(Image, '/rgb_img', self.rgb_callback, 10)
         self.depth_sub = self.node_.create_subscription(Image, '/depth_img', self.depth_callback, 10)
-        self.rgb_image = None
-        self.depth_image = None
 
     def rgb_callback(self, msg):
-        if self.rgb_image is None:  # Only save the first image
-            self.rgb_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+        self.rgb_image_ = self.bridge.imgmsg_to_cv2(msg, "bgr8")
 
     def depth_callback(self, msg):
-        if self.depth_image is None:  # Only save the first image
-            self.depth_image = self.bridge.imgmsg_to_cv2(msg, "mono8")
+        self.depth_image_ = self.bridge.imgmsg_to_cv2(msg, "mono8")
     
     def update_position(self, x: float, y: float, z: float):
         self.x_ = x
@@ -154,9 +151,7 @@ class CalibrateCamera:
             self.node_.get_logger().info('Taking camera calibration photo. ({}/3)'.format(i + 1))
             coordinates = {'x':self.x_,'y':self.y_,'z':self.z_}
             self.node_.get_logger().info(f"Trying to load image from: {self.rgb_dir_}")
-            
-            img_rgb = self.rgb_img_
-             
+            img_rgb = self.rgb_image_
             ret, centers = self.find_pattern(img_rgb)
             if not self.success_flag:
                 self.save_image(img_rgb, str(i + 1))
