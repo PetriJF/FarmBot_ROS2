@@ -5,6 +5,8 @@ import numpy as np
 import os
 import yaml
 from ament_index_python.packages import get_package_share_directory
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
 
 #TODO get these values from map config file
 MAP_X = 2000
@@ -17,6 +19,19 @@ class Panorama:
         self.z_ = 0.0
         self.node_ = node
         self.mvm_ = mvm
+        self.bridge = CvBridge()
+        self.rgb_sub = self.node_.create_subscription(Image, '/rgb_img', self.rgb_callback, 10)
+        self.depth_sub = self.node_.create_subscription(Image, '/depth_img', self.depth_callback, 10)
+        self.rgb_image = None
+        self.depth_image = None
+
+    def rgb_callback(self, msg):
+        if self.rgb_image is None:  # Only save the first image
+            self.rgb_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+
+    def depth_callback(self, msg):
+        if self.depth_image is None:  # Only save the first image
+            self.depth_image = self.bridge.imgmsg_to_cv2(msg, "mono8")
         
     
     def update_position(self, x: float, y: float, z: float):
@@ -55,18 +70,7 @@ class Panorama:
         self.y_ = self.map_size_y_px - int(self.y_/self.config_data_['coord_scale'])
         
         # Load the new image
-        new_image_path = os.path.join(self.config_directory_,'saved_rgb_image.png')
-        for _ in range(3):
-            try:
-                new_image = cv2.imread(new_image_path, cv2.IMREAD_UNCHANGED)
-                if new_image is not None:
-                    break  # Image successfully read, exit the loop
-            except Exception as e:
-                print(f"Error reading image: {e}")
-        else:
-            # If the loop completes without successfully reading the image, raise an error
-            raise RuntimeError("Failed to read the image after multiple attempts")
-        
+        new_image = self.rgb_img_
         rotation_angle = self.config_data_['total_rotation_angle']
         new_image = self.rotate_image(new_image, rotation_angle)
         map_path = os.path.join(self.config_directory_,'rgb_map.png')

@@ -8,6 +8,7 @@ import os
 import cv2
 import numpy as np
 import depthai as dai
+import threading
 
 class CameraNode:
     def __init__(self, node: Node):
@@ -23,9 +24,29 @@ class CameraNode:
         
         self.rgb_image_ = None
         self.depth_image_ = None
-        # Set a timer to process and publish images at a specified rate
-        timer_period = 0.5  # seconds
-        self.timer = self.node_.create_timer(timer_period, self.run)
+
+        # Start the packet processing loop in a separate thread
+        self.processing_thread = threading.Thread(target=self.packet_processing_loop)
+        self.processing_thread.daemon = True  # Ensures that the thread will close when the main program exits
+        self.processing_thread.start()
+    
+    def packet_processing_loop(self):
+        while True:
+            # Fetch packets from the device's output queues
+            latestPacket = {"rgb": None, "stereo": None}
+            queueEvents = self.device.getQueueEvents(("rgb", "stereo"))
+            for queueName in queueEvents:
+                packets = self.device.getOutputQueue(queueName).tryGetAll()
+                if len(packets) > 0:
+                    latestPacket[queueName] = packets[-1]
+
+            # Process the latest available packets
+            if latestPacket["rgb"] is not None:
+                self.rgb_image_ = latestPacket["rgb"].getCvFrame()
+                self.publish_images(rgb_frame=self.rgb_image_)
+            if latestPacket["stereo"] is not None:
+                self.depth_image_ = self.process_depth_frame(latestPacket["stereo"].getFrame())
+                self.publish_images(depth_frame=self.depth_image_)
 
     def load_config(self):
         # Load configuration from YAML file
@@ -109,27 +130,27 @@ class CameraNode:
             depth_msg = self.bridge.cv2_to_imgmsg(depth_frame, encoding='mono8')
             self.depth_publisher.publish(depth_msg)
 
-    def run(self):
-        # Retrieve and publish RGB and depth frames from the camera
-        latestPacket = {"rgb": None, "stereo": None}
-        queueEvents = self.device.getQueueEvents(("rgb", "stereo"))
-        for queueName in queueEvents:
-            packets = self.device.getOutputQueue(queueName).tryGetAll()
-            if len(packets) > 0:
-                latestPacket[queueName] = packets[-1]
+    # def run(self):
+    #     # Retrieve and publish RGB and depth frames from the camera
+    #     latestPacket = {"rgb": None, "stereo": None}
+    #     queueEvents = self.device.getQueueEvents(("rgb", "stereo"))
+    #     for queueName in queueEvents:
+    #         packets = self.device.getOutputQueue(queueName).tryGetAll()
+    #         if len(packets) > 0:
+    #             latestPacket[queueName] = packets[-1]
 
-        if latestPacket["rgb"] is not None:
-            self.rgb_image_ = latestPacket["rgb"].getCvFrame()
-            #self.rgb_image_ = cv2.rotate(self.rgb_image_, cv2.ROTATE_180)
-            #self.rgb_image_ = cv2.flip(self.rgb_image_, 1)
-            self.publish_images(rgb_frame=self.rgb_image_)
-            self.save_images(rgb=True)
-        if latestPacket["stereo"] is not None:
-            self.depth_image_ = self.process_depth_frame(latestPacket["stereo"].getFrame())
-            #self.depth_image_ = cv2.rotate(self.depth_image_, cv2.ROTATE_180)
-            #self.depth_image_ = cv2.flip(self.depth_image_, 1)
-            self.publish_images(depth_frame=self.depth_image_ )
-            self.save_images(depth=True)
+    #     if latestPacket["rgb"] is not None:
+    #         self.rgb_image_ = latestPacket["rgb"].getCvFrame()
+    #         #self.rgb_image_ = cv2.rotate(self.rgb_image_, cv2.ROTATE_180)
+    #         #self.rgb_image_ = cv2.flip(self.rgb_image_, 1)
+    #         self.publish_images(rgb_frame=self.rgb_image_)
+    #         self.save_images(rgb=True)
+    #     if latestPacket["stereo"] is not None:
+    #         self.depth_image_ = self.process_depth_frame(latestPacket["stereo"].getFrame())
+    #         #self.depth_image_ = cv2.rotate(self.depth_image_, cv2.ROTATE_180)
+    #         #self.depth_image_ = cv2.flip(self.depth_image_, 1)
+    #         self.publish_images(depth_frame=self.depth_image_ )
+    #         self.save_images(depth=True)
         
 
     def process_depth_frame(self, disparity_frame):
@@ -154,24 +175,24 @@ class CameraNode:
                 self.node_.get_logger().warn(f"Error reading YAML file: {e}")
                 return None
             
-    def save_images(self):
-        if self.rgb_image_ is not None and self.depth_image_ is not None:
-            cv2.imwrite(os.path.join(self.config_directory_,"saved_rgb_image.png"), self.rgb_image_)
-            self.node_.get_logger().info('RGB image saved successfully.')
-            cv2.imwrite(os.path.join(self.config_directory_,"saved_depth_image.png"), self.depth_image_)
-            self.node_.get_logger().info('Depth image saved successfully.')
-        else:
-            self.node_.get_logger().info('No images to save.')
+    # def save_images(self):
+    #     if self.rgb_image_ is not None and self.depth_image_ is not None:
+    #         cv2.imwrite(os.path.join(self.config_directory_,"saved_rgb_image.png"), self.rgb_image_)
+    #         self.node_.get_logger().info('RGB image saved successfully.')
+    #         cv2.imwrite(os.path.join(self.config_directory_,"saved_depth_image.png"), self.depth_image_)
+    #         self.node_.get_logger().info('Depth image saved successfully.')
+    #     else:
+    #         self.node_.get_logger().info('No images to save.')
             
-    def save_images(self, rgb = False, depth = False):
-        if self.rgb_image_ is not None and rgb == True: 
-            cv2.imwrite(os.path.join(self.config_directory_,"saved_rgb_image.png"), self.rgb_image_)
-            self.node_.get_logger().info('RGB image saved successfully.')
-        elif self.depth_image_ is not None and depth == True:
-            cv2.imwrite(os.path.join(self.config_directory_,"saved_depth_image.png"), self.depth_image_)
-            self.node_.get_logger().info('Depth image saved successfully.')
-        else:
-            self.node_.get_logger().info('No images to save.')
+    # def save_images(self, rgb = False, depth = False):
+    #     if self.rgb_image_ is not None and rgb == True: 
+    #         cv2.imwrite(os.path.join(self.config_directory_,"saved_rgb_image.png"), self.rgb_image_)
+    #         self.node_.get_logger().info('RGB image saved successfully.')
+    #     elif self.depth_image_ is not None and depth == True:
+    #         cv2.imwrite(os.path.join(self.config_directory_,"saved_depth_image.png"), self.depth_image_)
+    #         self.node_.get_logger().info('Depth image saved successfully.')
+    #     else:
+    #         self.node_.get_logger().info('No images to save.')
     
 
 def main(args=None):
