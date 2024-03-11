@@ -192,7 +192,7 @@ class ToolCommands:
                 self.wait_for_request_.result = int(info[2][1:])
                 self.wait_for_request_.wait_flag = False
 
-    def stitch_panorama_client(self):
+    def stitch_panorama_client(self, calib: bool, x: float, y: float, z: float):
         '''
         Tool command service client used to communicate between the farmbot
         controller and the map handler.
@@ -210,7 +210,7 @@ class ToolCommands:
         
         # Set the command to the service request
         request = StringRepReq.Request()
-        request.data = 'ADD HERE ANY SETUP THAT MIGHT CHANGE'
+        request.data = 'Calib' if calib else str(x) + ' ' + str(y) + ' ' + str(z)
 
         # Call async and add the response callback
         future = client.call_async(request = request)

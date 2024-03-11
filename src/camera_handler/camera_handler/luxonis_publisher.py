@@ -62,6 +62,8 @@ class CameraNode:
         self.FOCAL_LENGTH_PX = self.config_data['camera_constants']['FOCAL_LENGTH_PX']
         self.BASELINE = self.config_data['camera_constants']['BASELINE']
 
+        self.node_.get_logger().info('Updated camera settings based on calibration')
+
     def setup_camera(self):
         # Configure the DepthAI pipeline with stereo and RGB camera nodes
         self.pipeline = dai.Pipeline()
