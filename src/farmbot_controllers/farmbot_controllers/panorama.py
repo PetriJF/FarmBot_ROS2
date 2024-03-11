@@ -31,20 +31,11 @@ class Panorama:
     def depth_callback(self, msg):
         self.depth_image_ = self.bridge.imgmsg_to_cv2(msg, "mono8")
         
-        self.bridge = CvBridge()
-        self.rgb_sub = self.node_.create_subscription(Image, '/rgb_img', self.rgb_callback, 10)
-        self.depth_sub = self.node_.create_subscription(Image, '/depth_img', self.depth_callback, 10)
-        self.rgb_image = None
-        self.depth_image = None
-
-    def rgb_callback(self, msg):
-        if self.rgb_image is None:  # Only save the first image
-            self.rgb_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
-
-    def depth_callback(self, msg):
-        if self.depth_image is None:  # Only save the first image
-            self.depth_image = self.bridge.imgmsg_to_cv2(msg, "mono8")
-        
+        #self.bridge = CvBridge()
+        #self.rgb_sub = self.node_.create_subscription(Image, '/rgb_img', self.rgb_callback, 10)
+        #self.depth_sub = self.node_.create_subscription(Image, '/depth_img', self.depth_callback, 10)
+        #self.rgb_image_ = None
+        #self.depth_image_ = None
     
     def update_position(self, x: float, y: float, z: float):
         self.x_ = x
