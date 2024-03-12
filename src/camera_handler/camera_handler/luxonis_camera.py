@@ -6,18 +6,21 @@ from rclpy.node import Node
 from farmbot_interfaces.srv import StringRepReq
 from camera_handler.luxonis_publisher import CameraNode
 from camera_handler.panorama import Panorama
+from camera_handler.calib import CalibrateCamera
+
 class LuxonisCameraController(Node):
     # Node contructor
     def __init__(self):
         super().__init__("LuxonisCameraController")
         
         self.panorama_ = Panorama(self)
+        self.calib_ = CalibrateCamera(self)
 
         # Sequencing Service Server
         self.panorama_sequencing_server_ = self.create_service(StringRepReq, 'panorama_sequence', self.luxonis_panorama_sequence_server)
         
         # Sequencing Service Server
-        self.panorama_server_ = self.create_service(StringRepReq, 'form_panorama', self.luxonis_panorama_server)
+        self.panorama_server_ = self.create_service(StringRepReq, 'form_panorama', self.stitch_image_server)
         self.take_picture_ = CameraNode(self)
 
         # Camera Calibration Server
@@ -26,7 +29,7 @@ class LuxonisCameraController(Node):
         # Log the initialization
         self.get_logger().info("Luxonis Camera Handler Initialized..")
 
-    def luxonis_panorama_server(self, request, response):
+    def stitch_image_server(self, request, response):
         '''
         Take a picture of the map and stitch it accordingly
         '''
@@ -62,12 +65,18 @@ class LuxonisCameraController(Node):
     
     ## TODO both of this
     def luxonis_calibration(self, request, response):
-        ## Add here the coordinate commands and the camera picture commands
-        if request.data: # USE THE .data TO READ FROM YOUR REQUEST STRING
-            response.data = "WRITE THE COMMANDS HERE"
-        # Sequencing constructed successfully and server returns it
-        response.success = True
-        self.get_logger().info("Luxonis camera calibrated successfully")
+        
+        # Add here the coordinate commands and the camera picture commands
+        info = request.data.split(' ')
+        if request.data == 'GET': # USE THE .data TO READ FROM YOUR REQUEST STRING
+            response.data = self.calib_.get_sequence()
+            self.get_logger().info('Camera Calibration command sequence formed')
+        elif len(info) != 5:
+            self.get_logger().warn('Parsed calibration command incomplete. Command ignored!')
+            response.data = 'FAILED'
+        else:
+            response.data = self.calib_.calibrate_camera(run = int(info[1]), x = float(info[2]), y = float(info[3]), z = float(info[4]))
+          
         return response
 
     def luxonis_panorama_sequence_server(self, request, response):
@@ -75,7 +84,7 @@ class LuxonisCameraController(Node):
         if request.data: # USE THE .data TO READ FROM YOUR REQUEST STRING
             response.data = "WRITE THE COMMANDS HERE"
         # Sequencing constructed successfully and server returns it
-        response.success = True
+
         self.get_logger().info("Panorama sequence formed successfully")
         return response
 

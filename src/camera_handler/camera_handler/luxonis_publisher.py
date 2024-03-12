@@ -9,7 +9,6 @@ import cv2
 import numpy as np
 import depthai as dai
 import threading
-import threading
 
 class CameraNode:
     def __init__(self, node: Node):

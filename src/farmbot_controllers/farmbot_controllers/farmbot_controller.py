@@ -153,8 +153,9 @@ class KeyboardTeleOp(Node):
             ## Imaging commands
             case 'I_0': # Calibrate Camera
                 #self.tools_.cam_calib_client()
-                self.calib_.calibrate_camera()
-                self.tools_.stitch_panorama_client(calib = True, x = 0.0, y = 0.0, z = 0.0)
+                #self.calib_.calibrate_camera()
+                self.tools_.cam_calib_client(cmd = 'GET')
+                #self.tools_.stitch_panorama_client(calib = True, x = 0.0, y = 0.0, z = 0.0)
             case 'I_1': # Panorama Sequencing
                 self.tools_.stitch_panorama_client(calib = False, x = self.cur_x_, y = self.cur_y_, z = self.cur_z_)
                 #self.panorama_.stitch_image_onto_map()
@@ -177,6 +178,12 @@ class KeyboardTeleOp(Node):
             self.cur_x_ = float(msgSplit[1][1:])
             self.cur_y_ = float(msgSplit[2][1:])
             self.cur_z_ = float(msgSplit[3][1:])
+            
+            # Update the position reference within the sequencing module
+            self.tools_.x = self.cur_x_
+            self.tools_.y = self.cur_y_
+            self.tools_.z = self.cur_z_
+
             self.calib_.update_position(self.cur_x_, self.cur_y_, self.cur_z_)
             #self.panorama_.update_position(self.cur_x_, self.cur_y_, self.cur_z_)
         if reportCode == 'R41':

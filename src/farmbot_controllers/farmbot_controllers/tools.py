@@ -22,6 +22,10 @@ class ToolCommands:
         self.mvm_ = mvm
         self.devices_ = devices
 
+        self.x = 0
+        self.y = 0
+        self.z = 0
+
         # The ID of the current tool mounted. Should be 0 when no tool mounted!
         self.current_tool_id_ = 0# Get UART Response to Request Client
         
@@ -179,8 +183,13 @@ class ToolCommands:
                 self.sequence_.pop(0)
             # Handle Vision Commands
             elif self.command_type_ == 'VC':
+                cmd = self.sequence_[0].split(' ')
                 # Vision command
-                self.stitch_panorama_client()
+                if cmd[0] == 'CALIB':
+                    self.cam_calib_client(cmd = (self.sequence_[0] + ' ' + str(self.x) + ' ' + str(self.y) + ' ' + str(self.z)))
+                elif cmd[0] == 'PAN':
+                    self.stitch_panorama_client()
+                self.sequence_.pop(0)
 
     def uart_message(self, msg: str):
         '''
@@ -220,9 +229,12 @@ class ToolCommands:
         '''
         Camera Service Server callback
         '''
+        if future.result().data == 'FAILED':
+            self.clear_sequence()
+
         self.wait_for_camera_ = False
 
-    def cam_calib_client(self):
+    def cam_calib_client(self, cmd: str):
         '''
         Tool command service client used to communicate between the farmbot
         controller and the map handler.
@@ -230,6 +242,10 @@ class ToolCommands:
         Args:
             cmd {str}: The command that is sent to the map handler
         '''
+        if not cmd:
+            self.node_.get_logger().warn('Calibration command type not set! Command ignored')
+            return
+
         # Initializing the client and wait for map server confirmation
         client = self.node_.create_client(StringRepReq, 'calibrate_luxonis')
         while not client.wait_for_service(1.0):
@@ -237,11 +253,11 @@ class ToolCommands:
         
         # Set the command to the service request
         request = StringRepReq.Request()
-        request.data = 'ADD HERE ANY SETUP THAT MIGHT CHANGE'
+        request.data = cmd
 
         # Call async and add the response callback
         future = client.call_async(request = request)
-        future.add_done_callback(self.cmd_sequence_callback)
+        future.add_done_callback(self.cmd_sequence_callback if cmd == 'GET' else self.stitch_callback)
     
     def panorama_client(self):
         '''
@@ -262,7 +278,7 @@ class ToolCommands:
 
         # Call async and add the response callback
         future = client.call_async(request = request)
-        future.add_done_callback(self.cmd_sequence_callback)
+        future.add_done_callback(self.stitch_callback)
 
     def status_callback(self, state: Bool):
         '''
