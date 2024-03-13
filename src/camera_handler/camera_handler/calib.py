@@ -1,5 +1,4 @@
 from rclpy.node import Node
-#from farmbot_controllers.movement import Movement
 from ament_index_python.packages import get_package_share_directory
 import os
 import math
@@ -10,15 +9,15 @@ import yaml
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 
-"""Calibrate camera using a grid of circles calibration card."""
+## Global constants
 
 ROW_COLORS = [(0, 0, 255), (0, 127, 255), (0, 186, 186), (0, 255, 0),
               (187, 187, 0), (255, 0, 0), (255, 0, 255)]
 AXIS_INDEX = {'init': 0, 'x': 2, 'y': 1}
 AXIS_COLORS = [
-    (255, 255, 255),  # init/center: white
-    (0, 0, 255),  # y-axis: red
-    (255, 0, 0),  # x-axis: blue
+    (255, 255, 255),    # init/center: white
+    (0, 0, 255),        # y-axis: red
+    (255, 0, 0),        # x-axis: blue
 ]
 
 # Make sure the number of relative movements is equal to the position count!!
@@ -70,7 +69,9 @@ class CalibrateCamera:
     '-----
     '''
     def __init__(self, node: Node):
-        # Node instance for the module
+        '''
+        Calibration module constructer. Initializes variables and sets subscriptions
+        '''
         self.node_ = node
 
         '''Set initial attributes.
@@ -93,6 +94,7 @@ class CalibrateCamera:
             AXIS_INDEX['y']: {},
         }
 
+        # Set the working global variables
         self.output_img = None
         self.center = None
         self.axis_points = None
@@ -144,22 +146,25 @@ class CalibrateCamera:
 
     def calibrate_camera(self, run: int, x: float, y: float, z: float):
         '''
-        AAAAAAAAAAAAAAAAAAAAA
+        It captures the set amount of images, and once everything is 
+        available, it computes all the calibration details.
         '''
         success = self.capture(run = run, x = x, y = y, z = z)
         if not success:
-            self.node_.get_logger().warn('Capture failed on calibration step {}! Cancelled the calibration!', run)
+            self.node_.get_logger().warn(f'Capture failed on calibration step {run}! Cancelled the calibration!')
             return 'FAILED'
 
         if run == POSITION_COUNT and success:
             self.calibrate()
             self.save_image()
+            return 'COMPLETE'
         
         return 'SUCCESS'
 
     def capture(self, run: int, x: float, y: float, z: float):
         '''
-        Move the bot along x and y axes, take photos, and detect circles.
+        Once the Farmbot is at the desired position, an image is captured
+        from the luxonis camera feed
         '''
         self.node_.get_logger().info('Taking camera calibration photo. ({}/3)'.format(run))
         coordinates = {'x': x,'y': y,'z': z}
@@ -393,9 +398,10 @@ class CalibrateCamera:
             
         self.node_.get_logger().info(f'Calibration data saved to {config_file}')
 
-    
     def __generate_rotation_matrix(self, rotation):
-        """For rotating images and points."""
+        '''
+        For rotating images and points.
+        '''
         return cv2.getRotationMatrix2D(tuple(self.center), rotation, 1)
 
 
@@ -416,7 +422,9 @@ class CalibrateCamera:
             self.output_img, rotation_matrix, size)
         
     def __calculate_origin(self, rotated_axis_points):
-        """Determine image origin location from dot axis compasses."""
+        '''
+        Determine image origin location from dot axis compasses.
+        '''
         origin = []
         for i in range(2):
             diffs = rotated_axis_points[i] - rotated_axis_points[i + 1]
@@ -429,7 +437,9 @@ class CalibrateCamera:
         return origin
 
     def __calculate_scale(self):
-        """Use pattern dimensions to calculate image pixel scale."""
+        '''
+        Use pattern dimensions to calculate image pixel scale.
+        '''
         # first circle in first row
         x_1, y_1 = self.dot_images[AXIS_INDEX['init']]['circles'][0][0]
         # last circle in first row
