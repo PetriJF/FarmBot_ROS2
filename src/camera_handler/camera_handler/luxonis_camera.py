@@ -60,6 +60,7 @@ class LuxonisCameraController(Node):
                 response.data = 'FAILED'
                 return response
             # Stitch image to panorama
+            # Sequencing constructed successfully and server returns it
             self.panorama_.stitch_image_onto_map(x = float(msg[0]), y = float(msg[1]))
             self.get_logger().info('Picture stitched to the panorama successfully')
         else:
@@ -67,10 +68,6 @@ class LuxonisCameraController(Node):
             response.data = 'FAILED'
             return response
 
-
-        # Sequencing constructed successfully and server returns it
-
-        
         return response
     
     def luxonis_calibration(self, request, response):
@@ -103,13 +100,11 @@ class LuxonisCameraController(Node):
     def luxonis_panorama_sequence_server(self, request, response):
         ## Add here the coordinate commands and the camera picture commands
         if request.data: # USE THE .data TO READ FROM YOUR REQUEST STRING
-            response.data = "WRITE THE COMMANDS HERE"
+            response.data = 'WRITE THE COMMANDS HERE'
         # Sequencing constructed successfully and server returns it
 
-        self.get_logger().info("Panorama sequence formed successfully")
+        self.get_logger().info'Panorama sequence formed successfully')
         return response
-
-
 
 # Main Function called on the initialization of the ROS2 Node
 def main(args = None):

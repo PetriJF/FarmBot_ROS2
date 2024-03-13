@@ -8,38 +8,58 @@ from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 
 class Panorama:
+    '''
+    Class used for taking pictures from the farmbot and stitching them into
+    a panorama representing the map information
+    '''
     def __init__(self, node: Node):
+        '''
+        Panorama module constructor extending a node's functionality
+        '''
         self.node_ = node
         
-        self.map_x = 2000
-        self.map_y = 1500
+        self.map_x = -1.0
+        self.map_y = -1.0
 
         self.bridge = CvBridge()
         self.rgb_image_ = None
         self.depth_image_ = None
-        self.rgb_sub = self.node_.create_subscription(Image, '/rgb_img', self.rgb_callback, 10)
-        self.depth_sub = self.node_.create_subscription(Image, '/depth_img', self.depth_callback, 10)
+        self.rgb_sub = self.node_.create_subscription(Image, '/rgb_img', self.__rgb_callback, 10)
+        self.depth_sub = self.node_.create_subscription(Image, '/depth_img', self.__depth_callback, 10)
 
-    def rgb_callback(self, msg):
+    def __rgb_callback(self, msg):
+        '''
+        Subscriber callback for the RGB camera feed
+        '''
         self.rgb_image_ = self.bridge.imgmsg_to_cv2(msg, "bgr8")
 
-    def depth_callback(self, msg):
+    def __depth_callback(self, msg):
+        '''
+        Subscriber callback for the Depth camera feed
+        '''
         self.depth_image_ = self.bridge.imgmsg_to_cv2(msg, "mono8")
         
     def initialize_map_if_needed(self, map_path):
+        '''
+        If the map does not exist at the specified path, create a blank canvas and write it
+        '''
         if not os.path.exists(map_path):
             # Create a blank canvas with 3 channels for RGB
             blank_canvas = np.zeros((self.map_size_x_px, self.map_size_y_px, 3), dtype=np.uint8)
             cv2.imwrite(map_path, blank_canvas)
 
-    def load_from_yaml(self, path, fileName):
+    def load_from_yaml(self, path: str, file_name: str):
+        '''
+        Loads the specified yaml file from the specified path and returns a 
+        the dictionary withign the file
+        '''
         # Load configuration data from a YAML file
-        fullPath = os.path.join(path, fileName)
-        if not os.path.exists(fullPath):
-            self.node_.get_logger().warn(f"File path is invalid: {fullPath}")
+        full_path = os.path.join(path, file_name)
+        if not os.path.exists(full_path):
+            self.node_.get_logger().warn(f"File path is invalid: {full_path}")
             return None
         
-        with open(fullPath, 'r') as yaml_file:
+        with open(full_path, 'r') as yaml_file:
             try:
                 return yaml.safe_load(yaml_file)
             except yaml.YAMLError as e:
@@ -48,13 +68,33 @@ class Panorama:
     
 
     def stitch_image_onto_map(self, x: float, y: float):
+        '''
+        Takes a picture from the Luxonis camera and stitches it to the 
+        panorama map at the specified x and y coordinates
+        '''
+        # Loading the camera calibration information
         self.config_directory_ = os.path.join(get_package_share_directory('camera_handler'), 'config')
-        calib_file = os.path.join(self.config_directory_,'camera_calibration.yaml')
+        calib_file = 'camera_calibration.yaml'
         self.config_data_ = self.load_from_yaml(self.config_directory_, calib_file)
-        self.map_size_x_px = int(self.map_x/self.config_data_['coord_scale'])
-        self.map_size_y_px = int(self.map_y/self.config_data_['coord_scale'])
         
-        x = int(x/self.config_data_['coord_scale'])
+        # If the map dimensions were not set at the start of the run, load them from the active map
+        if self.map_x == -1.0 or self.map_y == -1.0:
+            # Load map instance
+            map_directory_ = os.path.join(get_package_share_directory('map_handler'), 'config')
+            map_file = 'active_map.yaml'
+            map_instance = self.load_from_yaml(map_directory_, map_file)
+            if map_instance:
+                # Get map dimensions
+                self.map_x = map_instance['map_reference']['x_len']
+                self.map_y = map_instance['map_reference']['y_len']
+
+                self.node_.get_logger().info('Loading map dimensions from active map file')
+        
+        # Set the map size relative to pixels
+        self.map_size_x_px = int(self.map_x / self.config_data_['coord_scale'])
+        self.map_size_y_px = int(self.map_y / self.config_data_['coord_scale'])
+        
+        x = int(x / self.config_data_['coord_scale'])
         y = self.map_size_y_px - int(y/self.config_data_['coord_scale'])
         
         # Load the new image
@@ -62,7 +102,7 @@ class Panorama:
         rotation_angle = self.config_data_['total_rotation_angle']
         new_image = self.rotate_image(new_image, rotation_angle)
         map_path = os.path.join(self.config_directory_,'rgb_map.png')
-        # Load or initialize the map image
+        # Load or initialize the map (panorama) image 
         self.initialize_map_if_needed(map_path)
         # Loading or initializing the map_image as RGB
         map_image = cv2.imread(map_path, cv2.IMREAD_COLOR)  # Ensures map_image is read as RGB
@@ -93,6 +133,10 @@ class Panorama:
         cv2.imwrite(map_path, map_image)
         
     def rotate_image(self, image, angle):
+        '''
+        Rotates the image around the center at the set angle
+        '''
+        
         # Get the dimensions of the image
         height, width = image.shape[:2]
         
