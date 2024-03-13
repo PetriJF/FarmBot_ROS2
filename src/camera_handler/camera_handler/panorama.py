@@ -1,5 +1,4 @@
 from rclpy.node import Node
-from farmbot_controllers.movement import Movement
 import cv2
 import numpy as np
 import os
@@ -8,17 +7,13 @@ from ament_index_python.packages import get_package_share_directory
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 
-#TODO get these values from map config file
-MAP_X = 2000
-MAP_Y = 1500
-
 class Panorama:
-    def __init__(self, node: Node, mvm: Movement):
-        self.x_ = 0.0
-        self.y_ = 0.0
-        self.z_ = 0.0
+    def __init__(self, node: Node):
         self.node_ = node
-        self.mvm_ = mvm
+        
+        self.map_x = 2000
+        self.map_y = 1500
+
         self.bridge = CvBridge()
         self.rgb_image_ = None
         self.depth_image_ = None
@@ -30,26 +25,6 @@ class Panorama:
 
     def depth_callback(self, msg):
         self.depth_image_ = self.bridge.imgmsg_to_cv2(msg, "mono8")
-        
-        self.bridge = CvBridge()
-        self.rgb_sub = self.node_.create_subscription(Image, '/rgb_img', self.rgb_callback, 10)
-        self.depth_sub = self.node_.create_subscription(Image, '/depth_img', self.depth_callback, 10)
-        self.rgb_image = None
-        self.depth_image = None
-
-    def rgb_callback(self, msg):
-        if self.rgb_image is None:  # Only save the first image
-            self.rgb_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
-
-    def depth_callback(self, msg):
-        if self.depth_image is None:  # Only save the first image
-            self.depth_image = self.bridge.imgmsg_to_cv2(msg, "mono8")
-        
-    
-    def update_position(self, x: float, y: float, z: float):
-        self.x_ = x
-        self.y_ = y
-        self.z_ = z
         
     def initialize_map_if_needed(self, map_path):
         if not os.path.exists(map_path):
@@ -72,15 +47,15 @@ class Panorama:
                 return None
     
 
-    def stitch_image_onto_map(self):
+    def stitch_image_onto_map(self, x: float, y: float):
         self.config_directory_ = os.path.join(get_package_share_directory('camera_handler'), 'config')
         calib_file = os.path.join(self.config_directory_,'camera_calibration.yaml')
         self.config_data_ = self.load_from_yaml(self.config_directory_, calib_file)
-        self.map_size_x_px = int(MAP_X/self.config_data_['coord_scale'])
-        self.map_size_y_px = int(MAP_Y/self.config_data_['coord_scale'])
+        self.map_size_x_px = int(self.map_x/self.config_data_['coord_scale'])
+        self.map_size_y_px = int(self.map_y/self.config_data_['coord_scale'])
         
-        self.x_ = int(self.x_/self.config_data_['coord_scale'])
-        self.y_ = self.map_size_y_px - int(self.y_/self.config_data_['coord_scale'])
+        x = int(x/self.config_data_['coord_scale'])
+        y = self.map_size_y_px - int(y/self.config_data_['coord_scale'])
         
         # Load the new image
         new_image = self.rgb_image_
@@ -94,24 +69,21 @@ class Panorama:
         if new_image.shape[2] != 3 or map_image.shape[2] != 3:
             raise ValueError("Both images must be RGB.")
 
-        # The rest of your function remains the same
-
-        
         # Calculate placement and cropping
         new_img_height, new_img_width = new_image.shape[:2]
         map_height, map_width = map_image.shape[:2]
 
         # Calculate the region of interest (ROI) in the map
-        start_x = max(self.x_, 0)
-        start_y = max(self.y_ - new_img_height, 0)
-        end_x = min(self.x_ + new_img_width, map_width)
-        end_y = min(self.y_, map_height)
+        start_x = max(x, 0)
+        start_y = max(y - new_img_height, 0)
+        end_x = min(x + new_img_width, map_width)
+        end_y = min(y, map_height)
 
         # Calculate corresponding region in new_image
-        new_start_x = start_x - self.x_ if self.x_ < 0 else 0
-        new_start_y = 0 if self.y_ - new_img_height < 0 else new_img_height - (self.y_ - start_y)
-        new_end_x = new_img_width - (self.x_ + new_img_width - map_width) if (self.x_ + new_img_width) > map_width else new_img_width
-        new_end_y = self.y_ if self.y_ < new_img_height else new_img_height
+        new_start_x = start_x - x if x < 0 else 0
+        new_start_y = 0 if y - new_img_height < 0 else new_img_height - (y - start_y)
+        new_end_x = new_img_width - (x + new_img_width - map_width) if (x + new_img_width) > map_width else new_img_width
+        new_end_y = y if y < new_img_height else new_img_height
 
         # Copy the overlapping area from new_image to map_image
         if new_end_x > new_start_x and new_end_y > new_start_y:

@@ -9,7 +9,6 @@ import cv2
 import numpy as np
 import depthai as dai
 import threading
-import threading
 
 class CameraNode:
     def __init__(self, node: Node):
@@ -49,29 +48,6 @@ class CameraNode:
                 self.depth_image_ = self.process_depth_frame(latestPacket["stereo"].getFrame())
                 self.publish_images(depth_frame=self.depth_image_)
 
-        # Start the packet processing loop in a separate thread
-        self.processing_thread = threading.Thread(target=self.packet_processing_loop)
-        self.processing_thread.daemon = True  # Ensures that the thread will close when the main program exits
-        self.processing_thread.start()
-    
-    def packet_processing_loop(self):
-        while True:
-            # Fetch packets from the device's output queues
-            latestPacket = {"rgb": None, "stereo": None}
-            queueEvents = self.device.getQueueEvents(("rgb", "stereo"))
-            for queueName in queueEvents:
-                packets = self.device.getOutputQueue(queueName).tryGetAll()
-                if len(packets) > 0:
-                    latestPacket[queueName] = packets[-1]
-
-            # Process the latest available packets
-            if latestPacket["rgb"] is not None:
-                self.rgb_image_ = latestPacket["rgb"].getCvFrame()
-                self.publish_images(rgb_frame=self.rgb_image_)
-            if latestPacket["stereo"] is not None:
-                self.depth_image_ = self.process_depth_frame(latestPacket["stereo"].getFrame())
-                self.publish_images(depth_frame=self.depth_image_)
-
     def load_config(self):
         # Load configuration from YAML file
         self.config_directory_ = os.path.join(get_package_share_directory('camera_handler'), 'config')
@@ -84,6 +60,8 @@ class CameraNode:
         self.DEPTH_MAX_VAL = self.config_data['camera_constants']['DEPTH_MAX_VAL']
         self.FOCAL_LENGTH_PX = self.config_data['camera_constants']['FOCAL_LENGTH_PX']
         self.BASELINE = self.config_data['camera_constants']['BASELINE']
+
+        self.node_.get_logger().info('Updated camera settings based on calibration')
 
     def setup_camera(self):
         # Configure the DepthAI pipeline with stereo and RGB camera nodes

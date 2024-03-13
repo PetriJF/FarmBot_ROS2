@@ -54,9 +54,9 @@ def generate_launch_description():
             output='screen'
         ),
         
-        # Delay for 5 seconds
+        # Delay for 10 seconds
         TimerAction(
-            period=5.0,
+            period=10.0,
             actions=[
                 # Start uart_controller after the delay
                 Node(
