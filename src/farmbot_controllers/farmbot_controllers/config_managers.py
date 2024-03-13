@@ -179,6 +179,10 @@ class ConfigServer(Node):
                                 self.param_vals[self.params.MOVEMENT_STEP_PER_MM_Z]),
             ]
             
+            response.cmd = ('MAP ' + self.map_cmd_.update_info[0] 
+                            + ' ' + self.map_cmd_.update_info[1]
+                            + ' ' + self.map_cmd_.update_info[2])
+
             self.map_cmd_pub_.publish(self.map_cmd_)
             return response
         if code == 'SAVE':

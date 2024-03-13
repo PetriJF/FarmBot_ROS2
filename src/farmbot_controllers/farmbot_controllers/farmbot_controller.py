@@ -10,9 +10,6 @@ from farmbot_controllers.tools import ToolCommands
 from farmbot_controllers.movement import Movement
 from farmbot_controllers.states import State
 from farmbot_controllers.devices import DeviceControl
-from farmbot_controllers.calib import CalibrateCamera
-
-import time
 
 class KeyboardTeleOp(Node):
     # Node contructor
@@ -27,8 +24,6 @@ class KeyboardTeleOp(Node):
         self.devices_ = DeviceControl(self)
         # Initializing the tool module
         self.tools_ = ToolCommands(self, self.mvm_, self.devices_)
-        # Initializing the camera calibration module
-        self.calib_ = CalibrateCamera(self, self.mvm_)
 
         # Memory
         self.cur_x_ = 0.0
@@ -152,13 +147,12 @@ class KeyboardTeleOp(Node):
                 self.tools_.map_cmd_client(cmd = 'S_3_0_0\nTray3\nRadish\n1198.0 532.2 -240.0')
             ## Imaging commands
             case 'I_0': # Calibrate Camera
-                #self.tools_.cam_calib_client()
-                #self.calib_.calibrate_camera()
                 self.tools_.cam_calib_client(cmd = 'GET')
-                #self.tools_.stitch_panorama_client(calib = True, x = 0.0, y = 0.0, z = 0.0)
             case 'I_1': # Panorama Sequencing
-                self.tools_.stitch_panorama_client(calib = False, x = self.cur_x_, y = self.cur_y_, z = self.cur_z_)
-                #self.panorama_.stitch_image_onto_map()
+                self.tools_.stitch_panorama_client(calib = False, update_map = False,
+                                                    x = self.cur_x_, y = self.cur_y_,
+                                                    z = self.cur_z_)
+            ## Device commands
             case 'D_L_1' | 'D_L_0':
                 self.tools_.led_strip(state = int(code[0][4]))
             case 'D_V_0' | 'D_V_1':
@@ -184,8 +178,6 @@ class KeyboardTeleOp(Node):
             self.tools_.y = self.cur_y_
             self.tools_.z = self.cur_z_
 
-            self.calib_.update_position(self.cur_x_, self.cur_y_, self.cur_z_)
-            #self.panorama_.update_position(self.cur_x_, self.cur_y_, self.cur_z_)
         if reportCode == 'R41':
             self.tools_.uart_message(msg.data)
         
@@ -221,7 +213,7 @@ class KeyboardTeleOp(Node):
             self.get_logger().error("Service call failed %r" % (e, ))
 
     ## Parameter Config Service Client
-    def parameterConfigClient(self, cmd = String):
+    def parameterConfigClient(self, cmd: String):
         client = self.create_client(ParameterConfig, 'manage_param_config')
         while not client.wait_for_service(1.0):
             self.get_logger().warn("Waiting for Parameter Config Server...")
@@ -237,9 +229,14 @@ class KeyboardTeleOp(Node):
             response = future.result()
             if not response:
                 self.get_logger().warn("Failure in Parameter Config Handling!")
+                return
             
-            ## TODO: Add a response to the future
-
+            if future.result().cmd:
+                info = future.result().cmd.split(' ')
+                if info[0] == 'MAP':
+                    self.tools_.stitch_panorama_client(calib = False, update_map = True,
+                                                       x = float(info[2]), y = float(info[4]),
+                                                       z = float(info[6]))
         except Exception as e:
             self.get_logger().error("Service call failed %r" % (e, ))
     
