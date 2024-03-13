@@ -55,11 +55,13 @@ class Panorama:
         
         if self.map_x == -1.0 or self.map_y == -1.0:
             map_directory_ = os.path.join(get_package_share_directory('map_handler'), 'config')
-            map_file = os.path.join(self.config_directory_,'active_map.yaml')
+            map_file = 'active_map.yaml'
             map_instance = self.load_from_yaml(map_directory_, map_file)
             
             self.map_x = map_instance['map_reference']['x_len']
             self.map_y = map_instance['map_reference']['y_len']
+
+            self.node_.get_logger().info('Loading map dimensions from active map file')
         
         self.map_size_x_px = int(self.map_x/self.config_data_['coord_scale'])
         self.map_size_y_px = int(self.map_y/self.config_data_['coord_scale'])
