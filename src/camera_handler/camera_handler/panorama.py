@@ -7,13 +7,13 @@ from ament_index_python.packages import get_package_share_directory
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 
-#TODO get these values from map config file
-MAP_X = 2000
-MAP_Y = 1500
-
 class Panorama:
     def __init__(self, node: Node):
         self.node_ = node
+        
+        self.map_x = 2000
+        self.map_y = 1500
+
         self.bridge = CvBridge()
         self.rgb_image_ = None
         self.depth_image_ = None
@@ -51,8 +51,8 @@ class Panorama:
         self.config_directory_ = os.path.join(get_package_share_directory('camera_handler'), 'config')
         calib_file = os.path.join(self.config_directory_,'camera_calibration.yaml')
         self.config_data_ = self.load_from_yaml(self.config_directory_, calib_file)
-        self.map_size_x_px = int(MAP_X/self.config_data_['coord_scale'])
-        self.map_size_y_px = int(MAP_Y/self.config_data_['coord_scale'])
+        self.map_size_x_px = int(self.map_x/self.config_data_['coord_scale'])
+        self.map_size_y_px = int(self.map_y/self.config_data_['coord_scale'])
         
         x = int(x/self.config_data_['coord_scale'])
         y = self.map_size_y_px - int(y/self.config_data_['coord_scale'])
@@ -69,9 +69,6 @@ class Panorama:
         if new_image.shape[2] != 3 or map_image.shape[2] != 3:
             raise ValueError("Both images must be RGB.")
 
-        # The rest of your function remains the same
-
-        
         # Calculate placement and cropping
         new_img_height, new_img_width = new_image.shape[:2]
         map_height, map_width = map_image.shape[:2]
