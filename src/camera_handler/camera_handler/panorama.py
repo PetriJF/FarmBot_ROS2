@@ -11,8 +11,8 @@ class Panorama:
     def __init__(self, node: Node):
         self.node_ = node
         
-        self.map_x = 2000
-        self.map_y = 1500
+        self.map_x = -1.0
+        self.map_y = -1.0
 
         self.bridge = CvBridge()
         self.rgb_image_ = None
@@ -32,14 +32,14 @@ class Panorama:
             blank_canvas = np.zeros((self.map_size_x_px, self.map_size_y_px, 3), dtype=np.uint8)
             cv2.imwrite(map_path, blank_canvas)
 
-    def load_from_yaml(self, path, fileName):
+    def load_from_yaml(self, path, file_name):
         # Load configuration data from a YAML file
-        fullPath = os.path.join(path, fileName)
-        if not os.path.exists(fullPath):
-            self.node_.get_logger().warn(f"File path is invalid: {fullPath}")
+        full_path = os.path.join(path, file_name)
+        if not os.path.exists(full_path):
+            self.node_.get_logger().warn(f"File path is invalid: {full_path}")
             return None
         
-        with open(fullPath, 'r') as yaml_file:
+        with open(full_path, 'r') as yaml_file:
             try:
                 return yaml.safe_load(yaml_file)
             except yaml.YAMLError as e:
@@ -50,7 +50,17 @@ class Panorama:
     def stitch_image_onto_map(self, x: float, y: float):
         self.config_directory_ = os.path.join(get_package_share_directory('camera_handler'), 'config')
         calib_file = os.path.join(self.config_directory_,'camera_calibration.yaml')
+        
         self.config_data_ = self.load_from_yaml(self.config_directory_, calib_file)
+        
+        if self.map_x == -1.0 or self.map_y == -1.0:
+            map_directory_ = os.path.join(get_package_share_directory('map_handler'), 'config')
+            map_file = os.path.join(self.config_directory_,'active_map.yaml')
+            map_instance = self.load_from_yaml(map_directory_, map_file)
+            
+            self.map_x = map_instance['map_reference']['x_len']
+            self.map_y = map_instance['map_reference']['y_len']
+        
         self.map_size_x_px = int(self.map_x/self.config_data_['coord_scale'])
         self.map_size_y_px = int(self.map_y/self.config_data_['coord_scale'])
         
