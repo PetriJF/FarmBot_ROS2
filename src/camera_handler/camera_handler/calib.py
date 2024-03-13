@@ -74,12 +74,13 @@ class CalibrateCamera:
         '''
         self.node_ = node
 
+        self.calibration_data = {}
         '''Set initial attributes.
 
         Arguments:
             calibration_data: P2C().calibration_params JSON
         '''
-        self.calibration_data = {}
+
         self.config_directory_ = os.path.join(get_package_share_directory('camera_handler'), 'config')
         self.rgb_dir_ = os.path.join(self.config_directory_,"saved_rgb_image.png")
         self.depth_dir_ = os.path.join(self.config_directory_,"saved_depth_image.png")
