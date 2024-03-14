@@ -6,6 +6,7 @@ map_reference:
     T1:
     T2:
     T3:
+  trays:
 plant_details: 
   plant_count: 0
   plants:

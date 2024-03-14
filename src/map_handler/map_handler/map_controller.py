@@ -385,7 +385,7 @@ class MapController(Node):
         # Setting up a new tool
         if cmd == 0:
             self.add_tool(msg, index)
-            return 'T_x_0 SUCCESS'
+            return 'SUCCESS'
         elif cmd == 1 or cmd == 2:
             self.tool_details_.x_pos = self.map_instance_['map_reference']['tools']['T' + index]['position']['x']
             self.tool_details_.y_pos = self.map_instance_['map_reference']['tools']['T' + index]['position']['y']
@@ -403,6 +403,8 @@ class MapController(Node):
             tools = self.map_instance_['map_reference']['tools']
             if ('T' + index) in tools:
                 del tools['T' + index]
+                return 'SUCCESS'
+            return 'FAILED'
 
         # Start the appropriate command
         self.get_logger().warn(f'Unrecognized command {str(msg)}')
