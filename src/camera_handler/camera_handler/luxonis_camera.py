@@ -103,7 +103,7 @@ class LuxonisCameraController(Node):
             response.data = 'WRITE THE COMMANDS HERE'
         # Sequencing constructed successfully and server returns it
 
-        self.get_logger().info'Panorama sequence formed successfully')
+        self.get_logger().info('Panorama sequence formed successfully')
         return response
 
 # Main Function called on the initialization of the ROS2 Node

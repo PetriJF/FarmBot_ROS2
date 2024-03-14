@@ -36,10 +36,10 @@ class Movement:
         '''
         Finds the home for all the axis on the farmbot.
         '''
-        self.find_axis_home(x = True, y = False, z = False)
-        self.find_axis_home(x = False, y = True, z = False)
         self.find_axis_home(x = False, y = False, z = True)
-
+        self.find_axis_home(x = False, y = True, z = False)
+        self.find_axis_home(x = True, y = False, z = False)
+        
     def find_axis_home(self, x = False, y = False, z = False):
         '''Homes the selected axis on the farmbot. For example, for homing x and y you set them to True.
 
@@ -54,7 +54,9 @@ class Movement:
         '''
         Calibrates the lengths for all the axis on the farmbot.
         '''
-        self.calibrate_axis(x = True, y = True, z = True)
+        self.calibrate_axis(x = False, y = False, z = True)
+        self.calibrate_axis(x = False, y = True, z = False)
+        self.calibrate_axis(x = True, y = False, z = False)
 
     def calibrate_axis(self, x = False, y = False, z = False):
         '''Calibrates the selected axis on the farmbot. For example, for calibrating the length along the x and y axis, you set them to True.

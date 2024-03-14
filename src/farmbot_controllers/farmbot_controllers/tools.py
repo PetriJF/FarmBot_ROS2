@@ -109,10 +109,11 @@ class ToolCommands:
         # Register the response of the server
         cmd = future.result().data.split('\n')
         # For a coordinate command response
-     
+
         self.node_.get_logger().info(future.result().data)
 
-        self.sequence_.extend(cmd)
+        if cmd[0] not in ['', 'SUCCESS', 'FAILED', 'UNRECOGNIZED']:
+            self.sequence_.extend(cmd)
 
     def sequencing_timer(self):
         '''
