@@ -48,54 +48,60 @@ class FarmbotControl(Node):
     def cmd_interp_callback(self, cmd = String):
         code = cmd.data.split(' ')
         match code[0]:
+            ## Electronic Stop
             case 'e':
                 self.get_logger().info('CLEARING SEQUENCE')
                 self.tools_.clear_sequence()
-            case 'w':
-                self.cur_x_ += self.cur_increment_
-                self.mvm_.move_gantry_abs(x_coord = self.cur_x_ + self.cur_increment_, y_coord = self.cur_y_, z_coord = self.cur_z_)
-            case 'a':
-                self.cur_y_ -= self.cur_increment_
-                self.mvm_.move_gantry_abs(x_coord = self.cur_x_, y_coord = self.cur_y_ - self.cur_increment_, z_coord = self.cur_z_)
-            case 's':
-                self.cur_x_ -= self.cur_increment_
-                self.mvm_.move_gantry_abs(x_coord = self.cur_x_ - self.cur_increment_, y_coord = self.cur_y_, z_coord = self.cur_z_)
-            case 'd':
-                self.cur_y_ += self.cur_increment_
-                self.mvm_.move_gantry_abs(x_coord = self.cur_x_, y_coord = self.cur_y_ + self.cur_increment_, z_coord = self.cur_z_)
+            ## Movement Commands
+            case 'M':
+                self.mvm_.move_gantry_abs(x_coord = float(code[1]), y_coord = float(code[2]), z_coord = float(code[3]))
+            case 'w' | 's':
+                self.mvm_.move_gantry_abs(x_coord = self.cur_x_ + (self.cur_increment_ * (-1 if code[0] == 's' else 1)),
+                                          y_coord = self.cur_y_,
+                                          z_coord = self.cur_z_)
+            case 'a' | 'd':
+                self.mvm_.move_gantry_abs(x_coord = self.cur_x_,
+                                          y_coord = self.cur_y_ + self.cur_increment_ * (-1 if code[0] == 'a' else 1),
+                                          z_coord = self.cur_z_)
             case '1':
                 self.cur_increment_ = 10.0
             case '2':
                 self.cur_increment_ = 100.0
             case '3':
                 self.cur_increment_ = 500.0
-            case 'C_1': # Load config
+            ## Homing commands
+            case 'H_0': 
+                self.mvm_.go_home()
+            case 'H_1':
+                self.mvm_.find_all_homes()
+            case 'H_2':
+                self.mvm_.find_axis_home(x = True if code[1] == 'X' else False,
+                                         y = True if code[1] == 'Y' else False,
+                                         z = True if code[1] == 'Z' else False)
+            ## Parameter configuration commands
+            case 'CONF':
+                if len(code) == 1:
+                    self.param_config_client(cmd = 'SAVE')
+                    self.param_config_client(cmd = 'MAP')
+                else:
+                    if code[1] == 'S':
+                        self.param_config_client(cmd = 'SAVE')
+                    elif code[1] == 'M':
+                        self.param_config_client(cmd = 'MAP')
+            ## Axis Calibration commands
+            case 'C_0': # C_0 for calib. all axis, C_0 X for calib. x axis and so on
+                if len(code) == 1:
+                    self.mvm_.calibrate_all_axis()
+                else:
+                    self.mvm_.calibrate_axis(x = True if code[1] == 'X' else False,
+                                             y = True if code[1] == 'Y' else False,
+                                             z = True if code[1] == 'Z' else False)
+            ## Load parameter configuration commands
+            case 'C_1': # e.g. C_1 Genesis
                 if code[1]:
                     self.config_loader_client(ver = code[1])
                 else:
                     self.get_logger().warn('No parameter config set')
-            case 'h': 
-                self.mvm_.go_home()
-            case 'j':
-                self.mvm_.find_axis_home(x = True)
-            case 'k':
-                self.mvm_.find_axis_home(y = True)
-            case 'l':
-                self.mvm_.find_axis_home(z = True)
-            case 'fh':
-                self.mvm_.find_all_homes()
-            case 'c':
-                self.mvm_.calibrate_all_axis()
-            case 'v':
-                self.mvm_.calibrate_axis(x = True)
-            case 'b':
-                self.mvm_.calibrate_axis(y = True)
-            case 'n':
-                self.mvm_.calibrate_axis(z = True)
-            case 'o':
-                self.param_config_client(cmd = 'SAVE')
-            case 'p':
-                self.param_config_client(cmd = 'MAP')
             ## Tool commands
             case 'T_1_0' | 'T_2_0' | 'T_3_0': # e.g. T_1_0 Seeder 1198.0 332.4 -240.0 1
                 tool = code[0] + '\n' + code[1] + '\n' + code[2] + ' ' + code[3] + ' ' + code[4] + ' ' + code[5]
