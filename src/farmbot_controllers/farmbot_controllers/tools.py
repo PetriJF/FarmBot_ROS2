@@ -288,7 +288,7 @@ class ToolCommands:
 
         # Call async and add the response callback
         future = client.call_async(request = request)
-        future.add_done_callback(self.stitch_callback)
+        future.add_done_callback(self.cmd_sequence_callback)
 
     def status_callback(self, state: Bool):
         '''

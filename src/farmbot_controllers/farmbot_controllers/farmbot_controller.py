@@ -151,10 +151,12 @@ class FarmbotControl(Node):
                 self.tools_.map_cmd_client(cmd = tray)
             case 'I_0': # Calibrate Camera
                 self.tools_.cam_calib_client(cmd = 'GET')
-            case 'I_1': # Panorama Sequencing
+            case 'I_1': # Stitch panorama at current position
                 self.tools_.stitch_panorama_client(calib = False, update_map = False,
                                                     x = self.cur_x_, y = self.cur_y_,
                                                     z = self.cur_z_)
+            case 'I_2':
+                self.tools_.panorama_client()
             ## Device commands
             case 'D_L_1' | 'D_L_0':
                 self.tools_.led_strip(state = int(code[0][4]))
