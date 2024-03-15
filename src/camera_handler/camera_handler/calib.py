@@ -459,3 +459,10 @@ class CalibrateCamera:
                  (origin_x, origin_y - 100), AXIS_COLORS[AXIS_INDEX['y']], 10)
         cv2.line(self.output_img, (origin_x - 100, origin_y),
                  (origin_x + 100, origin_y), AXIS_COLORS[AXIS_INDEX['x']], 10)
+        
+    def get_panorama_increments(self):
+        '''
+        Get the panorama increments for the x and y axis for minimizing 
+        the amount of images needed to stitch the whole map into a panorama
+        '''
+        return 300, 250 # x, y

@@ -7,6 +7,7 @@ from farmbot_interfaces.srv import StringRepReq
 from camera_handler.luxonis_publisher import CameraNode
 from camera_handler.panorama import Panorama
 from camera_handler.calib import CalibrateCamera
+import math
 
 class LuxonisCameraController(Node):
     # Node contructor
@@ -96,12 +97,36 @@ class LuxonisCameraController(Node):
         # Return outcome
         return response
 
-    # TODO: add panorama sequencing
     def luxonis_panorama_sequence_server(self, request, response):
-        ## Add here the coordinate commands and the camera picture commands
-        if request.data: # USE THE .data TO READ FROM YOUR REQUEST STRING
-            response.data = 'WRITE THE COMMANDS HERE'
-        # Sequencing constructed successfully and server returns it
+        '''
+        Service server that creates a sequence for making taking 
+        pictures at multiple positions through the farmbot working
+        area and stitching them into a large panorama.
+        '''
+        seq = ''
+        
+        # In case settings are needed
+        if request.data == 'SOMETHING':
+            pass
+
+        x_inc, y_inc = self.calib_.get_panorama_increments()
+        
+        if self.panorama_.map_x != -1.0 and self.panorama_.map_y != -1.0:
+            x_pos_count = math.ceil(self.panorama_.map_x / x_inc)
+            y_pos_count = math.ceil(self.panorama_.map_y / y_inc)
+
+            x_inc = self.panorama_.map_x / x_pos_count
+            y_inc = self.panorama_.map_y / y_pos_count
+
+            for y_pos in range(y_pos_count):
+                for x_pos in range(x_pos_count):
+                    x = x_pos * x_inc
+                    y = y_pos * y_inc
+                    seq += f"CC_P\n{x} {y} 0.0\n"
+                    seq += 'VC_P\nPAN\n'
+
+
+        response.data = seq
 
         self.get_logger().info('Panorama sequence formed successfully')
         return response
