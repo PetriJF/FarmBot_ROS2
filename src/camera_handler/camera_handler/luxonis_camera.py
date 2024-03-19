@@ -7,6 +7,8 @@ from farmbot_interfaces.srv import StringRepReq
 from camera_handler.luxonis_publisher import CameraNode
 from camera_handler.panorama import Panorama
 from camera_handler.calib import CalibrateCamera
+from ament_index_python.packages import get_package_share_directory
+import os
 import math
 
 class LuxonisCameraController(Node):
@@ -109,14 +111,17 @@ class LuxonisCameraController(Node):
         if request.data == 'SOMETHING':
             pass
 
-        x_inc, y_inc = self.calib_.get_panorama_increments()
+        x_inc, y_inc = self.panorama_.get_panorama_increments()
+        self.get_logger().info(f'Panorama increments {x_inc}, {y_inc}')
         
-        if self.panorama_.map_x != -1.0 and self.panorama_.map_y != -1.0:
-            x_pos_count = math.ceil(self.panorama_.map_x / x_inc)
-            y_pos_count = math.ceil(self.panorama_.map_y / y_inc)
+                
+        if self.panorama_.map_x_ != -1.0 and self.panorama_.map_y_ != -1.0:
+            self.get_logger().info(f'Panorama max_x: {self.panorama_.map_x_}, map_y: {self.panorama_.map_y_}')
+            x_pos_count = math.ceil(self.panorama_.map_x_ / x_inc)
+            y_pos_count = math.ceil(self.panorama_.map_y_ / y_inc)
 
-            x_inc = self.panorama_.map_x / x_pos_count
-            y_inc = self.panorama_.map_y / y_pos_count
+            x_inc = self.panorama_.map_x_ / x_pos_count
+            y_inc = self.panorama_.map_y_ / y_pos_count
 
             for y_pos in range(y_pos_count):
                 for x_pos in range(x_pos_count):
@@ -124,11 +129,13 @@ class LuxonisCameraController(Node):
                     y = y_pos * y_inc
                     seq += f"CC_P\n{x} {y} 0.0\n"
                     seq += 'VC_P\nPAN\n'
+            self.get_logger().info('Panorama sequence formed successfully')
+        else:
+            self.get_logger().info('Could not form panorama sequence')
 
 
         response.data = seq
 
-        self.get_logger().info('Panorama sequence formed successfully')
         return response
 
 # Main Function called on the initialization of the ROS2 Node
