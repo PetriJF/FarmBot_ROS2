@@ -25,7 +25,7 @@ POSITION_COUNT = 3
 RELATIVE_MOVEMENTS = [
     {'x': 0, 'y': 0, 'z': 0},
     {'x': 0, 'y': 50, 'z': 0},
-    {'x': 50, 'y': 0, 'z': 0},
+    {'x': 50, 'y': 50, 'z': 0},
 ]
 
 class CalibrateCamera:

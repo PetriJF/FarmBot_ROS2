@@ -18,9 +18,11 @@ class Panorama:
         '''
         self.node_ = node
         
-        self.map_x = -1.0
-        self.map_y = -1.0
-
+        self.map_x_ = -1.0
+        self.map_y_ = -1.0
+        self.config_directory_ = os.path.join(get_package_share_directory('camera_handler'), 'config')
+        self.calib_file_ = 'camera_calibration.yaml'
+        
         self.bridge = CvBridge()
         self.rgb_image_ = None
         self.depth_image_ = None
@@ -45,7 +47,7 @@ class Panorama:
         '''
         if not os.path.exists(map_path):
             # Create a blank canvas with 3 channels for RGB
-            blank_canvas = np.zeros((self.map_size_x_px, self.map_size_y_px, 3), dtype=np.uint8)
+            blank_canvas = np.zeros((self.map_size_y_px, self.map_size_x_px, 3), dtype=np.uint8)
             cv2.imwrite(map_path, blank_canvas)
 
     def load_from_yaml(self, path: str, file_name: str):
@@ -73,33 +75,32 @@ class Panorama:
         panorama map at the specified x and y coordinates
         '''
         # Loading the camera calibration information
-        self.config_directory_ = os.path.join(get_package_share_directory('camera_handler'), 'config')
-        calib_file = 'camera_calibration.yaml'
-        self.config_data_ = self.load_from_yaml(self.config_directory_, calib_file)
+        
+        self.config_data = self.load_from_yaml(self.config_directory_, self.calib_file_)
         
         # If the map dimensions were not set at the start of the run, load them from the active map
-        if self.map_x == -1.0 or self.map_y == -1.0:
+        if self.map_x_ == -1.0 or self.map_y_ == -1.0:
             # Load map instance
             map_directory_ = os.path.join(get_package_share_directory('map_handler'), 'config')
             map_file = 'active_map.yaml'
             map_instance = self.load_from_yaml(map_directory_, map_file)
             if map_instance:
                 # Get map dimensions
-                self.map_x = map_instance['map_reference']['x_len']
-                self.map_y = map_instance['map_reference']['y_len']
+                self.map_x_ = map_instance['map_reference']['x_len']
+                self.map_y_ = map_instance['map_reference']['y_len']
 
                 self.node_.get_logger().info('Loading map dimensions from active map file')
         
         # Set the map size relative to pixels
-        self.map_size_x_px = int(self.map_x / self.config_data_['coord_scale'])
-        self.map_size_y_px = int(self.map_y / self.config_data_['coord_scale'])
+        self.map_size_x_px = int(self.map_x_ / self.config_data['coord_scale'])
+        self.map_size_y_px = int(self.map_y_ / self.config_data['coord_scale'])
         
-        x = int(x / self.config_data_['coord_scale'])
-        y = self.map_size_y_px - int(y/self.config_data_['coord_scale'])
+        x = int(x / self.config_data['coord_scale'])
+        y = self.map_size_y_px - int(y/self.config_data['coord_scale'])
         
         # Load the new image
         new_image = self.rgb_image_
-        rotation_angle = self.config_data_['total_rotation_angle']
+        rotation_angle = self.config_data['total_rotation_angle']
         new_image = self.rotate_image(new_image, rotation_angle)
         map_path = os.path.join(self.config_directory_,'rgb_map.png')
         # Load or initialize the map (panorama) image 
@@ -148,3 +149,28 @@ class Panorama:
         rotated_image = cv2.warpAffine(image, rotation_matrix, (width, height))
 
         return rotated_image
+    
+    def get_panorama_increments(self):
+        '''
+        Get the panorama increments for the x and y axis for minimizing 
+        the amount of images needed to stitch the whole map into a panorama
+        '''
+        self.config_data_ = self.load_from_yaml(self.config_directory_, self.calib_file_)
+        if self.map_x_ == -1.0 or self.map_y_ == -1.0:
+            # Load map instance
+            map_directory_ = os.path.join(get_package_share_directory('map_handler'), 'config')
+            map_file = 'active_map.yaml'
+            map_instance = self.load_from_yaml(map_directory_, map_file)
+            if map_instance:
+                # Get map dimensions
+                self.map_x_ = map_instance['map_reference']['x_len']
+                self.map_y_ = map_instance['map_reference']['y_len']
+
+                self.node_.get_logger().info('Loading map dimensions from active map file')
+        
+        # px = mm / scale
+        # mm = px * scale
+        height, width = self.rgb_image_.shape[:2] 
+        height_mm = height* self.config_data_['coord_scale']
+        width_mm = width * self.config_data_['coord_scale']
+        return height_mm, width_mm# x, y
