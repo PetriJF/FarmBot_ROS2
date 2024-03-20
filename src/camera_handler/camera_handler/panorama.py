@@ -68,7 +68,14 @@ class Panorama:
                 self.node_.get_logger().warn(f"Error reading YAML file: {e}")
                 return None
     
-
+    def save_image_for_mosaic(self, num: int):
+        mosaic_directory = os.path.join(self.config_directory_, 'mosaic')
+        filename = f"{mosaic_directory}/image_{num}.jpg"
+        os.makedirs(mosaic_directory, exist_ok=True)
+        cv2.imwrite(filename, self.rgb_image_)
+        self.node_.get_logger().info(f'saved mosaic image {num}')
+        
+        
     def stitch_image_onto_map(self, x: float, y: float):
         '''
         Takes a picture from the Luxonis camera and stitches it to the 

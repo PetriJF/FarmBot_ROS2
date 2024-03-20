@@ -195,7 +195,14 @@ class ToolCommands:
                 if cmd[0] == 'CALIB':
                     self.cam_calib_client(cmd = (self.sequence_[0] + ' ' + str(self.x) + ' ' + str(self.y) + ' ' + str(self.z)))
                 elif cmd[0] == 'PAN':
-                    self.stitch_panorama_client()
+                    self.stitch_panorama_client(calib = False, update_map = False, mosaic = False,
+                                                    x = self.x, y = self.y,
+                                                    z = self.z)
+                elif cmd[0] == 'MOSAIC':
+                    self.stitch_panorama_client(calib = False, update_map = False, mosaic = True,
+                                                    x = self.x, y = self.y,
+                                                    z = self.z, num = int(cmd[1]))
+                    self.sequence_.pop(0)
                 self.sequence_.pop(0)
             # The amount of ticks the farmbot should wait in the sequence
             # before moving to the next command
@@ -213,7 +220,7 @@ class ToolCommands:
                 self.wait_for_request_.result = int(info[2][1:])
                 self.wait_for_request_.wait_flag = False
 
-    def stitch_panorama_client(self, calib: bool, update_map: bool, x: float, y: float, z: float):
+    def stitch_panorama_client(self, calib: bool, update_map: bool, mosaic: bool, x: float, y: float, z: float, num = int(-1)):
         '''
         Tool command service client used to communicate between the farmbot
         controller and the map handler.
@@ -224,8 +231,8 @@ class ToolCommands:
         # Block sequencing here async
         self.wait_for_camera_ = True
 
-        if calib and update_map:
-            self.node_.get_logger().warn('Cannot have both command types sent at the same time!')
+        if sum([calib, update_map, mosaic]) > 1:
+            self.node_.get_logger().warn('Cannot have more than 1 command type sent at the same time!')
 
         # Initializing the client and wait for map server confirmation
         client = self.node_.create_client(StringRepReq, 'form_panorama')
@@ -239,6 +246,8 @@ class ToolCommands:
             request.data = 'CALIB'
         elif update_map:
             request.data = 'MAP ' + str(x) + ' ' + str(y)
+        elif mosaic:
+            request.data = 'MOSAIC ' + str(num)
         else:
             request.data = str(x) + ' ' + str(y) + ' ' + str(z)
 
@@ -280,7 +289,7 @@ class ToolCommands:
         future = client.call_async(request = request)
         future.add_done_callback(self.cmd_sequence_callback if cmd == 'GET' else self.stitch_callback)
     
-    def panorama_client(self):
+    def panorama_client(self, mosaic = False):
         '''
         Tool command service client used to communicate between the farmbot
         controller and the map handler.
@@ -295,7 +304,10 @@ class ToolCommands:
         
         # Set the command to the service request
         request = StringRepReq.Request()
-        request.data = 'ADD HERE ANY SETUP THAT MIGHT CHANGE'
+        if mosaic:
+            request.data = 'MOSAIC'
+        else: 
+            request.data = 'ADD HERE ANY SETUP THAT MIGHT CHANGE'
 
         # Call async and add the response callback
         future = client.call_async(request = request)
