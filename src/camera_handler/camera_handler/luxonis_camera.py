@@ -115,13 +115,13 @@ class LuxonisCameraController(Node):
         self.get_logger().info(f'Panorama increments {x_inc}, {y_inc}')
         
                 
-        if self.panorama_.map_x_ != -1.0 and self.panorama_.map_y_ != -1.0:
-            self.get_logger().info(f'Panorama max_x: {self.panorama_.map_x_}, map_y: {self.panorama_.map_y_}')
-            x_pos_count = math.ceil(self.panorama_.map_x_ / x_inc)
-            y_pos_count = math.ceil(self.panorama_.map_y_ / y_inc)
+        if self.panorama_.map_x != -1.0 and self.panorama_.map_y != -1.0:
+            self.get_logger().info(f'Panorama max_x: {self.panorama_.map_x}, map_y: {self.panorama_.map_y}')
+            x_pos_count = math.ceil(self.panorama_.map_x / x_inc)
+            y_pos_count = math.ceil(self.panorama_.map_y / y_inc)
 
-            x_inc = self.panorama_.map_x_ / x_pos_count
-            y_inc = self.panorama_.map_y_ / y_pos_count
+            x_inc = self.panorama_.map_x / x_pos_count
+            y_inc = self.panorama_.map_y / y_pos_count
 
             for y_pos in range(y_pos_count):
                 for x_pos in range(x_pos_count):
@@ -131,7 +131,7 @@ class LuxonisCameraController(Node):
                     seq += 'VC_P\nPAN\n'
             self.get_logger().info('Panorama sequence formed successfully')
         else:
-            self.get_logger().info('Could not form panorama sequence')
+            self.get_logger().warn('Could not form panorama sequence')
 
 
         response.data = seq
