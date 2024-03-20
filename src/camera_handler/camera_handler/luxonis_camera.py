@@ -60,9 +60,6 @@ class LuxonisCameraController(Node):
         elif request.data.split(' ')[0] == 'MOSAIC':
             # Save image for mosaic
             # Sequencing constructed successfully and server returns it
-            self.get_logger().info(request.data)
-            self.get_logger().info(msg[0])
-            self.get_logger().info(msg[1])
             self.panorama_.save_image_for_mosaic(num = int(msg[1]))
             self.get_logger().info('Picture saved for mosaic successfully')
         elif len(msg) == 3: # Ensuring the command information is complete
@@ -129,17 +126,21 @@ class LuxonisCameraController(Node):
 
             x_inc = self.panorama_.map_x / x_pos_count
             y_inc = self.panorama_.map_y / y_pos_count
-            num = int(0)
+            num = int(1)
             for y_pos in range(y_pos_count):
                 for x_pos in range(x_pos_count):
                     x = x_pos * x_inc
                     y = y_pos * y_inc
                     seq += f"CC_P\n{x} {y} 0.0\n"
-                    if request.data == 'MOSAIC':
-                        seq+= f"VC_P\nMOSAIC {num}\n"
-                        num += 1
-                    else:
-                        seq += 'VC_P\nPAN\n'
+                    # if request.data == 'MOSAIC':
+                    #     seq+= f"VC_P\nMOSAIC {num}\n"
+                    #     num += 1
+                    # else:
+                    #     seq += 'VC_P\nPAN\n'
+                    seq += f"VC_P\nMOSAIC {num}\n" if request.data == 'MOSAIC' else 'VC_P\nPAN\n'
+                    seq += "TD_DELAY\nT1\n"
+                    num += 1
+                    
             self.get_logger().info('Panorama sequence formed successfully')
         else:
             self.get_logger().warn('Could not form panorama sequence')
