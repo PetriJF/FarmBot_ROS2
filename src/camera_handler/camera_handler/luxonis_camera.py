@@ -57,6 +57,14 @@ class LuxonisCameraController(Node):
             self.panorama_.map_x = float(info[1])
             self.panorama_.map_y = float(info[2])
             self.get_logger().info(f'Updated camera map dimensions to {self.panorama_.map_x} and {self.panorama_.map_y}')
+        elif request.data.split(' ')[0] == 'MOSAIC':
+            # Save image for mosaic
+            # Sequencing constructed successfully and server returns it
+            self.get_logger().info(request.data)
+            self.get_logger().info(msg[0])
+            self.get_logger().info(msg[1])
+            self.panorama_.save_image_for_mosaic(num = int(msg[1]))
+            self.get_logger().info('Picture saved for mosaic successfully')
         elif len(msg) == 3: # Ensuring the command information is complete
             if float(msg[2]) != 0.0:    # Ensuring the z-axis is homed
                 self.get_logger().warn('Z Axis is not in home position for the panorama stitching! Panorama command cancelled')
@@ -108,8 +116,7 @@ class LuxonisCameraController(Node):
         seq = ''
         
         # In case settings are needed
-        if request.data == 'SOMETHING':
-            pass
+        
 
         x_inc, y_inc = self.panorama_.get_panorama_increments()
         self.get_logger().info(f'Panorama increments {x_inc}, {y_inc}')
@@ -122,13 +129,17 @@ class LuxonisCameraController(Node):
 
             x_inc = self.panorama_.map_x / x_pos_count
             y_inc = self.panorama_.map_y / y_pos_count
-
+            num = int(0)
             for y_pos in range(y_pos_count):
                 for x_pos in range(x_pos_count):
                     x = x_pos * x_inc
                     y = y_pos * y_inc
                     seq += f"CC_P\n{x} {y} 0.0\n"
-                    seq += 'VC_P\nPAN\n'
+                    if request.data == 'MOSAIC':
+                        seq+= f"VC_P\nMOSAIC {num}\n"
+                        num += 1
+                    else:
+                        seq += 'VC_P\nPAN\n'
             self.get_logger().info('Panorama sequence formed successfully')
         else:
             self.get_logger().warn('Could not form panorama sequence')

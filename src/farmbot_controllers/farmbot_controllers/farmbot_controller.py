@@ -173,6 +173,8 @@ class FarmbotControl(Node):
                                                     z = self.cur_z_)
             case 'I_2':
                 self.tools_.panorama_client()
+            case 'I_3':
+                self.tools_.panorama_client(mosaic = True)
             ## Device commands
             case 'D_L_1' | 'D_L_0':
                 self.tools_.led_strip(state = int(code[0][4]))
