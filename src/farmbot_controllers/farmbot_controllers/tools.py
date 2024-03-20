@@ -202,7 +202,6 @@ class ToolCommands:
                     self.stitch_panorama_client(calib = False, update_map = False, mosaic = True,
                                                     x = self.x, y = self.y,
                                                     z = self.z, num = int(cmd[1]))
-                    self.sequence_.pop(0)
                 self.sequence_.pop(0)
             # The amount of ticks the farmbot should wait in the sequence
             # before moving to the next command
