@@ -131,11 +131,13 @@ class CalibrateCamera:
         '''
         cmd_seq = ''
         run_count = 1
+        seconds = 5
 
         for coords in RELATIVE_MOVEMENTS:
             # Move to the next calibration point
             cmd_seq += 'CC_C_x_1\n'
             cmd_seq += str(coords['x']) + ' ' + str(coords['y']) + ' ' + str(coords['z']) + '\n'
+            cmd_seq += f"TD_TICK_DELAY\nT{seconds}\n"
             # Capture the information and use it for calibration
             cmd_seq += 'VC_C_0\n'
             cmd_seq += f"CALIB {run_count}\n"

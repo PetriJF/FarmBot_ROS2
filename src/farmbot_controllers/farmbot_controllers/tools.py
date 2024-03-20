@@ -28,13 +28,14 @@ class ToolCommands:
 
         # The ID of the current tool mounted. Should be 0 when no tool mounted!
         self.current_tool_id_ = 0# Get UART Response to Request Client
-        
+
         self.sequence_ = []
         self.command_type_ = ''
         
         self.wait_for_request_ = WaitForRequest()
         self.farmbot_busy_ = False
         self.wait_for_camera_ = False
+        self.ticks_ = 0
 
         self.busy_state_sub_ = self.node_.create_subscription(Bool, 'busy_state', self.status_callback, 10)
         self.sequencing_timer_ = self.node_.create_timer(1.0, self.sequencing_timer)
@@ -122,6 +123,11 @@ class ToolCommands:
         queue is emptied in FIFO fashion.
         '''
         # If waiting for camera or queue is empty, return
+        if self.ticks_:
+            self.node_.get_logger().info(f'Waiting for {self.ticks_} more ticks')
+            self.ticks_ -= 1
+            return
+        
         if self.wait_for_camera_:
             return
         if not len(self.sequence_):
@@ -129,7 +135,7 @@ class ToolCommands:
 
         # Set the sequence command type. CC - Coord. Cmd, DC - Device Cmd, 
         # VC - Vision Cmd
-        if self.sequence_[0][:2] in ['CC', 'DC', 'VC']:
+        if self.sequence_[0][:2] in ['CC', 'DC', 'VC', 'TD']:
             self.command_type_ = self.sequence_[0][:2]
             self.sequence_.pop(0)
 
@@ -190,6 +196,11 @@ class ToolCommands:
                     self.cam_calib_client(cmd = (self.sequence_[0] + ' ' + str(self.x) + ' ' + str(self.y) + ' ' + str(self.z)))
                 elif cmd[0] == 'PAN':
                     self.stitch_panorama_client()
+                self.sequence_.pop(0)
+            # The amount of ticks the farmbot should wait in the sequence
+            # before moving to the next command
+            elif self.command_type_ == 'TD':
+                self.ticks_ = int(self.sequence_[0][1:])
                 self.sequence_.pop(0)
 
     def uart_message(self, msg: str):
