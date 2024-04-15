@@ -73,7 +73,7 @@ class Panorama:
         filename = f"{mosaic_directory}/image_{num}.jpg"
         os.makedirs(mosaic_directory, exist_ok=True)
         cv2.imwrite(filename, self.rgb_image_)
-        self.node_.get_logger().info(f'saved mosaic image {num}')
+        self.node_.get_logger().info(f'saved mosaic image {num:03}')
         
         
     def stitch_image_onto_map(self, x: float, y: float):
