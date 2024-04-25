@@ -55,3 +55,34 @@ ros2 run farmbot_controllers keyboard_controller
 ```
 
 You can now check the High Level Controller Commands list to test the various functions of the Farmbot.
+
+# How to run everything together (WIP - Subject to change)
+
+Before anything else, ensure that you have the most recent commit, and you properly built the workspace.
+
+You will need a minimum of 2 terminals for each robot (3 if you want manual user control). All three terminals are explained below:
+
+### 1. The Farmbot Packages
+
+These packages include everything from the main controller to the imagine controller. This will run all the nodes needed to interpret and form the commands that communicate with the Farmduino. Also, imaging and plant management happen here as well.
+
+For running the launch file use:
+``` bash
+ros2 launch farmbot_bringup standard.launch.py
+```
+
+### 2. Launch the Autonomous Command Controller
+
+This is a node that sends commands to the farmbot controller at specific times set in the script. If you want to create a specific plan for watering or managing your plants, make sure to modify the python script to suit your needs.
+
+``` bash
+ros2 launch farmbot_bringup standard.launch.py
+```
+
+### 3. User Command Handler (Optional)
+
+If you want to send commands to the farmbot that are outside the plan you have created for your plants, you can turn on the keyboard controller. For a complete list of all the High Level commands, check the documentation.
+
+``` bash
+ros2 launch farmbot_bringup standard.launch.py
+```
