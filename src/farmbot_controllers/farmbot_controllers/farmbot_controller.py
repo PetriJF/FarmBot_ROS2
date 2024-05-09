@@ -10,6 +10,7 @@ from farmbot_controllers.tools import ToolCommands
 from farmbot_controllers.movement import Movement
 from farmbot_controllers.states import State
 from farmbot_controllers.devices import DeviceControl
+from farmbot_controllers.parameters import Parameters
 
 class FarmbotControl(Node):
     # Node contructor
@@ -24,6 +25,8 @@ class FarmbotControl(Node):
         self.devices_ = DeviceControl(self)
         # Initializing the tool module
         self.tools_ = ToolCommands(self, self.mvm_, self.devices_)
+        # Initializing the parameter manipulator
+        self.params_ = Parameters(self)
 
         # Memory
         self.cur_x_ = 0.0
@@ -102,6 +105,19 @@ class FarmbotControl(Node):
                     self.config_loader_client(ver = code[1])
                 else:
                     self.get_logger().warn('No parameter config set')
+            ## Invert the encoder direction for a specified axis
+            case 'C_2':
+                if len(code) == 1:
+                    self.get_logger().warning('You have not selected the axis encoder you want to flip. Command ignored')
+                else:
+                    if code[1] in ['X', 'Y', 'Z']:
+                        param = 130 + ((1 if code[1] == 'X' else 0) +
+                                       (2 if code[1] == 'Y' else 0) +
+                                       (3 if code[1] == 'Z' else 0))
+                        self.param_config_client('F22 P' + str(param) + ' V1')
+                        self.params_.writeParam(param, 1)
+                    else:
+                        self.get_logger().warning('C_2: Invalid option selected. Choose: X, Y, Z')
             ## Tool commands
             case 'T_1_0' | 'T_2_0' | 'T_3_0': # e.g. T_1_0 Seeder 1198.0 332.4 -240.0 1
                 tool = code[0] + '\n' + code[1] + '\n' + code[2] + ' ' + code[3] + ' ' + code[4] + ' ' + code[5]
