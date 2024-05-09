@@ -33,6 +33,7 @@ class CameraNode:
         self.depth_image_ = None
 
         # Start the packet processing loop in a separate thread
+        self.should_continue = True  # Flag to control the execution of the thread
         self.processing_thread = threading.Thread(target=self.packet_processing_loop)
         self.processing_thread.daemon = True  # Ensures that the thread will close when the main program exits
         self.processing_thread.start()
@@ -75,7 +76,7 @@ class CameraNode:
         '''
         Loop used for processing packets from the camera
         '''
-        while True:
+        while self.should_continue:
             # Fetch packets from the device's output queues
             latestPacket = {"rgb": None, "stereo": None}
             queueEvents = self.device.getQueueEvents(("rgb", "stereo"))
@@ -91,6 +92,14 @@ class CameraNode:
             if latestPacket["stereo"] is not None:
                 self.depth_image_ = self.process_depth_frame(latestPacket["stereo"].getFrame())
                 self.publish_images(depth_frame=self.depth_image_)
+                
+    def stop_processing(self):  # Gracefully stop the processing thread
+        self.should_continue = False  # Signal the thread to exit
+        if self.processing_thread.is_alive():
+            self.processing_thread.join()  # Wait for the thread to finish
+
+    def __del__(self):  # Consider removing if you opt for explicit shutdown calls
+        self.stop_processing()  # Ensure resources are cleaned up
 
     def configure_depthai_components(self):
         '''
@@ -233,7 +242,8 @@ def main(args=None):
         rclpy.spin(camera_node)
     except KeyboardInterrupt:
         pass
-    finally:
+    finally:        
+        camera_node.stop_processing()  # Ensure the processing thread is stopped gracefully
         camera_node.destroy_node()
         rclpy.shutdown()
 

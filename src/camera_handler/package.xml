@@ -4,7 +4,7 @@
   <name>camera_handler</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="jamespetri28@gmail.com">farmbotdev</maintainer>
+  <maintainer email="ejakunskas@gmail.com">Edward</maintainer>
   <license>TODO: License declaration</license>
 
   <test_depend>ament_copyright</test_depend>
