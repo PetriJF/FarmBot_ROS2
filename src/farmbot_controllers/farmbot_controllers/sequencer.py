@@ -1,12 +1,13 @@
 from rclpy.node import Node
-from rclpy.action import ActionClient
-from rclpy.action.client import ClientGoalHandle
 from std_msgs.msg import Bool 
 from farmbot_interfaces.srv import StringRepReq
 from farmbot_controllers.movement import Movement
 from farmbot_controllers.devices import DeviceControl
 
 class WaitForRequest:
+    '''
+    Class used to control the flow of commands exported by the controller
+    '''
     def __init__(self):    
         self.wait_flag = False
         self.wait_for = -1
@@ -14,7 +15,7 @@ class WaitForRequest:
         self.expected = -1
 
 
-class ToolCommands:
+class Sequencer:
     def __init__(self, node: Node, mvm: Movement, devices: DeviceControl):
         # The farmbot node extension
         self.node_ = node
@@ -25,9 +26,6 @@ class ToolCommands:
         self.x = 0
         self.y = 0
         self.z = 0
-
-        # The ID of the current tool mounted. Should be 0 when no tool mounted!
-        self.current_tool_id_ = 0# Get UART Response to Request Client
 
         self.sequence_ = []
         self.command_type_ = ''
