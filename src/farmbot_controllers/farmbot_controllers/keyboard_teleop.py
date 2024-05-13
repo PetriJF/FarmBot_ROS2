@@ -20,6 +20,14 @@ class KeyboardTeleOp(Node):
         # Log the initialization
         self.get_logger().info('Keyboard Controller Initialized..')
 
+        self.get_logger().info('''\n
+                               This is a keyboard based controller for the ROS2 Farmbot 
+                               Controllers. The commands accepted can be found in the 
+                               Documentation under High Level Commands.\n
+                               NOTE: The commands here DO NOT automatically enter the
+                               sequencer as they hold execution priority! An exception
+                               is shown for sequencing commands such as 'P_4' for watering.''')
+
     def check_input(self):
         '''
         Checks the input stream for valid commands and sends them on.
@@ -28,12 +36,14 @@ class KeyboardTeleOp(Node):
         '''
         # Valid Keys and Commands
         valid_keys = ('e', 'E', 'w', 'a', 's', 'd', '1', '2', '3', 'h', 'j', 'k', 'l', 'fh',
-                     'o', 'p', 'T_2_0', 'T_2_1', 'T_2_2',
-                     'T_3_0', 'T_3_1', 'T_3_2', 
+                     'o', 'p',
+                     'T_1_1', 'T_1_2', 'T_2_1', 'T_2_2', 'T_3_1', 'T_3_2',
+                     'T_4_1', 'T_4_2', 'T_5_1', 'T_5_2', 'T_6_1', 'T_6_2',
                      'P_3', 'P_4', 'I_0', 'I_1', 'I_2', 'I_3', 'D_C', 'D_L_1', 'D_L_0',
                      'D_W_1', 'D_W_0', 'D_V_1', 'D_V_0',
                      'H_0', 'H_1')
-        compound_cmds = ('C_0', 'P_1', 'P_2', 'C_1', 'C_2', 'T_1_0', 'T_2_0', 'T_3_0', 'S_1_0', 'S_2_0', 'S_3_0', 'M', 'CONF', 'H_2')
+        compound_cmds = ('C_0', 'P_1', 'P_2', 'C_1', 'C_2', 'T_1_0', 'T_2_0', 'T_3_0',
+                         'T_4_0', 'T_5_0', 'T_6_0', 'S_1_0', 'S_2_0', 'S_3_0', 'M', 'CONF', 'H_2')
         # Record the user input
         user_input = input('\nEnter command: ')
         

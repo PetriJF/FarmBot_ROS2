@@ -6,7 +6,7 @@ from farmbot_interfaces.msg import PlantManage
 from farmbot_interfaces.srv import ParameterConfig, StringRepReq
 
 # Modules
-from farmbot_controllers.tools import ToolCommands
+from farmbot_controllers.sequencer import Sequencer
 from farmbot_controllers.movement import Movement
 from farmbot_controllers.states import State
 from farmbot_controllers.devices import DeviceControl
@@ -24,7 +24,7 @@ class FarmbotControl(Node):
         # Initializing the devices and peripherals modules
         self.devices_ = DeviceControl(self)
         # Initializing the tool module
-        self.tools_ = ToolCommands(self, self.mvm_, self.devices_)
+        self.tools_ = Sequencer(self, self.mvm_, self.devices_)
         # Initializing the parameter manipulator
         self.params_ = Parameters(self)
 
