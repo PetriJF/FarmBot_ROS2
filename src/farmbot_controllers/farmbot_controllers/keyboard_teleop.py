@@ -20,6 +20,14 @@ class KeyboardTeleOp(Node):
         # Log the initialization
         self.get_logger().info('Keyboard Controller Initialized..')
 
+        self.get_logger().info('''\n
+                               This is a keyboard based controller for the ROS2 Farmbot 
+                               Controllers. The commands accepted can be found in the 
+                               Documentation under High Level Commands.\n
+                               NOTE: The commands here DO NOT automatically enter the
+                               sequencer as they hold execution priority! An exception
+                               is shown for sequencing commands such as 'P_4' for watering.''')
+
     def check_input(self):
         '''
         Checks the input stream for valid commands and sends them on.
