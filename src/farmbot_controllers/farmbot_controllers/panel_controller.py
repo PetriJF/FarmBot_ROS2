@@ -197,12 +197,20 @@ class PanelController(Node):
              self.cmd_.data = 'H_0'
              self.input_pub_.publish(self.cmd_)
     
-    # Example of mapping Button A to something (E.g. Homing)
+    # Example of mapping Button B to something (E.g. Calibrating)
     def buttonBHandler(self, channel):
         current_state = GPIO.input(FBPanel.BUTTON_B)
         if current_state == GPIO.LOW:
              self.cmd_.data = 'C_0'
              self.input_pub_.publish(self.cmd_)
+
+    # Example of mapping Button C to something (E.g. Watering)
+    def buttonCHandler(self, channel):
+        current_state = GPIO.input(FBPanel.BUTTON_B)
+        if current_state == GPIO.LOW:
+             self.cmd_.data = 'P_4'
+             self.input_pub_.publish(self.cmd_)
+
 
     def destroy_node(self):
         '''
@@ -222,6 +230,8 @@ def main(args = None):
     GPIO.add_event_detect(FBPanel.BUTTON_UNLOCK, GPIO.FALLING, callback=panel_node.reset_button_handler, bouncetime=200)
     GPIO.add_event_detect(FBPanel.BUTTON_A, GPIO.FALLING, callback=panel_node.buttonAHandler, bouncetime=1000)
     GPIO.add_event_detect(FBPanel.BUTTON_B, GPIO.FALLING, callback=panel_node.buttonBHandler, bouncetime=1000)
+    GPIO.add_event_detect(FBPanel.BUTTON_C, GPIO.FALLING, callback=panel_node.buttonCHandler, bouncetime=1000)
+    
 
     try:
         rclpy.spin(panel_node)
