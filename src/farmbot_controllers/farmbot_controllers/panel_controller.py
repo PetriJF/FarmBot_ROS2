@@ -191,14 +191,14 @@ class PanelController(Node):
             self.get_logger().info('RESET button pressed')
     
     # Example of mapping Button A to something (E.g. Homing)
-    def buttonAHandler(self):
+    def buttonAHandler(self, channel):
         current_state = GPIO.input(FBPanel.BUTTON_A)
         if current_state == GPIO.LOW:
              self.cmd_.data = 'H_0'
              self.input_pub_.publish(self.cmd_)
     
     # Example of mapping Button A to something (E.g. Homing)
-    def buttonBHandler(self):
+    def buttonBHandler(self, channel):
         current_state = GPIO.input(FBPanel.BUTTON_B)
         if current_state == GPIO.LOW:
              self.cmd_.data = 'C_0'
@@ -220,8 +220,8 @@ def main(args = None):
     # GPIO Button
     GPIO.add_event_detect(FBPanel.BUTTON_ESTOP, GPIO.FALLING, callback=panel_node.estop_button_handler, bouncetime=200)
     GPIO.add_event_detect(FBPanel.BUTTON_UNLOCK, GPIO.FALLING, callback=panel_node.reset_button_handler, bouncetime=200)
-    GPIO.add_event_detect(FBPanel.BUTTON_A, GPIO.FALLING, callback=panel_node.buttonAHandler, bouncetime=200)
-    GPIO.add_event_detect(FBPanel.BUTTON_B, GPIO.FALLING, callback=panel_node.buttonBHandler, bouncetime=200)
+    GPIO.add_event_detect(FBPanel.BUTTON_A, GPIO.FALLING, callback=panel_node.buttonAHandler, bouncetime=1000)
+    GPIO.add_event_detect(FBPanel.BUTTON_B, GPIO.FALLING, callback=panel_node.buttonBHandler, bouncetime=1000)
 
     try:
         rclpy.spin(panel_node)
