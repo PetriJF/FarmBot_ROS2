@@ -68,7 +68,7 @@ class PanelController(Node):
 
     ### Verifying user input for E_STOPS and RESETS
 
-    def command_callback(self, cmd = String):
+    def command_callback(self, cmd: String):
         if cmd.data == 'e':
             self.LED_client(FBPanel.ESTOP_LED, FBPanel.OFF)
             self.LED_client(FBPanel.UNLOCK_LED, FBPanel.FLASHING)
@@ -190,16 +190,19 @@ class PanelController(Node):
             self.priority_pub_.publish(self.cmd_)
             self.get_logger().info('RESET button pressed')
     
-    # Just for demonstration purposes
-    # def buttonAHandler(self, channel):
-    #     current_state = GPIO.input(FBPanel.BUTTON_A)
-    #     if current_state == GPIO.LOW:
-    #         self.LED_client(FBPanel.LED1, FBPanel.FLASHING)
-    #         self.LED_client(FBPanel.LED2, FBPanel.FLASHING)
-    #         self.LED_client(FBPanel.LED3, FBPanel.FLASHING)
-    #         self.LED_client(FBPanel.LED4, FBPanel.FLASHING)
-    #         #self.cmd_.data = 'A'
-    #         self.get_logger().info("Button A pressed")
+    # Example of mapping Button A to something (E.g. Homing)
+    def buttonAHandler(self):
+        current_state = GPIO.input(FBPanel.BUTTON_A)
+        if current_state == GPIO.LOW:
+             self.cmd_.data = 'H_0'
+             self.input_pub_.publish(self.cmd_)
+    
+    # Example of mapping Button A to something (E.g. Homing)
+    def buttonBHandler(self):
+        current_state = GPIO.input(FBPanel.BUTTON_B)
+        if current_state == GPIO.LOW:
+             self.cmd_.data = 'C_0'
+             self.input_pub_.publish(self.cmd_)
 
     def destroy_node(self):
         '''
@@ -217,7 +220,8 @@ def main(args = None):
     # GPIO Button
     GPIO.add_event_detect(FBPanel.BUTTON_ESTOP, GPIO.FALLING, callback=panel_node.estop_button_handler, bouncetime=200)
     GPIO.add_event_detect(FBPanel.BUTTON_UNLOCK, GPIO.FALLING, callback=panel_node.reset_button_handler, bouncetime=200)
-    #GPIO.add_event_detect(FBPanel.BUTTON_A, GPIO.FALLING, callback=panel_node.buttonAHandler, bouncetime=1000)
+    GPIO.add_event_detect(FBPanel.BUTTON_A, GPIO.FALLING, callback=panel_node.buttonAHandler, bouncetime=200)
+    GPIO.add_event_detect(FBPanel.BUTTON_B, GPIO.FALLING, callback=panel_node.buttonBHandler, bouncetime=200)
 
     try:
         rclpy.spin(panel_node)
@@ -226,7 +230,8 @@ def main(args = None):
     finally:
         GPIO.remove_event_detect(FBPanel.BUTTON_ESTOP)
         GPIO.remove_event_detect(FBPanel.BUTTON_UNLOCK)
-        #GPIO.remove_event_detect(FBPanel.BUTTON_A)
+        GPIO.remove_event_detect(FBPanel.BUTTON_A)
+        GPIO.remove_event_detect(FBPanel.BUTTON_B)
         panel_node.destroy_node()
         rclpy.shutdown()
 
