@@ -108,6 +108,15 @@ class Panorama:
         # Load the new image
         new_image = self.rgb_image_
         rotation_angle = self.config_data['total_rotation_angle']
+        
+        origin_location = self.config_data['image_bot_origin_location']
+        if origin_location == [1, 0]:
+            rotation_angle += 180
+        elif origin_location == [0, 0]:
+            rotation_angle -= 90
+        elif origin_location == [1, 1]:
+            rotation_angle += 90
+
         new_image = self.rotate_image(new_image, rotation_angle)
         map_path = os.path.join(self.config_directory_,'rgb_map.png')
         # Load or initialize the map (panorama) image 
@@ -116,6 +125,10 @@ class Panorama:
         map_image = cv2.imread(map_path, cv2.IMREAD_COLOR)  # Ensures map_image is read as RGB
         if new_image.shape[2] != 3 or map_image.shape[2] != 3:
             raise ValueError("Both images must be RGB.")
+
+        # Create mask for the new image
+        _, mask = cv2.threshold(cv2.cvtColor(new_image, cv2.COLOR_BGR2GRAY), 1, 255, cv2.THRESH_BINARY)
+        mask = cv2.merge((mask, mask, mask))
 
         # Calculate placement and cropping
         new_img_height, new_img_width = new_image.shape[:2]
@@ -133,9 +146,12 @@ class Panorama:
         new_end_x = new_img_width - (x + new_img_width - map_width) if (x + new_img_width) > map_width else new_img_width
         new_end_y = y if y < new_img_height else new_img_height
 
-        # Copy the overlapping area from new_image to map_image
-        if new_end_x > new_start_x and new_end_y > new_start_y:
-            map_image[start_y:end_y, start_x:end_x] = new_image[new_start_y:new_end_y, new_start_x:new_end_x]
+        # Copy the overlapping area from new_image to map_image using the mask
+        map_image[start_y:end_y, start_x:end_x] = np.where(mask[new_start_y:new_end_y, new_start_x:new_end_x], new_image[new_start_y:new_end_y, new_start_x:new_end_x], map_image[start_y:end_y, start_x:end_x])
+
+        # # Copy the overlapping area from new_image to map_image (LEGACY)
+        # if new_end_x > new_start_x and new_end_y > new_start_y:
+        #     map_image[start_y:end_y, start_x:end_x] = new_image[new_start_y:new_end_y, new_start_x:new_end_x]
 
         # Save the updated map image
         cv2.imwrite(map_path, map_image)
@@ -152,7 +168,7 @@ class Panorama:
         center = (width // 2, height // 2)
         
         # Perform the rotation
-        rotation_matrix = cv2.getRotationMatrix2D(center, -angle, 1.0)
+        rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
         rotated_image = cv2.warpAffine(image, rotation_matrix, (width, height))
 
         return rotated_image
