@@ -276,7 +276,7 @@ class FarmbotControl(Node):
             if future.result().cmd:
                 info = future.result().cmd.split(' ')
                 if info[0] == 'MAP':
-                    self.tools_.stitch_panorama_client(calib = False, update_map = True,
+                    self.tools_.stitch_panorama_client(calib = False, update_map = True, mosaic = False,
                                                        x = float(info[2]), y = float(info[4]),
                                                        z = float(info[6]))
         except Exception as e:
