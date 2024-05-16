@@ -55,8 +55,8 @@ def generate_launch_description():
         ),
         Node(
             package='camera_handler',
-            executable='standard_camera',
-            name='standard_camera',
+            executable='luxonis_camera',
+            name='luxonis_camera',
             output='screen'
         ),
         

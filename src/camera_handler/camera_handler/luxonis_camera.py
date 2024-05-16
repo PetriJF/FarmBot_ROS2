@@ -1,171 +1,258 @@
-#!/usr/bin/env python3
-
-# ROS2 Imports
 import rclpy
 from rclpy.node import Node
-from farmbot_interfaces.srv import StringRepReq
-from camera_handler.luxonis_publisher import CameraNode
-from camera_handler.panorama import Panorama
-from camera_handler.calib import CalibrateCamera
+from sensor_msgs.msg import Image
 from ament_index_python.packages import get_package_share_directory
+from cv_bridge import CvBridge
+import yaml
 import os
-import math
+import cv2
+import numpy as np
+import depthai as dai
+import threading
 
-class LuxonisCameraController(Node):
-    # Node contructor
+class LuxonisCameraNode(Node):
+    '''
+    Camera module that reads the Luxonis camera packets and publishes the RGB and 
+    depth frames on their respective topics
+    '''
     def __init__(self):
-        super().__init__("LuxonisCameraController")
-        # Loading the panorama and calibration modules
-        self.panorama_ = Panorama(self)
-        self.calib_ = CalibrateCamera(self)
+        '''
+        Module constructor extendint the node instance
+        '''
+        super().__init__('LuxonisCamera')
 
-        # Sequencing Service Server
-        self.panorama_sequencing_server_ = self.create_service(StringRepReq, 'panorama_sequence', self.luxonis_panorama_sequence_server)
+        self.bridge = CvBridge()# Bridge to convert between ROS and OpenCV images
+        self.load_config()      # Load configuration from YAML file
+        self.setup_camera()     # Initialize and configure the DepthAI camera
         
-        # Sequencing Service Server
-        self.panorama_server_ = self.create_service(StringRepReq, 'form_panorama', self.stitch_image_server)
-        self.take_picture_ = CameraNode(self)
+        # Initialize publishers for RGB and depth images
+        self.rgb_publisher = self.create_publisher(Image, 'rgb_img', 10)
+        self.depth_publisher = self.create_publisher(Image, 'depth_img', 10)
+        
+        self.rgb_image_ = None
+        self.depth_image_ = None
 
-        # Camera Calibration Server
-        self.calibration_server_ = self.create_service(StringRepReq, 'calibrate_luxonis', self.luxonis_calibration)
+        # Start the packet processing loop in a separate thread
+        self.should_continue = True  # Flag to control the execution of the thread
+        self.processing_thread = threading.Thread(target=self.packet_processing_loop)
+        self.processing_thread.daemon = True  # Ensures that the thread will close when the main program exits
+        self.processing_thread.start()
 
-        # Log the initialization
-        self.get_logger().info("Luxonis Camera Handler Initialized..")
-
-    def stitch_image_server(self, request, response):
-        '''
-        Service server that handles the luxonis camera node.
-        Primary task is taking a picture of the map and stitching it accordingly
-        '''
-        # Assuming request success
-        response.data = 'SUCCESS'
-        # Getting the command information
-        msg = request.data.split(' ')
-
-        # Command information not set
-        if not request.data:
-            self.get_logger().warn('You need to parse panorama command! Request ignored')
-            response.data = 'FAILED'
-            return response
-
-        # Requesting the camera to laod the calibration configuration
-        if request.data == 'CALIB':
-            self.take_picture_.load_config()
-            return response
-        elif request.data.split(' ')[0] == 'MAP':
-            info = request.data.split(' ')
-            self.panorama_.map_x = float(info[1])
-            self.panorama_.map_y = float(info[2])
-            self.get_logger().info(f'Updated camera map dimensions to {self.panorama_.map_x} and {self.panorama_.map_y}')
-        elif request.data.split(' ')[0] == 'MOSAIC':
-            # Save image for mosaic
-            # Sequencing constructed successfully and server returns it
-            self.panorama_.save_image_for_mosaic(num = int(msg[1]))
-            self.get_logger().info('Picture saved for mosaic successfully')
-        elif len(msg) == 3: # Ensuring the command information is complete
-            if float(msg[2]) != 0.0:    # Ensuring the z-axis is homed
-                self.get_logger().warn('Z Axis is not in home position for the panorama stitching! Panorama command cancelled')
-                response.data = 'FAILED'
-                return response
-            # Stitch image to panorama
-            # Sequencing constructed successfully and server returns it
-            self.panorama_.stitch_image_onto_map(x = float(msg[0]), y = float(msg[1]))
-            self.get_logger().info('Picture stitched to the panorama successfully')
-        else:
-            self.get_logger.warn('Command not recognized! Request ignored')
-            response.data = 'FAILED'
-            return response
-
-        return response
+        self.get_logger().info('Luxonis Camera Node initialized...')
     
-    def luxonis_calibration(self, request, response):
+    def setup_camera(self):
         '''
-        Service server that handles the luxonis camera calibration.
-        It forms a command sequence when the 'GET' request is received
-        and then handles subsequent commands that come from the sequence
-        manager.
+        Sets the camera links and pipeline
         '''
-        # Retrieve command information
-        info = request.data.split(' ')
-
-        if request.data == 'GET':   # Get calibration sequence
-            response.data = self.calib_.get_sequence()
-            self.get_logger().info('Camera Calibration command sequence formed')
-        elif len(info) != 5:        # Check if calibration command information is complete
-            self.get_logger().warn('Parsed calibration command incomplete. Command ignored!')
-            response.data = 'FAILED'
-        else:                       # Take picture and use it for calibration
-            response.data = self.calib_.calibrate_camera(run = int(info[1]), x = float(info[2]), y = float(info[3]), z = float(info[4]))
+        # Configure the DepthAI pipeline with stereo and RGB camera nodes
+        self.pipeline = dai.Pipeline()
+        stereo, mono_left, mono_right, cam_rgb = self.configure_depthai_components()
         
-        # Load the new config into the camera node
-        if response.data == 'COMPLETE':
-            self.take_picture_.load_config()
+        # Link camera outputs to XLinkOut nodes for transmission to host
+        mono_left.out.link(stereo.left)
+        mono_right.out.link(stereo.right)
+        cam_rgb.preview.link(self.xout_rgb.input)
+        stereo.disparity.link(self.xout_stereo.input)
+        
+        self.device = dai.Device(self.pipeline)  # Connect to the DepthAI device
 
-        # Return outcome
-        return response
-
-    def luxonis_panorama_sequence_server(self, request, response):
+    def load_config(self):
         '''
-        Service server that creates a sequence for making taking 
-        pictures at multiple positions through the farmbot working
-        area and stitching them into a large panorama.
+        Loads the camera configuration from the calibration file
         '''
-        seq = ''
-        
-        # In case settings are needed
-        
-        x_inc, y_inc = self.panorama_.get_panorama_increments()
-        self.get_logger().info(f'Panorama increments {x_inc}, {y_inc}')
-        
-        if self.panorama_.map_x != -1.0 and self.panorama_.map_y != -1.0:
-            self.get_logger().info(f'Panorama max_x: {self.panorama_.map_x}, map_y: {self.panorama_.map_y}')
-            x_pos_count = math.ceil(self.panorama_.map_x / x_inc)
-            y_pos_count = math.ceil(self.panorama_.map_y / y_inc)
+        # Load configuration from YAML file
+        self.config_directory_ = os.path.join(get_package_share_directory('camera_handler'), 'config')
+        config_file = 'luxonis_camera_config.yaml'
+        self.config_data = self.load_from_yaml(self.config_directory_, config_file)
+        # Extract relevant configuration values
+        self.HOST = self.config_data['server_constants']['HOST']
+        self.PORT = self.config_data['server_constants']['PORT']
+        self.DEPTH_MIN_VAL = self.config_data['camera_constants']['DEPTH_MIN_VAL']
+        self.DEPTH_MAX_VAL = self.config_data['camera_constants']['DEPTH_MAX_VAL']
+        self.FOCAL_LENGTH_PX = self.config_data['camera_constants']['FOCAL_LENGTH_PX']
+        self.BASELINE = self.config_data['camera_constants']['BASELINE']
 
-            x_inc = self.panorama_.map_x / x_pos_count
-            y_inc = self.panorama_.map_y / y_pos_count
-            num = int(1)
-            for y_pos in range(y_pos_count + 1):
-                # Determine the range for x_pos based on the current row (y_pos)
-                if y_pos % 2 == 0:
-                    # Even row: left to right
-                    x_range = range(x_pos_count + 1)
-                else:
-                    # Odd row: right to left
-                    x_range = range(x_pos_count, -1, -1)
+        self.WIDTH_PIXEL_COUNT = int(self.config_data['camera_calibration']['WIDTH_PIXEL_COUNT'])
+        self.HEIGHT_PIXEL_COUNT = int(self.config_data['camera_calibration']['HEIGHT_PIXEL_COUNT'])
+
+        self.get_logger().info('Updated camera settings based on calibration')
+
+    def packet_processing_loop(self):
+        '''
+        Loop used for processing packets from the camera
+        '''
+        while self.should_continue:
+            # Fetch packets from the device's output queues
+            latestPacket = {"rgb": None, "stereo": None}
+            queueEvents = self.device.getQueueEvents(("rgb", "stereo"))
+            for queueName in queueEvents:
+                packets = self.device.getOutputQueue(queueName).tryGetAll()
+                if len(packets) > 0:
+                    latestPacket[queueName] = packets[-1]
+
+            # Process the latest available packets
+            if latestPacket["rgb"] is not None:
+                self.rgb_image_ = latestPacket["rgb"].getCvFrame()
+                self.publish_images(rgb_frame=self.rgb_image_)
+            if latestPacket["stereo"] is not None:
+                self.depth_image_ = self.process_depth_frame(latestPacket["stereo"].getFrame())
+                self.publish_images(depth_frame=self.depth_image_)
                 
-                for x_pos in x_range:
-                    x = int(x_pos * x_inc)
-                    y = int(y_pos * y_inc)
-                    seq += f"CC_P\n{x} {y} 0.0\n"
-                    # Conditionally add either a mosaic or panoramic view command based on request.data
-                    if request.data == 'MOSAIC':
-                        seq += f"VC_P\nMOSAIC {num:03}\n"  # Using zero-padded numbering
-                    else:
-                        seq += 'VC_P\nPAN\n'
-                    num += 1
-                    
-            self.get_logger().info('Panorama sequence formed successfully')
-        else:
-            self.get_logger().warn('Could not form panorama sequence')
+    def stop_processing(self):  # Gracefully stop the processing thread
+        self.should_continue = False  # Signal the thread to exit
+        if self.processing_thread.is_alive():
+            self.processing_thread.join()  # Wait for the thread to finish
 
+    def __del__(self):  # Consider removing if you opt for explicit shutdown calls
+        self.stop_processing()  # Ensure resources are cleaned up
 
-        response.data = seq
+    def configure_depthai_components(self):
+        '''
+        Configuration for the DepthAI components
+        '''
+        # Create and configure DepthAI components (stereo depth, mono cameras, RGB camera)
+        stereo = self.pipeline.create(dai.node.StereoDepth)
+        mono_left = self.pipeline.create(dai.node.MonoCamera)
+        mono_right = self.pipeline.create(dai.node.MonoCamera)
+        cam_rgb = self.pipeline.create(dai.node.ColorCamera)
+        
+        # Mono camera settings
+        mono_left.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
+        mono_left.setBoardSocket(dai.CameraBoardSocket.LEFT)
+        mono_right.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
+        mono_right.setBoardSocket(dai.CameraBoardSocket.RIGHT)
+        
+        # RGB camera settings
+        cam_rgb.setBoardSocket(dai.CameraBoardSocket.RGB)
+        cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
+        cam_rgb.setPreviewSize(self.WIDTH_PIXEL_COUNT, self.HEIGHT_PIXEL_COUNT)
+        cam_rgb.setInterleaved(False)
+        cam_rgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
+        cam_rgb.setFps(40)
+        
+        # Create XLinkOut nodes for RGB and stereo depth data
+        self.xout_rgb = self.pipeline.create(dai.node.XLinkOut)
+        self.xout_rgb.setStreamName("rgb")
+        self.xout_stereo = self.pipeline.create(dai.node.XLinkOut)
+        self.xout_stereo.setStreamName("stereo")
+        
+        # Configure stereo depth settings based on YAML configuration
+        self.configure_stereo_depth(stereo)
+        
+        return stereo, mono_left, mono_right, cam_rgb
 
-        return response
+    def configure_stereo_depth(self, stereo):
+        '''
+        Apply stereo depth settings from configuration amd disparity post-processing
+        '''
+        # Apply stereo depth settings from configuration
+        stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
+        stereo.initialConfig.setMedianFilter(dai.MedianFilter.KERNEL_7x7)
+        stereo.setLeftRightCheck(self.config_data['camera_constants']['lr_check'])
+        stereo.setExtendedDisparity(self.config_data['camera_constants']['extended_disparity'])
+        stereo.setSubpixel(self.config_data['camera_constants']['subpixel'])
+        
+        # Additional disparity post-processing
+        config = stereo.initialConfig.get()
+        config.postProcessing.temporalFilter.enable = True
+        config.postProcessing.spatialFilter.enable = True
+        stereo.initialConfig.set(config)
 
-# Main Function called on the initialization of the ROS2 Node
-def main(args = None):
-    rclpy.init(args = args)
+    def publish_images(self, rgb_frame = None, depth_frame = None):
+        '''
+        Publish RGB and depth frames if available
+        '''
+        if rgb_frame is not None:
+            rgb_msg = self.bridge.cv2_to_imgmsg(rgb_frame, encoding='bgr8')
+            self.rgb_publisher.publish(rgb_msg)
 
-    luxonis_camera = LuxonisCameraController()
+        if depth_frame is not None:
+            depth_msg = self.bridge.cv2_to_imgmsg(depth_frame, encoding='mono8')
+            self.depth_publisher.publish(depth_msg)
+
+    # def run(self):
+    #     # Retrieve and publish RGB and depth frames from the camera
+    #     latestPacket = {"rgb": None, "stereo": None}
+    #     queueEvents = self.device.getQueueEvents(("rgb", "stereo"))
+    #     for queueName in queueEvents:
+    #         packets = self.device.getOutputQueue(queueName).tryGetAll()
+    #         if len(packets) > 0:
+    #             latestPacket[queueName] = packets[-1]
+
+    #     if latestPacket["rgb"] is not None:
+    #         self.rgb_image_ = latestPacket["rgb"].getCvFrame()
+    #         #self.rgb_image_ = cv2.rotate(self.rgb_image_, cv2.ROTATE_180)
+    #         #self.rgb_image_ = cv2.flip(self.rgb_image_, 1)
+    #         self.publish_images(rgb_frame=self.rgb_image_)
+    #         self.save_images(rgb=True)
+    #     if latestPacket["stereo"] is not None:
+    #         self.depth_image_ = self.process_depth_frame(latestPacket["stereo"].getFrame())
+    #         #self.depth_image_ = cv2.rotate(self.depth_image_, cv2.ROTATE_180)
+    #         #self.depth_image_ = cv2.flip(self.depth_image_, 1)
+    #         self.publish_images(depth_frame=self.depth_image_ )
+    #         self.save_images(depth=True)
+        
+
+    def process_depth_frame(self, disparity_frame):
+        '''
+        Process disparity frame to generate a depth frame for publishing
+        '''
+        disparity_frame[disparity_frame == 0] = 0.01  # Handle zero disparity
+        depth_frame = (self.FOCAL_LENGTH_PX * self.BASELINE) / disparity_frame
+        depth_frame[(depth_frame >= self.DEPTH_MAX_VAL) | (depth_frame <= self.DEPTH_MIN_VAL)] = 0
+        scaled_frame = np.clip(((depth_frame - 0) / (self.DEPTH_MAX_VAL - 0) * 255.0), 0, 255).astype(np.uint8)
+        return scaled_frame
+
+    def load_from_yaml(self, path, file_name):
+        '''
+        Loads the specified yaml file from the specified path and returns a 
+        the dictionary withign the file
+        '''
+        full_path = os.path.join(path, file_name)
+        if not os.path.exists(full_path):
+            self.get_logger().warn(f"File path is invalid: {full_path}")
+            return None
+        
+        with open(full_path, 'r') as yaml_file:
+            try:
+                return yaml.safe_load(yaml_file)
+            except yaml.YAMLError as e:
+                self.get_logger().warn(f"Error reading YAML file: {e}")
+                return None
+            
+    # def save_images(self):
+    #     if self.rgb_image_ is not None and self.depth_image_ is not None:
+    #         cv2.imwrite(os.path.join(self.config_directory_,"saved_rgb_image.png"), self.rgb_image_)
+    #         self.get_logger().info('RGB image saved successfully.')
+    #         cv2.imwrite(os.path.join(self.config_directory_,"saved_depth_image.png"), self.depth_image_)
+    #         self.get_logger().info('Depth image saved successfully.')
+    #     else:
+    #         self.get_logger().info('No images to save.')
+            
+    # def save_images(self, rgb = False, depth = False):
+    #     if self.rgb_image_ is not None and rgb == True: 
+    #         cv2.imwrite(os.path.join(self.config_directory_,"saved_rgb_image.png"), self.rgb_image_)
+    #         self.get_logger().info('RGB image saved successfully.')
+    #     elif self.depth_image_ is not None and depth == True:
+    #         cv2.imwrite(os.path.join(self.config_directory_,"saved_depth_image.png"), self.depth_image_)
+    #         self.get_logger().info('Depth image saved successfully.')
+    #     else:
+    #         self.get_logger().info('No images to save.')
+    
+
+def main(args=None):
+    rclpy.init(args=args)
+    camera_node = LuxonisCameraNode()
     
     try:
-        rclpy.spin(luxonis_camera)
+        rclpy.spin(camera_node)
     except KeyboardInterrupt:
         pass
+    finally:        
+        camera_node.stop_processing()  # Ensure the processing thread is stopped gracefully
+        camera_node.destroy_node()
+        rclpy.shutdown()
 
-    rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

@@ -23,7 +23,7 @@ class Panorama:
         self.config_directory_ = os.path.join(get_package_share_directory('camera_handler'), 'config')
         self.calib_file_ = 'camera_calibration.yaml'
         
-        self.camera_info_file_ = 'camera_config.yaml'
+        self.camera_info_file_ = 'luxonis_camera_config.yaml'
         self.camera_config_ = self.load_from_yaml(self.config_directory_, self.camera_info_file_)
 
         self.camera_width_px_ = int(self.camera_config_['camera_calibration']['WIDTH_PIXEL_COUNT'])

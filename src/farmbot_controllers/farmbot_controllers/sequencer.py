@@ -274,7 +274,7 @@ class Sequencer:
             return
 
         # Initializing the client and wait for map server confirmation
-        client = self.node_.create_client(StringRepReq, 'calibrate_luxonis')
+        client = self.node_.create_client(StringRepReq, 'camera_calibration')
         while not client.wait_for_service(1.0):
             self.node_.get_logger().warn('Waiting for Camera Calibration Server...')
         
