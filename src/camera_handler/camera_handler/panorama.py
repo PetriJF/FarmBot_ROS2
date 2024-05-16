@@ -23,6 +23,12 @@ class Panorama:
         self.config_directory_ = os.path.join(get_package_share_directory('camera_handler'), 'config')
         self.calib_file_ = 'camera_calibration.yaml'
         
+        self.camera_info_file_ = 'camera_config.yaml'
+        self.camera_config_ = self.load_from_yaml(self.config_directory_, self.camera_info_file_)
+
+        self.camera_width_px_ = int(self.camera_config_['camera_calibration']['WIDTH_PIXEL_COUNT'])
+        self.camera_height_px_ = int(self.camera_config_['camera_calibration']['HEIGHT_PIXEL_COUNT'])
+
         self.bridge = CvBridge()
         self.rgb_image_ = None
         self.depth_image_ = None
@@ -93,14 +99,14 @@ class Panorama:
             map_instance = self.load_from_yaml(map_directory_, map_file)
             if map_instance:
                 # Get map dimensions
-                self.map_x = map_instance['map_reference']['x_len']
-                self.map_y = map_instance['map_reference']['y_len']
+                self.map_x = float(map_instance['map_reference']['x_len'])
+                self.map_y = float(map_instance['map_reference']['y_len'])
 
                 self.node_.get_logger().info('Loading map dimensions from active map file')
         
-        # Set the map size relative to pixels
-        self.map_size_x_px = int(self.map_x / self.config_data['coord_scale'])
-        self.map_size_y_px = int(self.map_y / self.config_data['coord_scale'])
+        # Set the map size relative to pixels. Adding the camera width in order to have half a camera frame on each edge
+        self.map_size_x_px = int(self.map_x // float(self.config_data['coord_scale'])) + self.camera_width_px_
+        self.map_size_y_px = int(self.map_y // float(self.config_data['coord_scale'])) + self.camera_height_px_
         
         x = int(x / self.config_data['coord_scale'])
         y = self.map_size_y_px - int(y/self.config_data['coord_scale'])
@@ -108,6 +114,20 @@ class Panorama:
         # Load the new image
         new_image = self.rgb_image_
         rotation_angle = self.config_data['total_rotation_angle']
+        
+        origin_location = self.config_data['image_bot_origin_location']
+        if origin_location == [1, 0]:
+            rotation_angle += 180
+        elif origin_location == [0, 0]:
+            rotation_angle -= 90
+        elif origin_location == [1, 1]:
+            rotation_angle += 90
+
+        # Attempt to fix artifacts around edges
+        # Padding the new image before rotation (to fix interpolation artifacts when rotating)
+        # pad_size = 10  # Adjust as needed
+        # new_image = cv2.copyMakeBorder(new_image, pad_size, pad_size, pad_size, pad_size, cv2.BORDER_CONSTANT, value=(0, 0, 0))
+
         new_image = self.rotate_image(new_image, rotation_angle)
         map_path = os.path.join(self.config_directory_,'rgb_map.png')
         # Load or initialize the map (panorama) image 
@@ -116,6 +136,10 @@ class Panorama:
         map_image = cv2.imread(map_path, cv2.IMREAD_COLOR)  # Ensures map_image is read as RGB
         if new_image.shape[2] != 3 or map_image.shape[2] != 3:
             raise ValueError("Both images must be RGB.")
+
+        # Create mask for the new image
+        _, mask = cv2.threshold(cv2.cvtColor(new_image, cv2.COLOR_BGR2GRAY), 1, 255, cv2.THRESH_BINARY)
+        mask = cv2.merge((mask, mask, mask))
 
         # Calculate placement and cropping
         new_img_height, new_img_width = new_image.shape[:2]
@@ -133,9 +157,26 @@ class Panorama:
         new_end_x = new_img_width - (x + new_img_width - map_width) if (x + new_img_width) > map_width else new_img_width
         new_end_y = y if y < new_img_height else new_img_height
 
-        # Copy the overlapping area from new_image to map_image
-        if new_end_x > new_start_x and new_end_y > new_start_y:
-            map_image[start_y:end_y, start_x:end_x] = new_image[new_start_y:new_end_y, new_start_x:new_end_x]
+        # Attempt to fix artifacts around edges
+        # new_start_x = start_x - x + pad_size if x < 0 else pad_size
+        # new_start_y = pad_size if y - new_img_height < 0 else new_img_height - (y - start_y) + pad_size
+        # new_end_x = new_img_width - (x + new_img_width - map_width) + pad_size if (x + new_img_width) > map_width else new_img_width + pad_size
+        # new_end_y = y + pad_size if y < new_img_height else new_img_height + pad_size
+
+        # Copy the overlapping area from new_image to map_image using the mask
+        map_image[start_y:end_y, start_x:end_x] = np.where(mask[new_start_y:new_end_y, new_start_x:new_end_x],
+                                                           new_image[new_start_y:new_end_y, new_start_x:new_end_x],
+                                                           map_image[start_y:end_y, start_x:end_x])
+
+        # Attempt to fix artifacts around edges
+        # map_image[start_y+pad_size//2 : end_y-pad_size//2,
+        #           start_x+pad_size//2 : end_x-pad_size//2] = np.where(mask[new_start_y:new_end_y, new_start_x:new_end_x], 
+        #                                                               new_image[new_start_y:new_end_y, new_start_x:new_end_x], 
+        #                                                               map_image[start_y+pad_size//2 : end_y-pad_size//2, start_x+pad_size//2 : end_x-pad_size//2])
+
+        # # Copy the overlapping area from new_image to map_image (LEGACY)
+        # if new_end_x > new_start_x and new_end_y > new_start_y:
+        #     map_image[start_y:end_y, start_x:end_x] = new_image[new_start_y:new_end_y, new_start_x:new_end_x]
 
         # Save the updated map image
         cv2.imwrite(map_path, map_image)
@@ -152,7 +193,7 @@ class Panorama:
         center = (width // 2, height // 2)
         
         # Perform the rotation
-        rotation_matrix = cv2.getRotationMatrix2D(center, -angle, 1.0)
+        rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
         rotated_image = cv2.warpAffine(image, rotation_matrix, (width, height))
 
         return rotated_image

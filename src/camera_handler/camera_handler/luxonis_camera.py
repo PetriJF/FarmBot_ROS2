@@ -114,13 +114,9 @@ class LuxonisCameraController(Node):
         
         # In case settings are needed
         
-
         x_inc, y_inc = self.panorama_.get_panorama_increments()
-        x_inc = x_inc / 4
-        y_inc = y_inc / 4
         self.get_logger().info(f'Panorama increments {x_inc}, {y_inc}')
         
-                
         if self.panorama_.map_x != -1.0 and self.panorama_.map_y != -1.0:
             self.get_logger().info(f'Panorama max_x: {self.panorama_.map_x}, map_y: {self.panorama_.map_y}')
             x_pos_count = math.ceil(self.panorama_.map_x / x_inc)
@@ -129,14 +125,14 @@ class LuxonisCameraController(Node):
             x_inc = self.panorama_.map_x / x_pos_count
             y_inc = self.panorama_.map_y / y_pos_count
             num = int(1)
-            for y_pos in range(y_pos_count):
+            for y_pos in range(y_pos_count + 1):
                 # Determine the range for x_pos based on the current row (y_pos)
                 if y_pos % 2 == 0:
                     # Even row: left to right
-                    x_range = range(x_pos_count)
+                    x_range = range(x_pos_count + 1)
                 else:
                     # Odd row: right to left
-                    x_range = range(x_pos_count - 1, -1, -1)
+                    x_range = range(x_pos_count, -1, -1)
                 
                 for x_pos in x_range:
                     x = int(x_pos * x_inc)

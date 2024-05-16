@@ -168,7 +168,7 @@ class FarmbotControl(Node):
             case 'I_0': # Calibrate Camera
                 self.tools_.cam_calib_client(cmd = 'GET')
             case 'I_1': # Stitch panorama at current position
-                self.tools_.stitch_panorama_client(calib = False, update_map = False,
+                self.tools_.stitch_panorama_client(calib = False, update_map = False, mosaic = False,
                                                     x = self.cur_x_, y = self.cur_y_,
                                                     z = self.cur_z_)
             case 'I_2':
@@ -276,7 +276,7 @@ class FarmbotControl(Node):
             if future.result().cmd:
                 info = future.result().cmd.split(' ')
                 if info[0] == 'MAP':
-                    self.tools_.stitch_panorama_client(calib = False, update_map = True,
+                    self.tools_.stitch_panorama_client(calib = False, update_map = True, mosaic = False,
                                                        x = float(info[2]), y = float(info[4]),
                                                        z = float(info[6]))
         except Exception as e:
