@@ -467,4 +467,5 @@ class CalibrateCamera:
         Get the panorama increments for the x and y axis for minimizing 
         the amount of images needed to stitch the whole map into a panorama
         '''
-        return 300, 250 # x, y
+        # Move in half a camera width/height sections
+        return self.center[0], self.center[1] # x, y

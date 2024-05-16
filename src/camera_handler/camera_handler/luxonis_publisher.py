@@ -70,6 +70,9 @@ class CameraNode:
         self.FOCAL_LENGTH_PX = self.config_data['camera_constants']['FOCAL_LENGTH_PX']
         self.BASELINE = self.config_data['camera_constants']['BASELINE']
 
+        self.WIDTH_PIXEL_COUNT = int(self.config_data['camera_calibration']['WIDTH_PIXEL_COUNT'])
+        self.HEIGHT_PIXEL_COUNT = int(self.config_data['camera_calibration']['HEIGHT_PIXEL_COUNT'])
+
         self.node_.get_logger().info('Updated camera settings based on calibration')
 
     def packet_processing_loop(self):
@@ -120,7 +123,7 @@ class CameraNode:
         # RGB camera settings
         cam_rgb.setBoardSocket(dai.CameraBoardSocket.RGB)
         cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
-        cam_rgb.setPreviewSize(416,416)
+        cam_rgb.setPreviewSize(self.WIDTH_PIXEL_COUNT, self.HEIGHT_PIXEL_COUNT)
         cam_rgb.setInterleaved(False)
         cam_rgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
         cam_rgb.setFps(40)
