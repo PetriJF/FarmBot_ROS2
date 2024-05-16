@@ -168,7 +168,7 @@ class FarmbotControl(Node):
             case 'I_0': # Calibrate Camera
                 self.tools_.cam_calib_client(cmd = 'GET')
             case 'I_1': # Stitch panorama at current position
-                self.tools_.stitch_panorama_client(calib = False, update_map = False,
+                self.tools_.stitch_panorama_client(calib = False, update_map = False, mosaic = False,
                                                     x = self.cur_x_, y = self.cur_y_,
                                                     z = self.cur_z_)
             case 'I_2':
