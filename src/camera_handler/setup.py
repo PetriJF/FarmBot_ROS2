@@ -10,7 +10,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        (os.path.join('share', package_name, 'config'), [os.path.join(package_name, 'config', 'camera_config.yaml')]),
+        (os.path.join('share', package_name, 'config'), [os.path.join(package_name, 'config', 'luxonis_camera_config.yaml')]),
 
     ],
     install_requires=['setuptools'],
@@ -22,7 +22,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'luxonis_node = camera_handler.luxonis_camera:main',
+            'camera_controller = camera_handler.camera_controller:main',
+            'luxonis_camera = camera_handler.luxonis_camera:main',
+            'standard_camera = camera_handler.standard_camera:main',
         ],
     },
 )
