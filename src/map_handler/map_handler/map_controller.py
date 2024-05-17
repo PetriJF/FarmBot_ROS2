@@ -148,6 +148,7 @@ class MapController(Node):
         self.plant_ref_['plant_details']['plant_radius'] = exclusion_radius
         self.plant_ref_['plant_details']['canopy_radius'] = canopy_radius
         self.plant_ref_['plant_details']['max_height'] = max_z
+        self.plant_ref_['plant_details']['soil_moisture'] = 0.0
         self.plant_ref_['status']['growth_stage'] = growth_stage
 
         index = self.map_instance_['plant_details']['plant_count'] + 1
