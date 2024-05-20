@@ -39,12 +39,15 @@ class MapController(Node):
         tray_16_ref_file = '16_seed_tray.yaml'
         reference_plant_file_ = 'plant_reference.yaml'
         reference_map_file_ = 'map_references.yaml'
+        watering_guide_file_ = 'watering_guide.yaml'
 
         # Loading the map instance from memory
         self.map_instance_ = self.retrieve_map(directory = self.directory_,
                                                file_name1 = self.active_map_file_,
                                                file_name2 = reference_map_file_)
         
+        self.water_guide_instance_ = self.load_from_yaml(self.directory_, watering_guide_file_)
+
         # Loading the tool exhanging module and the tool command object
         self.tool_exchanger_ = ToolExchanger(node = self, 
                                              map_max_x = self.map_instance_['map_reference']['x_len'],
@@ -305,9 +308,12 @@ class MapController(Node):
             response.data = self.seed_plants()
             return response
         elif request.data == 'P_4':
-            response.data = self.water_plants()
+            response.data = self.water_plants(rigid = True)
             return response
-        elif request.data == 'P_5':
+        elif request.data == 'P_5': # Using moisture sensor reading
+            response.data = self.water_plants(rigid = False)
+            return response
+        elif request.data == 'P_9':
             response.data = self.check_moisture()
             return response
 
@@ -360,7 +366,7 @@ class MapController(Node):
 
         # Return home
         sequence += f'CC_P_5\n'
-        sequence += f'{0.0} {0.0} {0.0}\n'
+        sequence += f'{0.0} {0.0} {0.0}'
 
         return sequence
 
@@ -416,17 +422,35 @@ class MapController(Node):
         # If no valid position is found, return None
         return None
 
-    def water_plants(self):
+    def water_plants(self, rigid = False):
         '''
         Creates the sequence for watering all the plants by appending the sequences
         for watering each individual plant
         '''
+        # Setting the watering thresholds
+        DRY_TRESHOLD_MAX = 350
+        AVERAGE_THRESHOLD_MAX = 500
+        WET_THRESHOLD_MAX = 650
+
+        # Helper function that returns the pulse count based on sensor reading
+        def map_moisture_reading(reading: int, plant_name: str) -> int:
+            if reading <= DRY_TRESHOLD_MAX:
+                return self.water_guide_instance_[plant_name]['dry']
+            if reading <= AVERAGE_THRESHOLD_MAX:
+                return self.water_guide_instance_[plant_name]['average']
+            if reading <= WET_THRESHOLD_MAX:
+                return self.water_guide_instance_[plant_name]['wet']
+            # If it gets here it means that it is too wet and therefore no watering happens
+            return 0
+        
         cmd_sequence = ''
         plants = self.map_instance_['plant_details']['plants']
         for plant_index in plants:
             plant = plants[plant_index]
             
-            water_pulses = int(plant['plant_details']['water_quantity'])
+            water_pulses = (int(plant['plant_details']['water_quantity']) if rigid else
+                                                            map_moisture_reading(reading = int(plant['plant_details']['soil_moisture']),
+                                                                                 plant_name = plant['identifiers']['plant_name']))
 
             cmd_sequence += self.water_plant(plant, water_pulses)
 
@@ -448,9 +472,9 @@ class MapController(Node):
         plant_y = plant['position']['y']
         plant_z = plant['position']['z']
 
-        cmd = f"CC_P_{plant['identifiers']['index']}_4\n"
+        cmd = f"CC_P_4/5_{plant['identifiers']['index']}\n"
         # go to seed location
-        cmd += f"{plant_x} {plant_y} {-self.safe_z_increment_}\n"
+        cmd += f"{plant_x} {plant_y} {0.0}\n"
         # Turn on water pump pump
         cmd += f"DC_P_{plant['identifiers']['index']}_4\n"
         for i in range(pulses):

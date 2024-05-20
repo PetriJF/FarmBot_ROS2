@@ -49,11 +49,12 @@ Commands used to manage the plants that are loaded onto the farmbot.
 
 | Code | Subcodes                                 | Description                                                                    |
 | ---- | ---------------------------------------- | ------------------------------------------------------------------------------ |
-| P_1  | x y z exl_r can_r water max_z name stage | Adds a plant to a position with personalized information. **x, y, z** represent the position of the plant, **exl_r** represents the exclusion radius, **can_r** represents the canopy radius, **water** represents the water quantity, **name** represents the plant's name and **stage** represents the growth stage the plant is currently at. E.g. *P_1 100.0 200.0 -290.0, 50.0 30.0 6 Tomato Planning*                                                                                               |
+| P_1  | x y z exl_r can_r water max_z name stage | Adds a plant to a position with personalized information. **x, y, z** represent the position of the plant, **exl_r** represents the exclusion radius, **can_r** represents the canopy radius, **water** represents the water quantity, **name** represents the plant's name and **stage** represents the growth stage the plant is currently at. E.g. *P_1 100.0 200.0 -290.0, 50.0 30.0 6 Tomato Planning*                                                                                       |
 | P_2  | index                                    | Removes the plant with the parsed **index**. E.g. *P_2 3*                      |
 | P_3  |                                          | Seed all the plants that are in the "Planning" growth stage.                   |
-| P_4  |                                          | Water all the plants                                                           |
-| P_5  |                                          | Check the moisture levels around all the plants                                |
+| P_4  |                                          | Water all the plants regardless of moisture levels (amount set in config)      |
+| P_5  |                                          | Water all the plants based on moisture levels                                  |
+| P_9  |                                          | Check the moisture levels around all the plants                                |
 
 # Device Commands
 
