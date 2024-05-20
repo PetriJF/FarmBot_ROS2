@@ -1,0 +1,16 @@
+Tomato:
+  dry: 3
+  average: 2
+  wet: 1
+Marigold:
+  dry: 1
+  average: 1
+  wet: 0
+Basil:
+  dry: 3
+  average: 2
+  wet: 1
+Radish:
+  dry: 3
+  average: 2
+  wet: 1
