@@ -172,7 +172,8 @@ class Sequencer:
                 self.wait_for_request_.wait_for = -1
                 self.wait_for_request_.index = -1
 
-                
+            if self.sequence_[0] == '':
+                self.sequence_.pop(0)
 
             # Move the gantry to the parsed coordinates
             if self.command_type_ == 'CC':
