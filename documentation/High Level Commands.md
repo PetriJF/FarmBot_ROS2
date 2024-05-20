@@ -52,7 +52,8 @@ Commands used to manage the plants that are loaded onto the farmbot.
 | P_1  | x y z exl_r can_r water max_z name stage | Adds a plant to a position with personalized information. **x, y, z** represent the position of the plant, **exl_r** represents the exclusion radius, **can_r** represents the canopy radius, **water** represents the water quantity, **name** represents the plant's name and **stage** represents the growth stage the plant is currently at. E.g. *P_1 100.0 200.0 -290.0, 50.0 30.0 6 Tomato Planning* |
 | P_2  | index                                    | Removes the plant with the parsed **index**. E.g. *P_2 3*                                                                                                                                                                                                                                                                                                                                                   |
 | P_3  |                                          | Seed all the plants that are in the "Planning" growth stage.                                                                                                                                                                                                                                                                                                                                                |
-| P_4  |                                          | Water all the plants                                                                                                                                                                                                                                                                                                                                                                                        |
+| P_4  |                                          | Water all the plants   |
+| P_5 |                                   | Check the moisture levels around all the plants |
 
 # Device Commands
 
@@ -64,6 +65,7 @@ Commands that control the different devices connected to the farmbot.
 | D_W_a |          | Turns on (**a** = 1) or off (**a** = 0) the water pump. E.g. *D_W_1*  |
 | D_V_a |          | Turns on (**a** = 1) or off (**a** = 0) the vacuum pump. E.g. *D_V_1* |
 | D_C   |          | Checks if there is a tool mounted on the UTP mount                    |
+| D_S_C |          | Check the Soil Sensor reading                                         |
 
 # Vision Commands
 

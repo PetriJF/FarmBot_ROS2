@@ -13,6 +13,7 @@ class WaitForRequest:
         self.wait_for = -1
         self.result = -1
         self.expected = -1
+        self.index = -1
 
 
 class Sequencer:
@@ -75,8 +76,8 @@ class Sequencer:
         light_pin = 7
         self.devices_.set_pin_value(pin = light_pin, value = state, pin_mode = False)
     
-    ## Tool Exchanging Client
-    def map_cmd_client(self, cmd = str):
+    ## Map Handler Client
+    def map_cmd_client(self, cmd: str):
         '''
         Tool command service client used to communicate between the farmbot
         controller and the map handler.
@@ -151,14 +152,27 @@ class Sequencer:
                 self.wait_for_request_.expected = -1
                 self.wait_for_request_.result = -1
                 self.wait_for_request_.wait_for = -1
+                self.wait_for_request_.index = -1
             elif (self.wait_for_request_.result != -1 and self.wait_for_request_.wait_for == 63
                     and self.wait_for_request_.result != self.wait_for_request_.expected):
                 self.node_.get_logger().warn(f"FAILED TOOL {'MOUNTING' if self.wait_for_request_.expected == 0 else 'UNMOUNTING'}!! Stopping sequence")
                 self.wait_for_request_.expected = -1
                 self.wait_for_request_.result = -1
                 self.wait_for_request_.wait_for = -1
+                self.wait_for_request_.index = -1
                 self.clear_sequence()
                 return
+
+            if(self.wait_for_request_.result != -1 and self.wait_for_request_.wait_for == 59):
+                reading: str = f'SoilReading {self.wait_for_request_.index} {self.wait_for_request_.result}'
+                self.map_cmd_client(cmd = reading)
+                
+                self.wait_for_request_.expected = -1
+                self.wait_for_request_.result = -1
+                self.wait_for_request_.wait_for = -1
+                self.wait_for_request_.index = -1
+
+                
 
             # Move the gantry to the parsed coordinates
             if self.command_type_ == 'CC':
@@ -177,6 +191,13 @@ class Sequencer:
                     self.wait_for_request_.wait_flag = True
                     self.wait_for_request_.wait_for = 63
                     self.wait_for_request_.expected = int(cmd[1])
+                    self.wait_for_request_.index = -1
+                if cmd[0] == 'READSOIL':
+                    self.devices_.read_pin(59, True)
+                    self.wait_for_request_.wait_flag = True
+                    self.wait_for_request_.wait_for = 59
+                    self.wait_for_request_.expected = -1
+                    self.wait_for_request_.index = int(cmd[1])
                 if cmd[0] == 'Vacuum':
                     if cmd[1] in ['0', '1']:
                         self.vacuum_pump(state = int(cmd[1]))

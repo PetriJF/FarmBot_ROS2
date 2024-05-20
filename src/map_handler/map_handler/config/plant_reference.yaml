@@ -1,18 +1,19 @@
 identifiers:            ### Used for indexing and plant classifying
-  index: 0           # Plant unique index
-  plant_name: ''      # Plant name
+  index: 0              # Plant unique index
+  plant_name: ''        # Plant name
 position:               ### Representing the plant's XY position and the current Z Height of the plant
   x: 0.0
   y: 0.0
   z: 0.0
 plant_details:          ### Plant details used for planting and managing
-  plant_radius: 0.0    # The separation radius to the closest plant
-  canopy_radius: 0.0   # Average canopy size for the plant
-  water_quantity: 0.0  # Amount of water needed per watering state
-  max_height: 0.0      # Average maximum height of the plant
+  plant_radius: 0.0     # The separation radius to the closest plant
+  canopy_radius: 0.0    # Average canopy size for the plant
+  soil_moisture: 0.0    # The last soil moisture reading done around the plant
+  water_quantity: 0.0   # Amount of water needed per watering state
+  max_height: 0.0       # Average maximum height of the plant
 status:                 ### Plant status
   plant_date:           # Date of planting
     day: 0
     month: 0
     year: 0
-  growth_stage: ''    # Current growth stage
+  growth_stage: ''      # Current growth stage

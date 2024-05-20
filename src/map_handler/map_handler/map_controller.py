@@ -1,6 +1,7 @@
 import os
 import yaml
 import copy
+import math
 
 import rclpy
 from rclpy.node import Node
@@ -148,6 +149,7 @@ class MapController(Node):
         self.plant_ref_['plant_details']['plant_radius'] = exclusion_radius
         self.plant_ref_['plant_details']['canopy_radius'] = canopy_radius
         self.plant_ref_['plant_details']['max_height'] = max_z
+        self.plant_ref_['plant_details']['soil_moisture'] = 0.0
         self.plant_ref_['status']['growth_stage'] = growth_stage
 
         index = self.map_instance_['plant_details']['plant_count'] + 1
@@ -287,18 +289,132 @@ class MapController(Node):
         Map Command Server.
         Receives commands and returns either a sequence or a response to the request
         '''
+        cmd_split = request.data.split(' ')
         type = request.data[0]
         # Tool Command Type
-        if type == 'T':
+        if cmd_split[0] == 'SoilReading':
+            response.data = self.set_soil_moisture(index = int(cmd_split[1]), reading = int(cmd_split[2]))
+            return response
+        elif type == 'T':
             response.data = self.tool_cmd_interpreter(request.data)
-        if type == 'S':
-            response.data == self.tray_cmd_interpreter(request.data)
-        if request.data == 'P_3':
+            return response
+        elif type == 'S':
+            response.data = self.tray_cmd_interpreter(request.data)
+            return response
+        elif request.data == 'P_3':
             response.data = self.seed_plants()
-        if request.data == 'P_4':
+            return response
+        elif request.data == 'P_4':
             response.data = self.water_plants()
-            
+            return response
+        elif request.data == 'P_5':
+            response.data = self.check_moisture()
+            return response
+
+        response.data = 'UNRECOGNIZED'
         return response
+
+    def check_moisture(self) -> str:
+        '''
+        Generates a sequence of commands to probe the soil moisture around each plant.
+
+        Returns:
+        str: A sequence of commands for probing soil moisture.
+        '''
+        sequence = ''
+        
+        # Get the constraints of the map
+        max_x = self.map_instance_['map_reference']['x_len']
+        max_y = self.map_instance_['map_reference']['y_len']
+        max_z = (-1.0) * self.map_instance_['map_reference']['z_len'] + 10.0
+
+        # Get the details of all the plants and iterate through them
+        plants = self.map_instance_['plant_details']['plants']
+        for plant_index in plants:
+            plant = plants[plant_index]
+
+            # Get hte probing location
+            index = plant['identifiers']['index']
+            x, y = self.get_probing_location(plants = plants,
+                                             x = plant['position']['x'],
+                                             y = plant['position']['y'],
+                                             exl_r = plant['plant_details']['plant_radius'],
+                                             max_x = max_x,
+                                             max_y = max_y,
+                                             index = index)
+
+            # Set coordinate command
+            sequence += f'CC_P_5\n'
+            # Go over probing location
+            sequence += f'{x} {y} {0.0}\n'
+            # Lower to probing location
+            sequence += f'{x} {y} {max_z}\n'
+            # Wait for 2 ticks
+            sequence += f'TD_TICK_DELAY\nT{2}\n'
+            # Probe the moisture value
+            sequence += f'DC_P_5\n'
+            sequence += f'READSOIL {index}\n'
+            # Raise from probing location
+            sequence += f'CC_P_5\n'
+            sequence += f'{x} {y} {0.0}\n'
+
+        # Return home
+        sequence += f'CC_P_5\n'
+        sequence += f'{0.0} {0.0} {0.0}\n'
+
+        return sequence
+
+    def get_probing_location(self, plants: dict, x: float, y: float, exl_r: float,
+                             max_x: float, max_y: float, index: int) -> tuple[float, float]:
+        '''
+        Determines a probing location around a plant.
+
+        Args:
+        plants (dict): Dictionary with all the plants.
+        x (float): x-coordinate of the plant.
+        y (float): y-coordinate of the plant.
+        exl_r (float): Exclusion radius around the plant.
+        max_x (float): Maximum x-axis position
+        max_y (float): Maximum y-axis position
+
+        Returns:
+        (float, float): New (x, y) coordinates for the probing location.
+        '''
+        
+        # Define boundary limits
+        threshold = 10.0
+        
+        min_x, min_y = threshold, threshold
+        max_x, max_y = max_x - threshold, max_y - threshold
+
+        # Helper function to check if a point is within the exclusion radius of any plant except itself
+        def is_within_exclusion_radius(px, py, plant_id):
+            for other_plant_id, plant_info in plants.items():
+                if other_plant_id == plant_id:
+                    continue
+                plant_x = plant_info['position']['x']
+                plant_y = plant_info['position']['y']
+                plant_radius = plant_info['plant_details']['plant_radius']
+                distance = math.sqrt((px - plant_x) ** 2 + (py - plant_y) ** 2)
+                if distance < plant_radius + exl_r:
+                    return True
+            return False
+
+        # Iterate over angles to find a valid position on the exclusion radius
+        for angle in range(0, 360, 5):  # Check every 5 degrees
+            radians = math.radians(angle)
+            probe_x = x + exl_r * math.cos(radians)
+            probe_y = y + exl_r * math.sin(radians)
+
+            # Check if the position is within bounds
+            if min_x <= probe_x <= max_x and min_y <= probe_y <= max_y:
+                # Check if the position is not within the exclusion radius of any other plant
+                if not is_within_exclusion_radius(probe_x, probe_y, index):
+                    return probe_x, probe_y
+
+
+        # If no valid position is found, return None
+        return None
 
     def water_plants(self):
         '''
@@ -428,7 +544,17 @@ class MapController(Node):
         self.get_logger().info(str(self.map_instance_))
         self.save_to_yaml(self.map_instance_, self.directory_, self.active_map_file_, create_if_empty = True)
 
-
+    def set_soil_moisture(self, index: int, reading: int) -> str:
+        plants = self.map_instance_['plant_details']['plants']
+        if index in plants:
+            self.get_logger().info(f"Plant of Index '{index}' has soil moisture reading: '{reading}'")
+            self.map_instance_['plant_details']['plants'][index]['plant_details']['soil_moisture'] = copy.deepcopy(reading)
+            self.save_to_yaml(self.map_instance_, self.directory_, self.active_map_file_, create_if_empty = False)
+        else:
+            self.get_logger().warn(f"Couldn't find plant with index '{index}' to add moisture reading to")
+            return 'FAILED'
+        
+        return 'SUCCESS'
 
     def save_to_yaml(self, data: dict, path = '', file_name = '', create_if_empty = False):
         '''
