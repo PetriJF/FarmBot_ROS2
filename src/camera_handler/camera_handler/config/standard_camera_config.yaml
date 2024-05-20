@@ -1,0 +1,22 @@
+server_constants:
+  HOST: 'localhost'
+  PORT: 12345
+camera_constants:
+  DEPTH_MIN_VAL: 180  # Minimum depth value in mm
+  DEPTH_MAX_VAL: 1000  # Maximum depth value in mm
+  FOCAL_LENGTH_PX: 462  # Focal length in pixels (832/720)*400 (would be 832 at 720p, but we want 400p because that gives shorter standoff than 800)
+  BASELINE: 75  # Baseline distance in mm
+  extended_disparity: True
+  subpixel: False
+  lr_check: True
+camera_calibration:
+  CAM_ROTATION: 0
+  SCALE: 1
+  CAMERA_Z: 27.5
+  CAMERA_X: 15
+  CAMERA_Y: 57.5
+  CENTER_PIXEL_X: 208
+  CENTER_PIXEL_Y: 208
+  WIDTH_PIXEL_COUNT: 416
+  HEIGHT_PIXEL_COUNT: 416
+  
