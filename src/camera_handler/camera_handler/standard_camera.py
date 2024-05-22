@@ -15,63 +15,67 @@ class StandardCameraNode(Node):
     '''
     def __init__(self):
         super().__init__('StandardCamera')
-        self.bridge_ = CvBridge()# Bridge to convert between ROS and OpenCV images
+        self.bridge_ = CvBridge()  # Bridge to convert between ROS and OpenCV images
 
         # Initialize publishers for RGB and depth images
         self.rgb_publisher_ = self.create_publisher(Image, 'rgb_img', 10)
 
-        # First run flag
-        self.first_run_flag_ = True
+        # Initialize the camera
+        self.init_camera()
 
         # Camera Frequency
-        capture_freq = 1.0 / 24.0 # 24 frames a second
+        capture_freq = 1.0 / 24.0  # 30 frames a second
         self.camera_timer_ = self.create_timer(capture_freq, self.capture_image)
 
         self.get_logger().info('Standard Camera Node initialized...')
+
+    def init_camera(self):
+        '''
+        Initialize the camera
+        '''
+        self.WIDTH = 640  
+        self.HEIGHT = 480
+        self.camera_port = 0
+        self.discard_frames = 20  # Reduced number of discarded frames
+
+        self.camera = cv2.VideoCapture(self.camera_port)
+        if not self.camera.isOpened():
+            self.get_logger().error('Error: Could not open video device.')
+            return
+
+        sleep(0.1)
+        try:
+            self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.WIDTH)
+            self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.HEIGHT)
+            self.camera.set(cv2.CAP_PROP_FPS, 24)  # Set camera frame rate
+        except AttributeError:
+            self.camera.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, self.WIDTH)
+            self.camera.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, self.HEIGHT)
+
+        for _ in range(self.discard_frames):
+            self.camera.grab()
 
     def capture_image(self):
         '''
         Take a photo using the farmbot snake camera and publish it to /rgb_img
         '''
-        WIDTH = 640
-        HEIGHT = 480
+        ret, image = self.camera.read()
 
-        if 'NONE' in CAMERA:
-            self.get_logger().error('No camera selected. Choose a camera on the device page.')
+        if not ret:
+            self.get_logger().error('Problem getting image.')
             return
-        elif 'RPI' in CAMERA:
-            self.get_logger().error('Raspberry Pi Camera not supported yet.')
-            return
-        else:  # With USB camera:
-            camera_port = 0
-            image_width = WIDTH
-            image_height = HEIGHT
-            discard_frames = 20
 
-            camera = cv2.VideoCapture(camera_port)
-            sleep(0.1)
-            try:
-                camera.set(cv2.CAP_PROP_FRAME_WIDTH, image_width)
-                camera.set(cv2.CAP_PROP_FRAME_HEIGHT, image_height)
-            except AttributeError:
-                camera.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, image_width)
-                camera.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, image_height)
+        # Save image to file
+        image_msg = self.bridge_.cv2_to_imgmsg(image, "bgr8")
+        self.rgb_publisher_.publish(image_msg)
 
-            if self.first_run_flag_:
-                for _ in range(discard_frames):
-                    camera.grab()
-                self.first_run_flag_ = False
-
-            ret, image = camera.read()
-            camera.release()
-
-
-            if not ret:
-                self.get_logger().error('Problem getting image.')
-                return
-
-            image_msg = self.bridge_.cv2_to_imgmsg(image, "bgr8")
-            self.rgb_publisher_.publish(image_msg)
+    def destroy_node(self):
+        '''
+        Cleanup resources when shutting down the node
+        '''
+        self.camera.release()
+        self.get_logger().info('Camera released.')
+        super().destroy_node()
 
 # Main Function called on the initialization of the ROS2 Node
 def main(args = None):
@@ -84,6 +88,7 @@ def main(args = None):
     except KeyboardInterrupt:
         pass
 
+    cam.destroy_node()
     rclpy.shutdown()
 
 if __name__ == '__main__':
