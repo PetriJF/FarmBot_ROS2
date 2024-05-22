@@ -233,7 +233,7 @@ class MapController(Node):
         Checks if there is a tray with the seed type loaded in it
         '''
         trays = self.map_instance_['map_reference']['trays']
-        self.get_logger().info(str(trays))
+        # self.get_logger().info(str(trays))
         for tray_index in trays:
             tray = trays[tray_index]
             if tray:
@@ -270,11 +270,12 @@ class MapController(Node):
         cmd += 'Vacuum 1\n'
         # Collect a seed
         cmd += f"CC_P_{plant['identifiers']['index']}_3\n"
+        cmd += f"{tray_x} {tray_y} {tray_z}\n"
         # Retract with the seed
         cmd += f"{tray_x} {tray_y} {tray_z + self.safe_z_increment_}\n"
         cmd += f"{tray_x} {tray_y} {0.0}\n"
         # Go to the plant at safe z
-        cmd += f"{tray_x} {tray_y} {0.0}\n"
+        cmd += f"{plant_x} {plant_y} {0.0}\n"
         cmd += f"{plant_x} {plant_y} {plant_z + self.safe_z_increment_}\n"
         # Plant the seed
         cmd += f"{plant_x} {plant_y} {plant_z}\n"

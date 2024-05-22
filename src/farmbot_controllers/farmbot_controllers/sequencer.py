@@ -137,6 +137,7 @@ class Sequencer:
         if self.sequence_[0][:2] in ['CC', 'DC', 'VC', 'TD']:
             self.command_type_ = self.sequence_[0][:2]
             self.sequence_.pop(0)
+            return
 
         # If the farmbot is not busy and a request's response is not processed
         if not self.farmbot_busy_ and not self.wait_for_request_.wait_flag:
