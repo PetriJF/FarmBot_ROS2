@@ -1,4 +1,3 @@
-from rclpy.node import Node
 import cv2
 import numpy as np
 import os
@@ -6,189 +5,234 @@ import yaml
 from ament_index_python.packages import get_package_share_directory
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
+from rclpy.node import Node
 
-class Panorama:
+class PlantDetection:
     '''
-    Class used for taking pictures from the farmbot and stitching them into
-    a panorama representing the map information
+    Class used for taking pictures from the farmbot and processing them for plant detection
     '''
     def __init__(self, node: Node):
         '''
-        Panorama module constructor extending a node's functionality
+        PlantDetection module constructor extending a node's functionality
         '''
-        self.node_ = node
+        self.node = node
         
-        self.map_x = -1.0
-        self.map_y = -1.0
-        self.config_directory_ = os.path.join(get_package_share_directory('camera_handler'), 'config')
-        self.calib_file_ = 'camera_calibration.yaml'
+        self.map_width = -1.0
+        self.map_height = -1.0
+        self.config_directory = os.path.join(get_package_share_directory('camera_handler'), 'config')
+        self.map_directory = os.path.join(get_package_share_directory('map_handler'), 'config')
+        self.map_file = 'active_map.yaml'
+        self.calib_file = 'camera_calibration.yaml'
+        self.camera_config_file = 'standard_camera_config.yaml'
         
         self.bridge = CvBridge()
-        self.rgb_image_ = None
-        self.depth_image_ = None
-        self.rgb_sub = self.node_.create_subscription(Image, '/rgb_img', self.__rgb_callback, 10)
-        self.depth_sub = self.node_.create_subscription(Image, '/depth_img', self.__depth_callback, 10)
+        self.rgb_image = None
+        self.depth_image = None
+        self.rgb_sub = self.node.create_subscription(Image, '/rgb_img', self.rgb_callback, 10)
+        self.depth_sub = self.node.create_subscription(Image, '/depth_img', self.depth_callback, 10)
 
-    def __rgb_callback(self, msg):
+    def rgb_callback(self, msg):
         '''
         Subscriber callback for the RGB camera feed
         '''
-        self.rgb_image_ = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+        self.rgb_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
 
-    def __depth_callback(self, msg):
+    def depth_callback(self, msg):
         '''
         Subscriber callback for the Depth camera feed
         '''
-        self.depth_image_ = self.bridge.imgmsg_to_cv2(msg, "mono8")
+        self.depth_image = self.bridge.imgmsg_to_cv2(msg, "mono8")
 
-    def load_from_yaml(self, path: str, file_name: str):
+    def load_yaml(self, path: str, file_name: str):
         '''
-        Loads the specified yaml file from the specified path and returns a 
-        the dictionary withign the file
+        Loads the specified yaml file from the specified path and returns a dictionary
         '''
-        # Load configuration data from a YAML file
         full_path = os.path.join(path, file_name)
         if not os.path.exists(full_path):
-            self.node_.get_logger().warn(f"File path is invalid: {full_path}")
+            self.node.get_logger().warn(f"File path is invalid: {full_path}")
             return None
         
         with open(full_path, 'r') as yaml_file:
             try:
                 return yaml.safe_load(yaml_file)
             except yaml.YAMLError as e:
-                self.node_.get_logger().warn(f"Error reading YAML file: {e}")
+                self.node.get_logger().warn(f"Error reading YAML file: {e}")
                 return None
     
-    def segment_plants(image, hsv_min=[40, 50, 50], hsv_max=[90, 255, 255]):
-        # Read the image
+    def segment_plants(self, image, hsv_min=[40, 50, 50], hsv_max=[90, 255, 255]):
+        '''
+        Segments plants in the image based on HSV color space and returns circles around detected plants
+        '''
         if image is None:
             print("Could not open or find the image.")
             return
         
-        # Convert the image to the HSV color space
         hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        
-        # Create a mask for the green color
         lower_green = np.array(hsv_min)
         upper_green = np.array(hsv_max)
         mask = cv2.inRange(hsv_image, lower_green, upper_green)
         
-        # Perform morphological operations to remove noise and fill gaps
         kernel = np.ones((5, 5), np.uint8)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         
-        # Find contours of the plants
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        # Create a copy of the original image to draw contours
         circles = []
-        # Draw circles around each detected plant
+        
         for contour in contours:
             if cv2.contourArea(contour) > 100:  # Filter out small contours
                 (x, y), radius = cv2.minEnclosingCircle(contour)
-                center = (int(x), int(y))
+                center = (int(x) + self.camera_config_data['camera_calibration']['CAMERA_X'] - self.camera_config_data['camera_calibration']['CENTER_PIXEL_X'], 
+                          int(y) + self.camera_config_data['camera_calibration']['CAMERA_Y'] - self.camera_config_data['camera_calibration']['CENTER_PIXEL_Y'])
                 radius = int(radius)
                 circles.append((center, radius))
-        return circles
+        return np.array(circles)
     
-    def save_image_for_mosaic(self, num: int):
-        mosaic_directory = os.path.join(self.config_directory_, 'mosaic')
-        filename = f"{mosaic_directory}/image_{num}.jpg"
-        os.makedirs(mosaic_directory, exist_ok=True)
-        cv2.imwrite(filename, self.rgb_image_)
-        self.node_.get_logger().info(f'saved mosaic image {num:03}')
-        
-        
-    def stitch_image_onto_map(self, x: float, y: float):
+    def identify_known_plants(self, circles, plant_positions):
         '''
-        Takes a picture from the Luxonis camera and stitches it to the 
-        panorama map at the specified x and y coordinates
+        Identifies which circles correspond to known plant positions
         '''
-        # Loading the camera calibration information
+        results = []
+        for circle_x, circle_y, circle_radius in circles:
+            radius_squared = circle_radius ** 2
+            is_known_plant = False
+            for plant_x, plant_y in plant_positions:
+                distance_squared = (plant_x - circle_x) ** 2 + (plant_y - circle_y) ** 2
+                if distance_squared <= radius_squared:
+                    is_known_plant = True
+                    break
+            results.append((circle_x, circle_y, circle_radius, is_known_plant))
+        return np.array(results)
+    
+    def filter_nearby_circles(self, known_circles):
+        '''
+        Adds a boolean column indicating if each circle is within 100 units of the perimeter of any known plant circle
+        '''
+        known_plant_circles = np.array([circle for circle in known_circles if circle[3]])
+        all_circles = np.array(known_circles)
+        within_100_units = np.zeros(len(all_circles), dtype=bool)
         
-        self.config_data = self.load_from_yaml(self.config_directory_, self.calib_file_)
-        # load image rgb
-        rgb_image_raw = self.rgb_image_
-        rotation_angle = self.config_data['total_rotation_angle']
+        for i, circle in enumerate(all_circles):
+            if circle[3]:
+                within_100_units[i] = True
+
+        for i, oc in enumerate(all_circles):
+            if within_100_units[i]:
+                continue
+            (ox, oy), oradius = oc[:2], oc[2]
+            for kc in known_plant_circles:
+                (kx, ky), kradius = kc[:2], kc[2]
+                distance = np.sqrt((ox - kx)**2 + (oy - ky)**2)
+                if distance <= kradius + oradius + 100:
+                    within_100_units[i] = True
+                    break
+
+        all_circles_within_100 = np.hstack((all_circles, within_100_units.reshape(-1, 1)))
+        return all_circles_within_100
+    
+    def scale_circles(self, circles, scale):
+        '''
+        Scales all values in circles by the given scale factor
+        '''
+        circles = np.array(circles)
+        values = circles[:, :3]  # Numeric values
+        boolean_column = circles[:, 3]  # Boolean values
+        scaled_values = values * scale
+        scaled_circles = np.hstack((scaled_values, boolean_column.reshape(-1, 1)))
+        return scaled_circles
+    
+    def append_to_yaml(self, path, data):
+        '''
+        Appends data to a YAML file without overwriting existing data
+        '''
+        if not os.path.exists(path):
+            with open(path, 'w') as file:
+                yaml.dump(data, file)
+        else:
+            with open(path, 'r') as file:
+                existing_data = yaml.safe_load(file) or []
+            with open(path, 'w') as file:
+                yaml.dump(existing_data + data, file)
+    
+    def detect_weeds(self, x: float, y: float):
+        '''
+        Processes the images to detect weeds and known plants and updates the map with detected circles
+        '''
+        self.calib_data = self.load_yaml(self.config_directory, self.calib_file)
+        self.camera_config_data = self.load_yaml(self.config_directory, self.camera_config_file)
+        active_map = self.load_yaml(self.map_directory, self.map_file)
+        
+        plant_positions = [(plant_data['position']['x'], plant_data['position']['y']) 
+                           for plant_data in active_map['plant_details']['plants'].values() if plant_data]
+        plant_positions = np.array(plant_positions)
+
+        rgb_image_raw = self.rgb_image
+        rotation_angle = self.calib_data['total_rotation_angle']
         rgb_image_rotated = self.rotate_image(rgb_image_raw, rotation_angle)
-        # draw circles around green things
-        circles = segment_plants(rgb_image_raw)
 
-        # convert circle center coordinates to map coordinates = robot coords + converted image coords to map coords
-        
-        # mark circles corresponding to saved plant coordinates blue
-        # mark other circles red
-        # write coordinates and radi of red circles to a yaml file for weeds
-        # If the map dimensions were not set at the start of the run, load them from the active map
-        if self.map_x == -1.0 or self.map_y == -1.0:
-            # Load map instance
-            map_directory_ = os.path.join(get_package_share_directory('map_handler'), 'config')
-            map_file = 'active_map.yaml'
-            map_instance = self.load_from_yaml(map_directory_, map_file)
-            if map_instance:
-                # Get map dimensions
-                self.map_x = map_instance['map_reference']['x_len']
-                self.map_y = map_instance['map_reference']['y_len']
+        circles = self.segment_plants(rgb_image_rotated)
 
-                self.node_.get_logger().info('Loading map dimensions from active map file')
+        robot_coords_circles = np.array([((int(center[0] * self.calib_data['coord_scale']) + x,
+                                          int(center[1] * self.calib_data['coord_scale']) + y),
+                                         int(radius * self.calib_data['coord_scale']) + 10) for center, radius in circles])
         
-        # Set the map size relative to pixels
-        self.map_size_x_px = int(self.map_x / self.config_data['coord_scale'])
-        self.map_size_y_px = int(self.map_y / self.config_data['coord_scale'])
-        
-        x = int(x / self.config_data['coord_scale'])
-        y = self.map_size_y_px - int(y/self.config_data['coord_scale'])
-        
-        # Load the new image
-        
-        map_path = os.path.join(self.config_directory_,'rgb_map.png')
-        # Load or initialize the map (panorama) image 
+        known_circles = self.identify_known_plants(robot_coords_circles, plant_positions)
+        final_circles = self.filter_nearby_circles(known_circles)
+
+        # Visualize circles on camera image
+        cam_img_circles = rgb_image_rotated.copy()
+        for circle in final_circles:
+            (cx, cy), radius, is_known_plant, is_within_100 = circle[:2], circle[2], circle[3], circle[4]
+            color = (255, 0, 0) if is_known_plant else (0, 0, 255)
+            if is_within_100 and not is_known_plant:
+                color = (0, 255, 255)
+            cv2.circle(cam_img_circles, (int(cx), int(cy)), int(radius), color, 2)
+
+        cam_img_circles_path = os.path.join(self.config_directory, 'cam_img_circles.jpg')
+        cv2.imwrite(cam_img_circles_path, cam_img_circles)
+
+        map_circles = self.scale_circles(final_circles, self.calib_data['coord_scale'])
+
+        map_path = os.path.join(self.config_directory, 'rgb_map.png')
         self.initialize_map_if_needed(map_path)
-        # Loading or initializing the map_image as RGB
-        map_image = cv2.imread(map_path, cv2.IMREAD_COLOR)  # Ensures map_image is read as RGB
-        if new_image.shape[2] != 3 or map_image.shape[2] != 3:
+        map_image = cv2.imread(map_path, cv2.IMREAD_COLOR)
+        if map_image.shape[2] != 3:
             raise ValueError("Both images must be RGB.")
 
-        # Calculate placement and cropping
-        new_img_height, new_img_width = new_image.shape[:2]
-        map_height, map_width = map_image.shape[:2]
+        for circle in map_circles:
+            (cx, cy), radius, is_known_plant, is_within_100 = circle[:2], circle[2], circle[3], circle[4]
+            color = (255, 0, 0) if is_known_plant else (0, 0, 255)
+            if is_within_100 and not is_known_plant:
+                color = (0, 255, 255)
+            cv2.circle(map_image, (int(cx), int(cy)), int(radius), color, 2)
 
-        # Calculate the region of interest (ROI) in the map
-        start_x = max(map_width - (x - new_img_width), 0)
-        start_y = max(map_height - (y + new_img_height), 0)
-        end_x = min(map_width - x , map_width)
-        end_y = min(map_height - y, map_height)
-
-        # Calculate corresponding region in new_image
-        #new_start_x = start_x - x if x < 0 else 0
-        new_start_x = start_x - (x-map_width) if x > map_width else 0
-        new_start_y = 0 if y - new_img_height < 0 else new_img_height - (y - start_y)
-        new_end_x = new_img_width - (x + new_img_width - map_width) if (x + new_img_width) > map_width else new_img_width
-        new_end_y = y if y < new_img_height else new_img_height
-
-        # Copy the overlapping area from new_image to map_image
-        if new_end_x > new_start_x and new_end_y > new_start_y:
-            map_image[start_y:end_y, start_x:end_x] = new_image[new_start_y:new_end_y, new_start_x:new_end_x]
-
-        # Save the updated map image
         cv2.imwrite(map_path, map_image)
+
+        known_plant_circles = [circle.tolist() for circle in final_circles if circle[3]]
+        other_circles = [circle.tolist() for circle in final_circles if not circle[3]]
+
+        known_plants_yaml = os.path.join(self.config_directory, 'known_plants.yaml')
+        other_plants_yaml = os.path.join(self.config_directory, 'other_plants.yaml')
+
+        self.append_to_yaml(known_plants_yaml, known_plant_circles)
+        self.append_to_yaml(other_plants_yaml, other_circles)
     
-    
-        
     def rotate_image(self, image, angle):
         '''
         Rotates the image around the center at the set angle
         '''
-        
-        # Get the dimensions of the image
         height, width = image.shape[:2]
-        
-        # Calculate the rotation center
         center = (width // 2, height // 2)
-        
-        # Perform the rotation
         rotation_matrix = cv2.getRotationMatrix2D(center, -angle, 1.0)
         rotated_image = cv2.warpAffine(image, rotation_matrix, (width, height))
-
         return rotated_image
+
+    def initialize_map_if_needed(self, map_path):
+        '''
+        Initialize the map image if it does not exist
+        '''
+        if not os.path.exists(map_path):
+            self.map_width = 1000  # Set the map size (example values)
+            self.map_height = 1000
+            map_image = np.zeros((self.map_height, self.map_width, 3), dtype=np.uint8)
+            cv2.imwrite(map_path, map_image)

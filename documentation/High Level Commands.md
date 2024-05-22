@@ -77,5 +77,5 @@ The commands that are related to the vision system.
 | I_0  |          | Calibrates the camera                                                                                   |
 | I_1  |          | Takes a picture at the current location and stitches it to the panorama                                 |
 | I_2  |          | Creates a sequence that has the farmbot create a panorama of the whole bed by taking pictures in a grid |
-
-
+| I_3  |          | Mosaic image stitching WIP |
+| I_4  |          | Detect weeds|

@@ -241,7 +241,7 @@ class Sequencer:
                 self.wait_for_request_.result = int(info[2][1:])
                 self.wait_for_request_.wait_flag = False
 
-    def stitch_panorama_client(self, calib: bool, update_map: bool, mosaic: bool, x: float, y: float, z: float, num = int(-1)):
+    def stitch_panorama_client(self, detect_weeds: bool, calib: bool, update_map: bool, mosaic: bool, x: float, y: float, z: float, num = int(-1)):
         '''
         Tool command service client used to communicate between the farmbot
         controller and the map handler.
@@ -267,6 +267,8 @@ class Sequencer:
             request.data = 'CALIB'
         elif update_map:
             request.data = 'MAP ' + str(x) + ' ' + str(y)
+        if detect_weeds:
+            request.data = 'DETECT_WEEDS' + ' ' + str(x) + ' ' + str(y)
         elif mosaic:
             request.data = 'MOSAIC ' + str(num)
         else:
