@@ -254,7 +254,7 @@ class MapController(Node):
 
         plant_x = plant['position']['x']
         plant_y = plant['position']['y']
-        plant_z = self.map_instance_['map_reference']['z_len']
+        plant_z = (-1.0) * self.map_instance_['map_reference']['z_len']
 
         tray_x = tray['position']['x']
         tray_y = tray['position']['y']
@@ -332,7 +332,7 @@ class MapController(Node):
         # Get the constraints of the map
         max_x = self.map_instance_['map_reference']['x_len']
         max_y = self.map_instance_['map_reference']['y_len']
-        max_z = (-1.0) * self.map_instance_['map_reference']['z_len'] + 10.0
+        max_z = (-1.0) * self.map_instance_['map_reference']['z_len']
 
         # Get the details of all the plants and iterate through them
         plants = self.map_instance_['plant_details']['plants']
