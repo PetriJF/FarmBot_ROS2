@@ -254,16 +254,15 @@ class MapController(Node):
 
         plant_x = plant['position']['x']
         plant_y = plant['position']['y']
-        plant_z = plant['position']['z']
+        plant_z = self.map_instance_['map_reference']['z_len']
 
         tray_x = tray['position']['x']
         tray_y = tray['position']['y']
         tray_z = tray['position']['z']
 
         cmd = f"CC_P_{plant['identifiers']['index']}_3\n"
-
-        tray_clearance = 30
-
+        # Go over seed tray
+        cmd += f"{tray_x} {tray_y} {0.0}\n"
         # Go over seed tray at safe z
         cmd += f"{tray_x} {tray_y} {tray_z + self.safe_z_increment_}\n"
         # Turn on vacuum pump
@@ -271,10 +270,11 @@ class MapController(Node):
         cmd += 'Vacuum 1\n'
         # Collect a seed
         cmd += f"CC_P_{plant['identifiers']['index']}_3\n"
-        cmd += f"{tray_x} {tray_y} {tray_z + tray_clearance}\n"
         # Retract with the seed
         cmd += f"{tray_x} {tray_y} {tray_z + self.safe_z_increment_}\n"
+        cmd += f"{tray_x} {tray_y} {0.0}\n"
         # Go to the plant at safe z
+        cmd += f"{tray_x} {tray_y} {0.0}\n"
         cmd += f"{plant_x} {plant_y} {plant_z + self.safe_z_increment_}\n"
         # Plant the seed
         cmd += f"{plant_x} {plant_y} {plant_z}\n"
@@ -283,7 +283,7 @@ class MapController(Node):
         cmd += 'Vacuum 0\n'
         # Retract the empty seeder
         cmd += f"CC_P_{plant['identifiers']['index']}_3\n"
-        cmd += f"{plant_x} {plant_y} {plant_z + self.safe_z_increment_}\n"
+        cmd += f"{plant_x} {plant_y} {0.0}\n"
 
         return cmd
 
