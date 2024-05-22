@@ -174,6 +174,7 @@ class Sequencer:
 
             if self.sequence_[0] == '':
                 self.sequence_.pop(0)
+                return
 
             # Move the gantry to the parsed coordinates
             if self.command_type_ == 'CC':
