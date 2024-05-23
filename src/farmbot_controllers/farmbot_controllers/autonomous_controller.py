@@ -15,13 +15,22 @@ class AutonomousCmds(Node):
         now = datetime.now().time()
         current_time = now.strftime('%H:%M')
         command = ''
-        if current_time == '11:31':
-            command = 'C_0'
-        elif current_time == '12:00':
-            command = 'CONF'
-        elif current_time == '13:01':
+        if current_time == '11:07':
             command = 'P_4'
-        
+        elif current_time == '12:00':
+            command = 'H_0'
+        # elif current_time == '14:57':
+        #     for i in range(0, 16):
+        #         for j in range(0, 4):
+        #             x = 700 + i*250
+        #             y = 850 + j*250
+        #             command = f'P_1 {x} {y} -290.0 50.0 100.0 1 0 Basil Planning'
+        #             self.get_logger().info('Publishing: "%s"' % command)
+        #             msg = String()
+        #             msg.data = command
+        #             self.publisher_.publish(msg)
+        #             time.sleep(0.5)
+
         if command:
             self.get_logger().info('Publishing: "%s"' % command)
             msg = String()
