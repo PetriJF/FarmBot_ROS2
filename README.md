@@ -76,7 +76,7 @@ ros2 launch farmbot_bringup standard.launch.py
 This is a node that sends commands to the farmbot controller at specific times set in the script. If you want to create a specific plan for watering or managing your plants, make sure to modify the python script to suit your needs.
 
 ``` bash
-ros2 launch farmbot_bringup standard.launch.py
+ros2 run farmbot_controllers keyboard_controller
 ```
 
 ### 3. User Command Handler (Optional)
@@ -84,5 +84,5 @@ ros2 launch farmbot_bringup standard.launch.py
 If you want to send commands to the farmbot that are outside the plan you have created for your plants, you can turn on the keyboard controller. For a complete list of all the High Level commands, check the documentation.
 
 ``` bash
-ros2 launch farmbot_bringup standard.launch.py
+ros2 run farmbot_controllers autonomous_controller
 ```
