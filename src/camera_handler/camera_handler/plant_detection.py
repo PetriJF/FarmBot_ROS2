@@ -64,9 +64,9 @@ class PlantDetection:
         Segments plants in the image based on HSV color space and returns circles around detected plants
         '''
         if image is None:
-            print("Could not open or find the image.")
-            return
-        
+            self.node.get_logger().warn("Could not open or find the image.")
+            return np.array([], dtype=object)
+
         hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         lower_green = np.array(hsv_min)
         upper_green = np.array(hsv_max)
@@ -79,21 +79,35 @@ class PlantDetection:
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         circles = []
         
+        image_height, image_width = image.shape[:2]
+        
         for contour in contours:
             if cv2.contourArea(contour) > 100:  # Filter out small contours
                 (x, y), radius = cv2.minEnclosingCircle(contour)
-                center = (int(x) + self.camera_config_data['camera_calibration']['CAMERA_X'] - self.camera_config_data['camera_calibration']['CENTER_PIXEL_X'], 
-                          int(y) + self.camera_config_data['camera_calibration']['CAMERA_Y'] - self.camera_config_data['camera_calibration']['CENTER_PIXEL_Y'])
+                center_x = int(x) + self.camera_config_data['camera_calibration']['CAMERA_X'] - self.camera_config_data['camera_calibration']['CENTER_PIXEL_X']
+                center_y = int(y) + self.camera_config_data['camera_calibration']['CAMERA_Y'] - self.camera_config_data['camera_calibration']['CENTER_PIXEL_Y']
                 radius = int(radius)
-                circles.append((center, radius))
-        return np.array(circles)
+
+                # Check if the entire circle is within the image frame
+                if (center_x - radius) >= 0 and (center_x + radius) <= image_width and (center_y - radius) >= 0 and (center_y + radius) <= image_height:
+                    circles.append(((center_x, center_y), radius))
+        
+        if len(circles) == 0:
+            self.node.get_logger().info("No plants detected in the image.")
+        
+        return np.array(circles, dtype=object)
     
     def identify_known_plants(self, circles, plant_positions):
         '''
         Identifies which circles correspond to known plant positions
         '''
+        if len(circles) == 0:
+            self.node.get_logger().info("No circles to identify as known plants.")
+            return np.array([], dtype=object)
+
         results = []
-        for circle_x, circle_y, circle_radius in circles:
+        for circle in circles:
+            circle_x, circle_y, circle_radius = circle[0][0], circle[0][1], circle[1]
             radius_squared = circle_radius ** 2
             is_known_plant = False
             for plant_x, plant_y in plant_positions:
@@ -102,14 +116,23 @@ class PlantDetection:
                     is_known_plant = True
                     break
             results.append((circle_x, circle_y, circle_radius, is_known_plant))
-        return np.array(results)
+        
+        return np.array(results, dtype=object)
     
     def filter_nearby_circles(self, known_circles):
         '''
         Adds a boolean column indicating if each circle is within 100 units of the perimeter of any known plant circle
         '''
-        known_plant_circles = np.array([circle for circle in known_circles if circle[3]])
-        all_circles = np.array(known_circles)
+        if len(known_circles) == 0:
+            self.node.get_logger().info("No known circles to filter.")
+            return np.array([], dtype=object)
+
+        known_plant_circles = np.array([circle for circle in known_circles if circle[3]], dtype=object)
+        all_circles = np.array(known_circles, dtype=object)
+        
+        if all_circles.ndim == 1:
+            all_circles = all_circles.reshape(-1, len(known_circles[0]))  # Ensure all_circles is 2D
+            
         within_100_units = np.zeros(len(all_circles), dtype=bool)
         
         for i, circle in enumerate(all_circles):
@@ -127,18 +150,25 @@ class PlantDetection:
                     within_100_units[i] = True
                     break
 
-        all_circles_within_100 = np.hstack((all_circles, within_100_units.reshape(-1, 1)))
+        if len(all_circles) == 0:
+            return all_circles  # Return empty if no circles are found
+        
+        all_circles_within_100 = np.hstack((all_circles, within_100_units[:, np.newaxis]))
         return all_circles_within_100
     
     def scale_circles(self, circles, scale):
         '''
         Scales all values in circles by the given scale factor
         '''
-        circles = np.array(circles)
-        values = circles[:, :3]  # Numeric values
-        boolean_column = circles[:, 3]  # Boolean values
+        if len(circles) == 0:
+            self.node.get_logger().info("No circles to scale.")
+            return np.array([], dtype=object)
+
+        circles = np.array(circles, dtype=object)
+        values = np.array([circle[:3] for circle in circles], dtype=float)  # Extract numeric values
+        boolean_column = np.array([circle[3] for circle in circles], dtype=bool)  # Extract boolean values
         scaled_values = values * scale
-        scaled_circles = np.hstack((scaled_values, boolean_column.reshape(-1, 1)))
+        scaled_circles = np.hstack((scaled_values, boolean_column[:, np.newaxis]))
         return scaled_circles
     
     def append_to_yaml(self, path, data):
@@ -162,22 +192,43 @@ class PlantDetection:
         self.camera_config_data = self.load_yaml(self.config_directory, self.camera_config_file)
         active_map = self.load_yaml(self.map_directory, self.map_file)
         
+        if active_map is None:
+            self.node.get_logger().warn("Active map could not be loaded.")
+            return
+        
         plant_positions = [(plant_data['position']['x'], plant_data['position']['y']) 
                            for plant_data in active_map['plant_details']['plants'].values() if plant_data]
         plant_positions = np.array(plant_positions)
 
+        if self.rgb_image is None:
+            self.node.get_logger().warn("RGB image is not available.")
+            return
+        
         rgb_image_raw = self.rgb_image
         rotation_angle = self.calib_data['total_rotation_angle']
         rgb_image_rotated = self.rotate_image(rgb_image_raw, rotation_angle)
 
         circles = self.segment_plants(rgb_image_rotated)
+        
+        if len(circles) == 0:
+            self.node.get_logger().info("No circles detected in the segmented image.")
+            return
 
         robot_coords_circles = np.array([((int(center[0] * self.calib_data['coord_scale']) + x,
                                           int(center[1] * self.calib_data['coord_scale']) + y),
-                                         int(radius * self.calib_data['coord_scale']) + 10) for center, radius in circles])
+                                         int(radius * self.calib_data['coord_scale']) + 10) for center, radius in circles], dtype=object)
         
         known_circles = self.identify_known_plants(robot_coords_circles, plant_positions)
+        
+        if len(known_circles) == 0:
+            self.node.get_logger().info("No known circles identified.")
+            return
+        
         final_circles = self.filter_nearby_circles(known_circles)
+        
+        if len(final_circles) == 0:
+            self.node.get_logger().info("No circles found within the specified distance.")
+            return
 
         # Visualize circles on camera image
         cam_img_circles = rgb_image_rotated.copy()
@@ -193,6 +244,10 @@ class PlantDetection:
 
         map_circles = self.scale_circles(final_circles, self.calib_data['coord_scale'])
 
+        if len(map_circles) == 0:
+            self.node.get_logger().info("No map circles to process.")
+            return
+        
         map_path = os.path.join(self.config_directory, 'rgb_map.png')
         self.initialize_map_if_needed(map_path)
         map_image = cv2.imread(map_path, cv2.IMREAD_COLOR)

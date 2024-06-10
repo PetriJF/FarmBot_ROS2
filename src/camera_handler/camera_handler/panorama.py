@@ -1,4 +1,3 @@
-from rclpy.node import Node
 import cv2
 import numpy as np
 import os
@@ -6,6 +5,8 @@ import yaml
 from ament_index_python.packages import get_package_share_directory
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
+import math
+from rclpy.node import Node
 
 class Panorama:
     '''
@@ -23,12 +24,6 @@ class Panorama:
         self.config_directory_ = os.path.join(get_package_share_directory('camera_handler'), 'config')
         self.calib_file_ = 'camera_calibration.yaml'
         
-        self.camera_info_file_ = 'luxonis_camera_config.yaml'
-        self.camera_config_ = self.load_from_yaml(self.config_directory_, self.camera_info_file_)
-
-        self.camera_width_px_ = int(self.camera_config_['camera_calibration']['WIDTH_PIXEL_COUNT'])
-        self.camera_height_px_ = int(self.camera_config_['camera_calibration']['HEIGHT_PIXEL_COUNT'])
-
         self.bridge = CvBridge()
         self.rgb_image_ = None
         self.depth_image_ = None
@@ -52,14 +47,14 @@ class Panorama:
         If the map does not exist at the specified path, create a blank canvas and write it
         '''
         if not os.path.exists(map_path):
-            # Create a blank canvas with 3 channels for RGB
-            blank_canvas = np.zeros((self.map_size_y_px, self.map_size_x_px, 3), dtype=np.uint8)
+            # Create a blank canvas with 4 channels for RGBA
+            blank_canvas = np.zeros((self.map_size_y_px, self.map_size_x_px, 4), dtype=np.uint8)
             cv2.imwrite(map_path, blank_canvas)
 
     def load_from_yaml(self, path: str, file_name: str):
         '''
         Loads the specified yaml file from the specified path and returns a 
-        the dictionary withign the file
+        the dictionary within the file
         '''
         # Load configuration data from a YAML file
         full_path = os.path.join(path, file_name)
@@ -76,11 +71,10 @@ class Panorama:
     
     def save_image_for_mosaic(self, num: int):
         mosaic_directory = os.path.join(self.config_directory_, 'mosaic')
-        filename = f"{mosaic_directory}/image_{num}.jpg"
+        filename = f"{mosaic_directory}/image_{num}.png"
         os.makedirs(mosaic_directory, exist_ok=True)
         cv2.imwrite(filename, self.rgb_image_)
         self.node_.get_logger().info(f'saved mosaic image {num:03}')
-        
         
     def stitch_image_onto_map(self, x: float, y: float):
         '''
@@ -88,122 +82,9 @@ class Panorama:
         panorama map at the specified x and y coordinates
         '''
         # Loading the camera calibration information
-        
         self.config_data = self.load_from_yaml(self.config_directory_, self.calib_file_)
         
         # If the map dimensions were not set at the start of the run, load them from the active map
-        if self.map_x == -1.0 or self.map_y == -1.0:
-            # Load map instance
-            map_directory_ = os.path.join(get_package_share_directory('map_handler'), 'config')
-            map_file = 'active_map.yaml'
-            map_instance = self.load_from_yaml(map_directory_, map_file)
-            if map_instance:
-                # Get map dimensions
-                self.map_x = float(map_instance['map_reference']['x_len'])
-                self.map_y = float(map_instance['map_reference']['y_len'])
-
-                self.node_.get_logger().info('Loading map dimensions from active map file')
-        
-        # Set the map size relative to pixels. Adding the camera width in order to have half a camera frame on each edge
-        self.map_size_x_px = int(self.map_x // float(self.config_data['coord_scale'])) + self.camera_width_px_
-        self.map_size_y_px = int(self.map_y // float(self.config_data['coord_scale'])) + self.camera_height_px_
-        
-        x = int(x / self.config_data['coord_scale'])
-        y = self.map_size_y_px - int(y/self.config_data['coord_scale'])
-        
-        # Load the new image
-        new_image = self.rgb_image_
-        rotation_angle = self.config_data['total_rotation_angle']
-        
-        origin_location = self.config_data['image_bot_origin_location']
-        if origin_location == [1, 0]:
-            rotation_angle += 180
-        elif origin_location == [0, 0]:
-            rotation_angle -= 90
-        elif origin_location == [1, 1]:
-            rotation_angle += 90
-
-        # Attempt to fix artifacts around edges
-        # Padding the new image before rotation (to fix interpolation artifacts when rotating)
-        # pad_size = 10  # Adjust as needed
-        # new_image = cv2.copyMakeBorder(new_image, pad_size, pad_size, pad_size, pad_size, cv2.BORDER_CONSTANT, value=(0, 0, 0))
-
-        new_image = self.rotate_image(new_image, rotation_angle)
-        map_path = os.path.join(self.config_directory_,'rgb_map.png')
-        # Load or initialize the map (panorama) image 
-        self.initialize_map_if_needed(map_path)
-        # Loading or initializing the map_image as RGB
-        map_image = cv2.imread(map_path, cv2.IMREAD_COLOR)  # Ensures map_image is read as RGB
-        if new_image.shape[2] != 3 or map_image.shape[2] != 3:
-            raise ValueError("Both images must be RGB.")
-
-        # Create mask for the new image
-        _, mask = cv2.threshold(cv2.cvtColor(new_image, cv2.COLOR_BGR2GRAY), 1, 255, cv2.THRESH_BINARY)
-        mask = cv2.merge((mask, mask, mask))
-
-        # Calculate placement and cropping
-        new_img_height, new_img_width = new_image.shape[:2]
-        map_height, map_width = map_image.shape[:2]
-
-        # Calculate the region of interest (ROI) in the map
-        start_x = max(x, 0)
-        start_y = max(y - new_img_height, 0)
-        end_x = min(x + new_img_width, map_width)
-        end_y = min(y, map_height)
-
-        # Calculate corresponding region in new_image
-        new_start_x = start_x - x if x < 0 else 0
-        new_start_y = 0 if y - new_img_height < 0 else new_img_height - (y - start_y)
-        new_end_x = new_img_width - (x + new_img_width - map_width) if (x + new_img_width) > map_width else new_img_width
-        new_end_y = y if y < new_img_height else new_img_height
-
-        # Attempt to fix artifacts around edges
-        # new_start_x = start_x - x + pad_size if x < 0 else pad_size
-        # new_start_y = pad_size if y - new_img_height < 0 else new_img_height - (y - start_y) + pad_size
-        # new_end_x = new_img_width - (x + new_img_width - map_width) + pad_size if (x + new_img_width) > map_width else new_img_width + pad_size
-        # new_end_y = y + pad_size if y < new_img_height else new_img_height + pad_size
-
-        # Copy the overlapping area from new_image to map_image using the mask
-        map_image[start_y:end_y, start_x:end_x] = np.where(mask[new_start_y:new_end_y, new_start_x:new_end_x],
-                                                           new_image[new_start_y:new_end_y, new_start_x:new_end_x],
-                                                           map_image[start_y:end_y, start_x:end_x])
-
-        # Attempt to fix artifacts around edges
-        # map_image[start_y+pad_size//2 : end_y-pad_size//2,
-        #           start_x+pad_size//2 : end_x-pad_size//2] = np.where(mask[new_start_y:new_end_y, new_start_x:new_end_x], 
-        #                                                               new_image[new_start_y:new_end_y, new_start_x:new_end_x], 
-        #                                                               map_image[start_y+pad_size//2 : end_y-pad_size//2, start_x+pad_size//2 : end_x-pad_size//2])
-
-        # # Copy the overlapping area from new_image to map_image (LEGACY)
-        # if new_end_x > new_start_x and new_end_y > new_start_y:
-        #     map_image[start_y:end_y, start_x:end_x] = new_image[new_start_y:new_end_y, new_start_x:new_end_x]
-
-        # Save the updated map image
-        cv2.imwrite(map_path, map_image)
-        
-    def rotate_image(self, image, angle):
-        '''
-        Rotates the image around the center at the set angle
-        '''
-        
-        # Get the dimensions of the image
-        height, width = image.shape[:2]
-        
-        # Calculate the rotation center
-        center = (width // 2, height // 2)
-        
-        # Perform the rotation
-        rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
-        rotated_image = cv2.warpAffine(image, rotation_matrix, (width, height))
-
-        return rotated_image
-    
-    def get_panorama_increments(self):
-        '''
-        Get the panorama increments for the x and y axis for minimizing 
-        the amount of images needed to stitch the whole map into a panorama
-        '''
-        self.config_data_ = self.load_from_yaml(self.config_directory_, self.calib_file_)
         if self.map_x == -1.0 or self.map_y == -1.0:
             # Load map instance
             map_directory_ = os.path.join(get_package_share_directory('map_handler'), 'config')
@@ -216,9 +97,166 @@ class Panorama:
 
                 self.node_.get_logger().info('Loading map dimensions from active map file')
         
-        # px = mm / scale
-        # mm = px * scale
-        height, width = self.rgb_image_.shape[:2] 
-        height_mm = height* self.config_data_['coord_scale']
-        width_mm = width * self.config_data_['coord_scale']
-        return height_mm, width_mm# x, y
+        # Set the map size relative to pixels
+        self.map_size_x_px = int(self.map_x / self.config_data['coord_scale'])
+        self.map_size_y_px = int(self.map_y / self.config_data['coord_scale'])
+        
+        x_px = int(x / self.config_data['coord_scale'])
+        y_px = int(y / self.config_data['coord_scale'])
+        
+        if self.rgb_image_ is None:
+            self.node_.get_logger().warn('RGB image is not available.')
+            return
+
+        # Rotate and add a transparent mask to the RGB image
+        rotation_angle = self.config_data['total_rotation_angle']
+        processed_image = self.rotate_and_mask_image(self.rgb_image_, rotation_angle)
+        
+        # Ensure processed_image has 4 channels
+        if processed_image.shape[2] != 4:
+            processed_image = cv2.cvtColor(processed_image, cv2.COLOR_BGR2BGRA)
+
+        # Get the dimensions of the processed image
+        new_img_height, new_img_width = processed_image.shape[:2] 
+        
+        if new_img_width == 0 or new_img_height == 0:
+            self.node_.get_logger().warn('Processed image has zero width or height.')
+            return
+        
+        # Load or initialize the map (panorama) image 
+        map_path = os.path.join(self.config_directory_,'rgb_map.png')
+        self.initialize_map_if_needed(map_path)
+        map_image = cv2.imread(map_path, cv2.IMREAD_UNCHANGED)  # Ensures map_image is read with alpha channel
+
+        # Ensure map_image has 4 channels
+        if map_image.shape[2] != 4:
+            map_image = cv2.cvtColor(map_image, cv2.COLOR_BGR2BGRA)
+
+        # Calculate placement and cropping
+        map_height, map_width = map_image.shape[:2]
+        
+        # Calculate the top-left corner of the image on the map
+        start_x = x_px - new_img_width // 2
+        start_y = map_height - y_px - new_img_height // 2  # Note: map_height - y_px to flip the y-coordinate
+
+        # Calculate the ROI in the map image and the corresponding region in the new image
+        roi_start_x = max(start_x, 0)
+        roi_start_y = max(start_y, 0)
+        roi_end_x = min(start_x + new_img_width, map_width)
+        roi_end_y = min(start_y + new_img_height, map_height)
+
+        new_start_x = max(-start_x, 0)
+        new_start_y = max(-start_y, 0)
+        new_end_x = new_start_x + (roi_end_x - roi_start_x)
+        new_end_y = new_start_y + (roi_end_y - roi_start_y)
+
+        self.node_.get_logger().info(f'start_x: {start_x}, start_y: {start_y}, roi_start_x: {roi_start_x}, roi_start_y: {roi_start_y}, roi_end_x: {roi_end_x}, roi_end_y: {roi_end_y}')
+        self.node_.get_logger().info(f'new_start_x: {new_start_x}, new_start_y: {new_start_y}, new_end_x: {new_end_x}, new_end_y: {new_end_y}')
+        
+        # Copy the overlapping area from new_image to map_image
+        if roi_end_x > roi_start_x and roi_end_y > roi_start_y:
+            alpha_s = processed_image[new_start_y:new_end_y, new_start_x:new_end_x, 3] / 255.0
+            alpha_l = 1.0 - alpha_s
+
+            for c in range(0, 3):
+                map_image[roi_start_y:roi_end_y, roi_start_x:roi_end_x, c] = (alpha_s * processed_image[new_start_y:new_end_y, new_start_x:new_end_x, c] +
+                                                                              alpha_l * map_image[roi_start_y:roi_end_y, roi_start_x:roi_end_x, c])
+
+            map_image[roi_start_y:roi_end_y, roi_start_x:roi_end_x, 3] = (alpha_s * processed_image[new_start_y:new_end_y, new_start_x:new_end_x, 3] +
+                                                                          alpha_l * map_image[roi_start_y:roi_end_y, roi_start_x:roi_end_x, 3])
+
+        # Save the updated map image
+        cv2.imwrite(map_path, map_image)
+        self.node_.get_logger().info('Picture stitched to the panorama successfully.')
+
+    def rotate_and_mask_image(self, image, angle):
+        '''
+        Rotates the image around the center at the set angle and adds a transparent mask.
+        '''
+        # Get the dimensions of the image
+        height, width = image.shape[:2]
+
+        # Calculate the rotation center
+        center = (width // 2, height // 2)
+
+        # Perform the rotation
+        rotation_matrix = cv2.getRotationMatrix2D(center, -angle, 1.0)
+
+        # Determine the new bounding dimensions of the rotated image
+        abs_cos = abs(rotation_matrix[0, 0])
+        abs_sin = abs(rotation_matrix[0, 1])
+
+        bound_w = int(height * abs_sin + width * abs_cos)
+        bound_h = int(height * abs_cos + width * abs_sin)
+
+        # Adjust the rotation matrix to take into account translation
+        rotation_matrix[0, 2] += bound_w / 2 - center[0]
+        rotation_matrix[1, 2] += bound_h / 2 - center[1]
+
+        # Perform the actual rotation
+        rotated_image = cv2.warpAffine(image, rotation_matrix, (bound_w, bound_h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0, 0))
+
+        # Create an alpha channel with full opacity
+        alpha_channel = np.ones((rotated_image.shape[0], rotated_image.shape[1], 1), dtype=rotated_image.dtype) * 255
+        rotated_image_rgba = np.concatenate((rotated_image, alpha_channel), axis=2)
+
+        # Mask the rotated image
+        mask = np.zeros((bound_h, bound_w, 4), dtype=np.uint8)
+        cv2.fillConvexPoly(mask, cv2.boxPoints(((width // 2, height // 2), (width, height), angle)).astype(int), (255, 255, 255, 255))
+
+        masked_image = cv2.bitwise_and(rotated_image_rgba, mask)
+
+        return masked_image
+    
+    def get_panorama_increments(self):
+        '''
+        Get the panorama increments for the x and y axis for minimizing 
+        the amount of images needed to stitch the whole map into a panorama
+        '''
+        self.config_data_ = self.load_from_yaml(self.config_directory_, self.calib_file_)
+        
+        if self.map_x == -1.0 or self.map_y == -1.0:
+            # Load map instance
+            map_directory_ = os.path.join(get_package_share_directory('map_handler'), 'config')
+            map_file = 'active_map.yaml'
+            map_instance = self.load_from_yaml(map_directory_, map_file)
+            if map_instance:
+                # Get map dimensions
+                self.map_x = map_instance['map_reference']['x_len']
+                self.map_y = map_instance['map_reference']['y_len']
+
+                self.node_.get_logger().info('Loading map dimensions from active map file')
+        
+        if self.rgb_image_ is None:
+            self.node_.get_logger().warn('RGB image is not available.')
+            return 0, 0
+
+        # Rotate the RGB image and add a transparent mask
+        rotation_angle = self.config_data_['total_rotation_angle']
+        processed_image = self.rotate_and_mask_image(self.rgb_image_, rotation_angle)
+
+        # Ensure processed_image has 4 channels
+        if processed_image.shape[2] != 4:
+            processed_image = cv2.cvtColor(processed_image, cv2.COLOR_BGR2BGRA)
+
+        # Get the dimensions of the processed image
+        height, width = processed_image.shape[:2] 
+
+        if width == 0 or height == 0:
+            self.node_.get_logger().warn('Processed image has zero width or height.')
+            return 0, 0
+
+        # Calculate the bounding box of the non-transparent area
+        gray = cv2.cvtColor(processed_image, cv2.COLOR_BGRA2GRAY)
+        _, thresh = cv2.threshold(gray, 1, 255, cv2.THRESH_BINARY)
+        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return 0, 0
+        x, y, w, h = cv2.boundingRect(contours[0])
+
+        # Convert the dimensions to millimeters using the coordinate scale
+        height_mm = h * self.config_data_['coord_scale']
+        width_mm = w * self.config_data_['coord_scale']
+
+        return height_mm, width_mm  # x, y
+
