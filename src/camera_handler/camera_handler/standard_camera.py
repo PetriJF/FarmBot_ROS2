@@ -24,7 +24,7 @@ class StandardCameraNode(Node):
         self.init_camera()
 
         # Camera Frequency
-        capture_freq = 1.0 / 24.0  # 30 frames a second
+        capture_freq = 1.0 / 30.0  # 30 frames a second
         self.camera_timer_ = self.create_timer(capture_freq, self.capture_image)
 
         self.get_logger().info('Standard Camera Node initialized...')
@@ -47,7 +47,7 @@ class StandardCameraNode(Node):
         try:
             self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.WIDTH)
             self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.HEIGHT)
-            self.camera.set(cv2.CAP_PROP_FPS, 24)  # Set camera frame rate
+            self.camera.set(cv2.CAP_PROP_FPS, 30)  # Set camera frame rate
         except AttributeError:
             self.camera.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, self.WIDTH)
             self.camera.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, self.HEIGHT)

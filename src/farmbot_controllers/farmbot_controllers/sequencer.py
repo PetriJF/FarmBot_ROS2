@@ -175,7 +175,6 @@ class Sequencer:
 
             if self.sequence_[0] == '':
                 self.sequence_.pop(0)
-                return
 
             # Move the gantry to the parsed coordinates
             if self.command_type_ == 'CC':
@@ -212,16 +211,18 @@ class Sequencer:
                 self.sequence_.pop(0)
             # Handle Vision Commands
             elif self.command_type_ == 'VC':
+                if not len(self.sequence_):
+                    return
                 cmd = self.sequence_[0].split(' ')
                 # Vision command
                 if cmd[0] == 'CALIB':
                     self.cam_calib_client(cmd = (self.sequence_[0] + ' ' + str(self.x) + ' ' + str(self.y) + ' ' + str(self.z)))
                 elif cmd[0] == 'PAN':
-                    self.stitch_panorama_client(calib = False, update_map = False, mosaic = False,
+                    self.stitch_panorama_client(calib = False, update_map = False, mosaic = False, detect_weeds = False,
                                                     x = self.x, y = self.y,
                                                     z = self.z)
                 elif cmd[0] == 'MOSAIC':
-                    self.stitch_panorama_client(calib = False, update_map = False, mosaic = True,
+                    self.stitch_panorama_client(calib = False, update_map = False, mosaic = True, detect_weeds = False,
                                                     x = self.x, y = self.y,
                                                     z = self.z, num = int(cmd[1]))
                 self.sequence_.pop(0)

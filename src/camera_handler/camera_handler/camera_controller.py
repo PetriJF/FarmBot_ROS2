@@ -6,6 +6,7 @@ from rclpy.node import Node
 from farmbot_interfaces.srv import StringRepReq
 from camera_handler.panorama import Panorama
 from camera_handler.calib import CalibrateCamera
+from camera_handler.plant_detection import PlantDetection
 import math
 
 class CameraController(Node):
@@ -15,7 +16,7 @@ class CameraController(Node):
         # Loading the panorama and calibration modules
         self.panorama_ = Panorama(self)
         self.calib_ = CalibrateCamera(self)
-
+        self.plant_detection_ = PlantDetection(self)
         # Sequencing Service Server
         self.panorama_sequencing_server_ = self.create_service(StringRepReq, 'panorama_sequence', self.panorama_server_callback)
 
@@ -59,6 +60,9 @@ class CameraController(Node):
             # Sequencing constructed successfully and server returns it
             self.panorama_.save_image_for_mosaic(num = int(msg[1]))
             self.get_logger().info('Picture saved for mosaic successfully')
+        elif request.data.split(' ')[0] == 'DETECT_WEEDS':
+            self.plant_detection_.detect_weeds(x = float(msg[1]), y = float(msg[2]))
+            self.get_logger().info('Weed detection ran successfully')
         elif len(msg) == 3: # Ensuring the command information is complete
             if float(msg[2]) != 0.0:    # Ensuring the z-axis is homed
                 self.get_logger().warn('Z Axis is not in home position for the panorama stitching! Panorama command cancelled')
