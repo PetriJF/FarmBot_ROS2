@@ -133,8 +133,8 @@ class Sequencer:
             return
 
         # Set the sequence command type. CC - Coord. Cmd, DC - Device Cmd, 
-        # VC - Vision Cmd
-        if self.sequence_[0][:2] in ['CC', 'DC', 'VC', 'TD']:
+        # VC - Vision Cmd, SC - Servo Cmd
+        if self.sequence_[0][:2] in ['CC', 'DC', 'SC', 'VC', 'TD']:
             self.command_type_ = self.sequence_[0][:2]
             self.sequence_.pop(0)
             return
@@ -184,6 +184,13 @@ class Sequencer:
                                              z_coord = float(coords[2]))
                 self.sequence_.pop(0)
                 return
+            # Node a servo to the parsed angle
+            if self.command_type_ == 'SC':
+                cmd = self.sequence_[0].split(' ')
+                pin = int(cmd[0])
+                angle = float(cmd[1])
+                
+                self.devices_.move_servo(pin, angle)
             # Manipulate the device as indicated in the command
             elif self.command_type_ == 'DC':
                 cmd = self.sequence_[0].split(' ')
