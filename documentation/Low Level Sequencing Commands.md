@@ -19,6 +19,25 @@ A command that tells the farmbot to move at a certain position based on the cali
 - ``0.0 0.0 0.0`` -> The coordinates the Farmbot EE moves to relative to home in X Y Z format
 - ``\n`` -> **NOTE:** ensure that you add the end line character at the end.
 
+# Servo Command
+
+A command that tells the farmbot to move the a servo attached to pin X to a specified angle A.
+
+### **Command Type Format:**
+
+``SC_T_x_1\n``
+-  **SC** -> Represents the servo command type.
+-  **S_x_1** -> Where the sequencing command was requested from.
+- ``\n`` -> **NOTE:** make sure that you add the end line character at the end.
+
+### **Command Information**:
+
+``4 90.0\n``
+- ``4`` -> The pin the servo is attached to.
+- ``90.0`` -> The angle the servo should move to.
+- ``\n`` -> **NOTE:** ensure that you add the end line character at the end.
+
+
 # Device Command
 
 These commands are used to communicate with devices connected to the Farmduino (e.g. LED Strip, Water Pump, etc.)

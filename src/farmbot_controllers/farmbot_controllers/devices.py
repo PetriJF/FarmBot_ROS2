@@ -1,5 +1,5 @@
 from rclpy.node import Node
-from farmbot_interfaces.msg import PinCommand, I2CCommand
+from farmbot_interfaces.msg import PinCommand, I2CCommand, ServoCommand
 from std_msgs.msg import Int64MultiArray
 
 class DeviceControl:
@@ -13,12 +13,13 @@ class DeviceControl:
         self.pin_cmd_ = PinCommand()
         self.water_cmd_ = Int64MultiArray()
         self.i2c_cmd_ = I2CCommand()
-
+        self.servo_cmd_ = ServoCommand()
 
         # Publishers for the command types
         self.pin_pub_ = self.node_.create_publisher(PinCommand, 'pin_command', 10)
         self.i2c_pub_ = self.node_.create_publisher(I2CCommand, 'i2c_command', 10)
         self.water_pub_ = self.node_.create_publisher(Int64MultiArray, 'water_command', 10)
+        self.servo_pub_ = self.node_.create_publisher(ServoCommand, 'move_servo', 10)
 
     ## I2C Control Handlers
     
@@ -149,4 +150,7 @@ class DeviceControl:
 
         self.pin_pub_.publish(self.pin_cmd_)
 
-
+    def move_servo(self, pin: int, angle: float):
+        self.servo_cmd_.pin = pin
+        self.servo_cmd_.ang = angle
+        self.servo_pub_.publish(self.servo_cmd_)
