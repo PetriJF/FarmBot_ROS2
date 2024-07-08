@@ -37,7 +37,7 @@ class Sequencer:
         self.ticks_ = 0
 
         self.busy_state_sub_ = self.node_.create_subscription(Bool, 'busy_state', self.status_callback, 10)
-        self.sequencer_sub_ = self.node_.create_subscription(String, 'sequencer', self.cmd_sequence_callback, 10)
+        self.sequencer_sub_ = self.node_.create_subscription(String, 'sequencer', self.extend_sequence, 10)
         self.sequencing_timer_ = self.node_.create_timer(1.0, self.sequencing_timer)
  
     def clear_sequence(self):
@@ -98,6 +98,10 @@ class Sequencer:
         # Call async and add the response callback
         future = client.call_async(request = request)
         future.add_done_callback(self.cmd_sequence_callback)
+
+    def extend_sequence(self, cmd: String):
+        temp = cmd.data.split('\n')
+        self.sequence_.extend(temp)
 
     def cmd_sequence_callback(self, future):
         '''
@@ -181,8 +185,8 @@ class Sequencer:
             if self.command_type_ == 'CC':
                 coords = self.sequence_[0].split(' ')
                 self.mvm_.move_gantry_abs(x_coord = float(coords[0]), 
-                                             y_coord = float(coords[1]), 
-                                             z_coord = float(coords[2]))
+                                          y_coord = float(coords[1]), 
+                                          z_coord = float(coords[2]))
                 self.sequence_.pop(0)
                 return
             # Node a servo to the parsed angle
@@ -192,6 +196,7 @@ class Sequencer:
                 angle = float(cmd[1])
                 
                 self.devices_.move_servo(pin, angle)
+                self.sequence_.pop(0)
             # Manipulate the device as indicated in the command
             elif self.command_type_ == 'DC':
                 cmd = self.sequence_[0].split(' ')
