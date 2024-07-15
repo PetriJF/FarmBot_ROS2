@@ -12,7 +12,6 @@ setup(
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'config'), [os.path.join(package_name, 'config', 'luxonis_camera_config.yaml')]),
         (os.path.join('share', package_name, 'config'), [os.path.join(package_name, 'config', 'standard_camera_config.yaml')]),
-        (os.path.join('share', package_name, 'config'), [os.path.join(package_name, 'config', 'rs_405_camera_config.yaml')]),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
