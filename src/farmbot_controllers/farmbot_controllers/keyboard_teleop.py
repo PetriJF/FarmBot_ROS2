@@ -43,7 +43,7 @@ class KeyboardTeleOp(Node):
                      'D_W_1', 'D_W_0', 'D_V_1', 'D_V_0',
                      'H_0', 'H_1', 'D_S_C')
         compound_cmds = ('C_0', 'P_1', 'P_2', 'C_1', 'C_2', 'T_1_0', 'T_2_0', 'T_3_0',
-                         'T_4_0', 'T_5_0', 'T_6_0', 'S_1_0', 'S_2_0', 'S_3_0', 'M', 'CONF', 'H_2')
+                         'T_4_0', 'T_5_0', 'T_6_0', 'S_1_0', 'S_2_0', 'S_3_0', 'M', 'CONF', 'H_2', 'M_S')
         # Record the user input
         user_input = input('\nEnter command: ')
         

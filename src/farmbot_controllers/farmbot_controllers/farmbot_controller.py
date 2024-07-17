@@ -48,7 +48,7 @@ class FarmbotControl(Node):
         # Log the initialization
         self.get_logger().info('Farmbot Controller Initialized..')
 
-    def cmd_interp_callback(self, cmd = String):
+    def cmd_interp_callback(self, cmd: String):
         code = cmd.data.split(' ')
         match code[0]:
             ## Electronic Stop
@@ -190,6 +190,9 @@ class FarmbotControl(Node):
                 self.devices_.read_pin(63, False)
             case 'D_S_C':
                 self.devices_.read_pin(59, True)
+            case 'M_S':
+                self.get_logger().info(f'Trying to move servo {int(code[1])} to {int(code[2])}')
+                self.devices_.move_servo(pin = int(code[1]), angle = float(code[2]))
 
     ## UART Handling Callback
     
