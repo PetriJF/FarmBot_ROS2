@@ -196,7 +196,7 @@ class FarmbotControl(Node):
 
     ## UART Handling Callback
     
-    def uart_feedback_callback(self, msg = String):
+    def uart_feedback_callback(self, msg: String):
         '''
         Takes the feedback from the Serial Receiver and updates
         information accordingly 

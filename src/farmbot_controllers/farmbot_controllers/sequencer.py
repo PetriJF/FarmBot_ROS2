@@ -44,7 +44,7 @@ class Sequencer:
         '''
         Clearing the sequence in cases such as an electronic stop
         '''
-        self.sequence_ = []
+        self.sequence_.clear()
 
 
     # Peripheral control functions TODO: Improve

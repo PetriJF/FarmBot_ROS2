@@ -74,12 +74,16 @@ class PanelController(Node):
             self.LED_client(FBPanel.UNLOCK_LED, FBPanel.FLASHING)
             self.cmd_.data = 'E'
             self.priority_pub_.publish(self.cmd_)
+            self.cmd_.data = 'e'
+            self.input_pub_.publish(self.cmd_)
             self.get_logger().info('ESTOP button pressed')
         elif cmd.data == 'E':
             self.LED_client(FBPanel.ESTOP_LED, FBPanel.ON)
             self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
             self.cmd_.data = 'F09'
             self.priority_pub_.publish(self.cmd_)
+            self.cmd_.data = 'E'
+            self.input_pub_.publish(self.cmd_)
             self.get_logger().info('RESET button pressed')
         self.input_pub_.publish(cmd)
 
@@ -176,6 +180,8 @@ class PanelController(Node):
             self.LED_client(FBPanel.UNLOCK_LED, FBPanel.FLASHING)
             self.cmd_.data = 'E'
             self.priority_pub_.publish(self.cmd_)
+            self.cmd_.data = 'e'
+            self.input_pub_.publish(self.cmd_)
             self.get_logger().info('ESTOP button pressed')
 
     def reset_button_handler(self, channel):
@@ -188,28 +194,30 @@ class PanelController(Node):
             self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
             self.cmd_.data = 'F09'
             self.priority_pub_.publish(self.cmd_)
+            self.cmd_.data = 'E'
+            self.input_pub_.publish(self.cmd_)
             self.get_logger().info('RESET button pressed')
     
     # Example of mapping Button A to something (E.g. Homing)
     def buttonAHandler(self, channel):
         current_state = GPIO.input(FBPanel.BUTTON_A)
         if current_state == GPIO.LOW:
-             self.cmd_.data = 'H_0'
-             self.input_pub_.publish(self.cmd_)
+            self.cmd_.data = 'H_0'
+            self.input_pub_.publish(self.cmd_)
     
     # Example of mapping Button B to something (E.g. Calibrating)
     def buttonBHandler(self, channel):
         current_state = GPIO.input(FBPanel.BUTTON_B)
         if current_state == GPIO.LOW:
-             self.cmd_.data = 'C_0'
-             self.input_pub_.publish(self.cmd_)
+            self.cmd_.data = 'C_0'
+            self.input_pub_.publish(self.cmd_)
 
     # Example of mapping Button C to something (E.g. Watering)
     def buttonCHandler(self, channel):
         current_state = GPIO.input(FBPanel.BUTTON_B)
         if current_state == GPIO.LOW:
-             self.cmd_.data = 'P_4'
-             self.input_pub_.publish(self.cmd_)
+            self.cmd_.data = 'P_4'
+            self.input_pub_.publish(self.cmd_)
 
 
     def destroy_node(self):
