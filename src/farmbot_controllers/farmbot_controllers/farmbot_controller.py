@@ -57,7 +57,10 @@ class FarmbotControl(Node):
                 self.tools_.clear_sequence()
             ## Movement Commands
             case 'M':
-                self.mvm_.move_gantry_abs(x_coord = float(code[1]), y_coord = float(code[2]), z_coord = float(code[3]))
+                if len(code) != 4:
+                    self.get_logger().warning("You need to include all 3 coordinates! Command ignored!")
+                else:
+                    self.mvm_.move_gantry_abs(x_coord = float(code[1]), y_coord = float(code[2]), z_coord = float(code[3]))
             case 'w' | 's':
                 self.mvm_.move_gantry_abs(x_coord = self.cur_x_ + (self.cur_increment_ * (-1 if code[0] == 's' else 1)),
                                           y_coord = self.cur_y_,
