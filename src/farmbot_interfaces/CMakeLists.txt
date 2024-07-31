@@ -8,6 +8,7 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/FBPanel.msg"
@@ -21,9 +22,11 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/StatusCommand.msg"
   "msg/PlantManage.msg"
   "msg/MapCommand.msg"
+  "msg/ImageMessage.msg"
   "srv/LedPanelHandler.srv"
   "srv/ParameterConfig.srv"
   "srv/StringRepReq.srv"
+  DEPENDENCIES sensor_msgs
 )
 
 ament_package()
