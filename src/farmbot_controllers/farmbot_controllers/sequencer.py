@@ -34,6 +34,7 @@ class Sequencer:
         self.wait_for_request_ = WaitForRequest()
         self.farmbot_busy_ = False
         self.wait_for_camera_ = False
+        self.general_wait_flag_ = False
         self.ticks_ = 0
 
         self.busy_state_sub_ = self.node_.create_subscription(Bool, 'busy_state', self.status_callback, 10)
@@ -117,7 +118,14 @@ class Sequencer:
 
         self.node_.get_logger().info(future.result().data)
 
-        if cmd[0] not in ['', 'SUCCESS', 'FAILED', 'UNRECOGNIZED']:
+        if cmd[0] == 'SUCCESS' and self.general_wait_flag_:
+            self.general_wait_flag_ = False
+        elif cmd[0] == 'FAILED' and self.general_wait_flag_:
+            self.general_wait_flag_ = False
+            self.node_.get_logger().warning('A Server Response Failed.. Clearing sequence')
+            self.clear_sequence()
+
+        elif cmd[0] not in ['', 'SUCCESS', 'FAILED', 'UNRECOGNIZED']:
             self.sequence_.extend(cmd)
 
     def sequencing_timer(self):
@@ -132,7 +140,7 @@ class Sequencer:
             self.ticks_ -= 1
             return
         
-        if self.wait_for_camera_:
+        if self.wait_for_camera_ or self.general_wait_flag_:
             return
         if not len(self.sequence_):
             return
@@ -261,6 +269,9 @@ class Sequencer:
         '''
         Used to implement experimental features
         '''
+        # Set the wait flag
+        self.general_wait_flag_ = True
+        
         # Initializing the client and wait for map server confirmation
         client = self.node_.create_client(StringRepReq, topic)
         while not client.wait_for_service(1.0):
