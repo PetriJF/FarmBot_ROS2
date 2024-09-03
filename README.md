@@ -1,9 +1,16 @@
 
 # Description
 
-This repository contains a ROS2 alternative to the Farmbot OS, which was originally written in Elixir, Lua and Python.
+[![ROS2Humble](https://img.shields.io/badge/ROS2_Humble-Ubuntu_22.04-blue.svg)](https://docs.ros.org/en/humble/index.html)
+[![ROS2Jazzy](https://img.shields.io/badge/ROS2_Jazzy-Ubuntu_24.04-green.svg)](https://docs.python.org/3/whatsnew/3.10.html)
+[![License](https://img.shields.io/badge/license-MIT-yellow.svg)](https://opensource.org/license/MIT/)
 
-The Raspberry Pi need to have Ubuntu 22.04 installed on them (server version is fine) with ROS2 Humble installed over it (Ensure it is NOT the barebones version).
+This repository contains a ROS2 alternative to the Farmbot OS, which was originally written in Elixir, Lua and Python. This repository assumes you are using an unmodified version of the [Original Farmduino Firmware](https://github.com/FarmBot/farmbot-arduino-firmware). Note that there is no option within the repository yet for loading the firmware on the Farmduino (You can load it by running the original RPi software at least once with the system).
+
+The codebase was tested on both ROS2 Humble (Ubuntu 22.04 - RPi 4&5) and ROS2 Jazzy (Ubuntu 24.04 - RPi 5). When preparing the environment, install the full version (not the barebones).
+
+Our implementation works purely from the terminal. You will need to SSH into the RPi and run 2 or 3 terminals (with the corrent ROS_DOMAIN_ID if running multiple farmbots from the same control machine). There are plans to add a user friendly GUI, but this task is currently in the backlog with low priority.
+
 # Disclaimer
 
 Please note that this is not a 1:1 refactoring of Farmbot OS. It contains all the tools necessary to run and utilize the main features of the Farmbots. The software was tested on the Genesis XL platform (v1.6 and v1.7), but it should work on the Express platform (needs testing).
@@ -15,15 +22,25 @@ This repository was developed in the AURA Project at Maynooth University and is 
 ### 1. Clone the respository
 
 Execute the following to clone the repo as a new subdirectory `/home/<yourname>/` containing the Farmbot ROS2 code base.
-   ```bash
-   git clone git@github.com:PetriJF/FarmBot_ROS2.git
-   ```
+``` bash
+git clone git@github.com:PetriJF/FarmBot_ROS2.git
+```
 
+(OPTIONAL) And enable the submodules you might want to use.
+``` bash
+git submodule init src/X    # replace X with the package name
+git submodule update src/X  # replace X with the package name
+```
+
+Alternatively, clone with the submodules (Optional -- these submodules represent experimental features done in the AURA team. Some submodules might be private and cannot be accessed until fully released)
+``` bash
+git clone --recurse-submodules git@github.com:PetriJF/FarmBot_ROS2.git
+```
 ### 2. Set your bashrc (Optional)
 
 Open the bashrc file in your user's directory
 
-```bash
+``` bash
 cd ~
 ls -a
 nano .bashrc
@@ -31,26 +48,47 @@ nano .bashrc
 
 Once open your terminal should look like a command editor. Go to the very end and add the following lines there:
 
-```bash
+``` bash
 # ROS2 sourcing
 source /opt/ros/humble/setup.bash
-source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash
 source ~/FarmBot_ROS2/install/setup.bash
 ```
 
 Note, if you installed something in a different directory than the default ones, you will have to adapt the 3 sourcing commands
 
-### 3. Test the workspace
+### 3. Install required packages
+
+``` bash
+sudo apt update
+sudo apt upgrade
+```
+
+**Install these if you are running on the Raspberry Pi 4 and ROS2 Humble (Assuming ROS2 Humble already installed)**
+```bash
+
+```
+**Install these if you are running on the Raspberry Pi 5 and ROS2 Jazzy (Assuming ROS2 Jazzy already installed)**
+``` bash
+sudo apt install python3-rpi-lgpio          # Compatible GPIO Library
+## MCPC
+pip install depthai --break-system-packages # To pass by PEP 668 (externally-managed-environment)
+# Run these with the Luxonis Cameras unplugged
+echo 'SUBSYSTEM=="usb", ATTRS{idVendor}=="03e7", MODE="0666"' | sudo tee /etc/udev/rules.d/80-movidius.rules
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+
+### 4. Test the workspace
 
 Attempt to run the farmbot launch file, starting up all the nodes needed for it to run
 
-```bash
+``` bash
 ros2 launch farmbot_bringup standardLaunch.launch.py
 ```
 
 You can also run the keyboard controller in another terminal to test a command
 
-```bash
+``` bash
 ros2 run farmbot_controllers keyboard_controller
 ```
 
