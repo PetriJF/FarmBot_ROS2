@@ -250,6 +250,7 @@ def main(args = None):
         GPIO.remove_event_detect(FBPanel.BUTTON_UNLOCK)
         GPIO.remove_event_detect(FBPanel.BUTTON_A)
         GPIO.remove_event_detect(FBPanel.BUTTON_B)
+        GPIO.remove_event_detect(FBPanel.BUTTON_C)
         panel_node.destroy_node()
         rclpy.shutdown()
 
