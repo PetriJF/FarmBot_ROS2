@@ -23,7 +23,7 @@ This repository was developed in the AURA Project at Maynooth University and is 
 
 Execute the following to clone the repo as a new subdirectory `/home/<yourname>/` containing the Farmbot ROS2 code base.
 ``` bash
-git clone git@github.com:PetriJF/FarmBot_ROS2.git
+git clone https://github.com/PetriJF/FarmBot_ROS2.git
 ```
 
 (OPTIONAL) And enable the submodules you might want to use.
