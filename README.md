@@ -69,6 +69,7 @@ sudo apt upgrade
 ```
 **Install these if you are running on the Raspberry Pi 5 and ROS2 Jazzy (Assuming ROS2 Jazzy already installed)**
 ``` bash
+sudo apt install python3-pip
 sudo apt install python3-rpi-lgpio          # Compatible GPIO Library
 ## MCPC
 pip install depthai --break-system-packages # To pass by PEP 668 (externally-managed-environment)
