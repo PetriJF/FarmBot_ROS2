@@ -50,7 +50,7 @@ Once open your terminal should look like a command editor. Go to the very end an
 
 ``` bash
 # ROS2 sourcing
-source /opt/ros/humble/setup.bash
+source /opt/ros/humble/setup.bash          # Replace humble with jazzy if that's the case
 source ~/FarmBot_ROS2/install/setup.bash
 ```
 
@@ -84,7 +84,7 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 Attempt to run the farmbot launch file, starting up all the nodes needed for it to run
 
 ``` bash
-ros2 launch farmbot_bringup standardLaunch.launch.py
+ros2 launch farmbot_bringup standard.launch.py
 ```
 
 You can also run the keyboard controller in another terminal to test a command
