@@ -1,0 +1,17 @@
+identifiers:            ### Used for indexing and plant classifying
+  index: 0              # Plant unique index
+  plant_name: ''        # Plant name
+position:               ### Representing the plant's XY position and the current Z Height of the plant
+  x: 0.0
+  y: 0.0
+  z: 0.0
+plant_details:          ### Plant details used for planting and managing
+  treatment_frequency: 0
+  spray_volume: 0
+  nozzle_height: 0
+status:                 ### Plant status
+  plant_date:           # Date of planting
+    day: 0
+    month: 0
+    year: 0
+  growth_stage: ''      # Current growth stage
