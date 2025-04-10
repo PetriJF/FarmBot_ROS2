@@ -13,3 +13,4 @@ map_reference:
 plant_details: 
   plant_count: 0
   plants:
+  weeds:
