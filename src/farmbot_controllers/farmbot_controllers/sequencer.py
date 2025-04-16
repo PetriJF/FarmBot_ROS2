@@ -55,49 +55,49 @@ class Sequencer:
         Turning on or off the vacuum pump
         '''
         vacuum_pin = 9
-        self.devices._set_pin_value(pin = vacuum_pin, value = state, pin_mode = False)
+        self.devices_.set_pin_value(pin = vacuum_pin, value = state, pin_mode = False)
 
     def water_pump(self, state: int):
         '''
         Turning on or off the water pump
         '''
         water_pin = 8
-        self.devices._set_pin_value(pin = water_pin, value = state, pin_mode = False)
+        self.devices_.set_pin_value(pin = water_pin, value = state, pin_mode = False)
 
     def water_pulses(self, delay = 500):
         '''
         Turning the water pump on, waiting for the specified time in ms and turning it off
         '''
         water_pin = 8
-        self.devices._set_pin_value_2(pin = water_pin, value1 = 1, delay = delay, value2 = 0, pin_mode = False)
+        self.devices_.set_pin_value_2(pin = water_pin, value1 = 1, delay = delay, value2 = 0, pin_mode = False)
 
     def peripheral_4(self, state: int):
         '''
         Turning on or off the peripheral 4 pin
         '''
         peripheral4_pin = 10
-        self.devices._set_pin_value(pin = peripheral4_pin, value = state, pin_mode = False)
+        self.devices_.set_pin_value(pin = peripheral4_pin, value = state, pin_mode = False)
 
     def peripheral4_pulses(self, delay = 500):
         '''
         Opening and closing secondary solenoid on peripheral 4 pin, waiting for the specified time
         '''
         peripheral4_pin = 10
-        self.devices._set_pin_value_2(pin = peripheral4_pin, value1 = 1, delay = delay, value2 = 0, pin_mode = False)
+        self.devices_.set_pin_value_2(pin = peripheral4_pin, value1 = 1, delay = delay, value2 = 0, pin_mode = False)
 
     def peripheral_5(self, state: int):
         '''
         Turning on or off the peripheral 5 pin
         '''
         peripheral5_pin = 12
-        self.devices._set_pin_value(pin = peripheral5_pin, value = state, pin_mode = False)
+        self.devices_.set_pin_value(pin = peripheral5_pin, value = state, pin_mode = False)
 
     def led_strip(self, state: int):
         '''
         Turning on or off the LED strip
         '''
         light_pin = 7
-        self.devices._set_pin_value(pin = light_pin, value = state, pin_mode = False)
+        self.devices_.set_pin_value(pin = light_pin, value = state, pin_mode = False)
 
     ## Map Handler Client
     def map_cmd_client(self, cmd: str):
@@ -250,6 +250,9 @@ class Sequencer:
                 if cmd[0] == 'WaterPulses':
                     if int(cmd[1]):
                         self.water_pulses(delay = int(cmd[1]))
+                if cmd[0] == 'P4_Pulses':
+                    if int(cmd[1]):
+                        self.peripheral4_pulses(delay=int(cmd[1]))
                 self.sequence_.pop(0)
             # Handle Vision Commands
             elif self.command_type_ == 'VC':
