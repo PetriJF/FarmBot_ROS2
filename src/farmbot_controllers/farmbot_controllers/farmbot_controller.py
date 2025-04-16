@@ -194,9 +194,9 @@ class FarmbotControl(Node):
             case 'D_S_C':
                 self.devices_.read_pin(59, True)
             case 'P4_0' | 'P4_1':
-                self.tools_.peripheral_4(state = int(code[0][4]))
+                self.tools_.peripheral_4(state = int(code[0][3]))
             case 'P5_0' | 'P5_1':
-                self.tools_.peripheral_5(state = int(code[0][4]))
+                self.tools_.peripheral_5(state = int(code[0][3]))
             case 'M_S':
                 self.get_logger().info(f'Trying to move servo {int(code[1])} to {int(code[2])}')
                 self.devices_.move_servo(pin = int(code[1]), angle = float(code[2]))
