@@ -7,6 +7,7 @@ from farmbot_interfaces.srv import StringRepReq
 from camera_handler.panorama import Panorama
 from camera_handler.calib import CalibrateCamera
 from camera_handler.plant_detection import PlantDetection
+from camera_handler.pinhole_capture import PinholeCapture
 import math
 
 class CameraController(Node):
@@ -17,16 +18,17 @@ class CameraController(Node):
         self.panorama_ = Panorama(self)
         self.calib_ = CalibrateCamera(self)
         self.plant_detection_ = PlantDetection(self)
+        self.pinhole_camera_ = PinholeCapture(self)
         # Sequencing Service Server
         self.panorama_sequencing_server_ = self.create_service(StringRepReq, 'panorama_sequence', self.panorama_server_callback)
-
+        self.pinhole_camera_server_ = self.create_service(StringRepReq, 'pinhole_camera', self.pinhole_camera_server_callback)
         # Sequencing Service Server
         self.panorama_server_ = self.create_service(StringRepReq, 'form_panorama', self.stitch_image_server)
         #self.take_picture_ = LuxonisCameraNode(self)
 
         # Camera Calibration Server
         self.calibration_server_ = self.create_service(StringRepReq, 'camera_calibration', self.calibration_server_callback)
-
+        
         # Log the initialization
         self.get_logger().info("Camera Controller Initialized..")
 
@@ -73,12 +75,34 @@ class CameraController(Node):
             self.panorama_.stitch_image_onto_map(x = float(msg[0]), y = float(msg[1]))
             self.get_logger().info('Picture stitched to the panorama successfully')
         else:
-            self.get_logger.warn('Command not recognized! Request ignored')
+            self.get_logger.warn(f'Command not recognized!!! Request ignored Command: {request.data} Message: {msg}')
             response.data = 'FAILED'
             return response
 
         return response
+    
+    def pinhole_camera_server_callback(self, request, response):
+        '''
+        Service server that handles the pinhole camera node.
+        Primary task is taking a picture and saving it to the local directory
+        '''
+        # Assuming request success
+        response.data = 'SUCCESS'
+        # Getting the command information
+        msg = request.data.split(' ')
 
+        # Command information not set
+        if not request.data:
+            self.get_logger().warn('You need to parse command! Request ignored')
+            response.data = 'FAILED'
+            return response
+
+        # Requesting the camera to laod the calibration configuration
+        # Save image for mosaic
+        self.get_logger().info(f'SAVE IMAGE CALLED WITH {int(msg[0])} {msg[1]}')
+        self.pinhole_camera_.save_image(num = int(msg[0]), name = msg[1])
+        return response
+        
     def calibration_server_callback(self, request, response):
         '''
         Service server that handles the luxonis camera calibration.
