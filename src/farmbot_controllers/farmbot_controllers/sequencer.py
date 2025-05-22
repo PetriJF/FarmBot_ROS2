@@ -271,8 +271,8 @@ class Sequencer:
                                                     z = self.z, num = int(cmd[1]))
                 elif cmd[0] == 'M_CAM_TAKE':
                     self.macro_client(topic = 'multicam_toggle', info = 'TAKE')
-                elif cmd[0] == 'PINHOLE_CAPTURE':
-                    self.pinhole_client(num = cmd[1], name = cmd[2])
+                elif cmd[0] == 'WEED_CAPTURE':
+                    self.general_camera_functions_client(num = cmd[1], name = cmd[2])
                 self.sequence_.pop(0)
             # The amount of ticks the farmbot should wait in the sequence
             # before moving to the next command
@@ -310,7 +310,7 @@ class Sequencer:
         future = client.call_async(request = request)
         future.add_done_callback(self.cmd_sequence_callback)
 
-    def pinhole_client(self, num: str, name: str):
+    def general_camera_functions_client(self, num: str, name: str):
         '''
         Tool command service client used to communicate between the farmbot
         controller and the map handler.
@@ -319,9 +319,9 @@ class Sequencer:
             cmd {str}: The command that is sent to the map handler
         '''
         # Initializing the client and wait for map server confirmation
-        client = self.node_.create_client(StringRepReq, 'pinhole_camera')
+        client = self.node_.create_client(StringRepReq, 'general_camera_functions')
         while not client.wait_for_service(1.0):
-            self.node_.get_logger().warn('Waiting for Pinhole Server...')
+            self.node_.get_logger().warn('Waiting for GCF Server...')
         
         # Set the command to the service request
         request = StringRepReq.Request()

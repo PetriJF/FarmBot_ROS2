@@ -1,0 +1,22 @@
+server_constants:
+  HOST: 'localhost'
+  PORT: 12345
+camera_constants:
+  CAMERA_TYPE: 'Lite'
+  COLOR_RESOLUTION: 'THE_4_K'
+  MONO_RESOLUTION: 'THE_720_P'
+  DEPTH_MIN_VAL: 500  # Minimum depth value in mm
+  DEPTH_MAX_VAL: 10000  # Maximum depth value in mm
+  extended_disparity: True
+  subpixel: False
+  lr_check: True
+camera_calibration:
+  CAM_ROTATION: 0
+  SCALE: 1
+  CAMERA_Z: 0
+  CAMERA_X: 0
+  CAMERA_Y: 0
+  CENTER_PIXEL_X: 208
+  CENTER_PIXEL_Y: 208
+  WIDTH_PIXEL_COUNT: 416
+  HEIGHT_PIXEL_COUNT: 416

@@ -7,7 +7,7 @@ from farmbot_interfaces.srv import StringRepReq
 from camera_handler.panorama import Panorama
 from camera_handler.calib import CalibrateCamera
 from camera_handler.plant_detection import PlantDetection
-from camera_handler.pinhole_capture import PinholeCapture
+from camera_handler.general_camera_functions import GeneralCameraFunctions
 import math
 
 class CameraController(Node):
@@ -18,10 +18,10 @@ class CameraController(Node):
         self.panorama_ = Panorama(self)
         self.calib_ = CalibrateCamera(self)
         self.plant_detection_ = PlantDetection(self)
-        self.pinhole_camera_ = PinholeCapture(self)
+        self.general_camera_functions_ = GeneralCameraFunctions(self)
         # Sequencing Service Server
         self.panorama_sequencing_server_ = self.create_service(StringRepReq, 'panorama_sequence', self.panorama_server_callback)
-        self.pinhole_camera_server_ = self.create_service(StringRepReq, 'pinhole_camera', self.pinhole_camera_server_callback)
+        self.general_camera_functions_server_ = self.create_service(StringRepReq, 'general_camera_functions', self.general_camera_functions_server_callback)
         # Sequencing Service Server
         self.panorama_server_ = self.create_service(StringRepReq, 'form_panorama', self.stitch_image_server)
         #self.take_picture_ = LuxonisCameraNode(self)
@@ -81,7 +81,7 @@ class CameraController(Node):
 
         return response
     
-    def pinhole_camera_server_callback(self, request, response):
+    def general_camera_functions_server_callback(self, request, response):
         '''
         Service server that handles the pinhole camera node.
         Primary task is taking a picture and saving it to the local directory
@@ -100,7 +100,7 @@ class CameraController(Node):
         # Requesting the camera to laod the calibration configuration
         # Save image for mosaic
         self.get_logger().info(f'SAVE IMAGE CALLED WITH {int(msg[0])} {msg[1]}')
-        self.pinhole_camera_.save_image(num = int(msg[0]), name = msg[1])
+        self.general_camera_functions_.save_weed_image(num = int(msg[0]), name = msg[1])
         return response
         
     def calibration_server_callback(self, request, response):
