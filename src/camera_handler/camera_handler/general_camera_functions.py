@@ -6,6 +6,7 @@ from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
+import os
 
 class GeneralCameraFunctions:
     """
@@ -43,8 +44,8 @@ class GeneralCameraFunctions:
     # ---------- Public API ---------- #
     def save_weed_image(self, num: int, name: str):
         """
-        Save the most recent frame to YYYY_MM_DD_capture_###_<name>.png,
-        compression level 0 (= lossless).
+        Save the most recent frame to /mnt/nas/GREG/YYYY_MM_DD/capture_###_<name>.png,
+        with compression level 0 (= lossless). Creates the date directory if it doesn't exist.
         """
         with self._lock:
             if self.latest_frame is None:
@@ -53,7 +54,9 @@ class GeneralCameraFunctions:
             frame_to_save = self.latest_frame.copy()
 
         date_str = datetime.now().strftime("%Y_%m_%d")
-        filename = f"{date_str}_capture_{num:03}_{name}.png"
+        dir_path = f"/mnt/nas/GREG/{date_str}"
+        os.makedirs(dir_path, exist_ok=True)
 
+        filename = f"{dir_path}/capture_{num:03}_{name}.png"
         cv2.imwrite(filename, frame_to_save, [cv2.IMWRITE_PNG_COMPRESSION, 0])
         self.node_.get_logger().info(f"Saved image {filename}")
