@@ -167,8 +167,8 @@ class Sequencer:
             return
 
         # Set the sequence command type. CC - Coord. Cmd, DC - Device Cmd, 
-        # VC - Vision Cmd, SC - Servo Cmd
-        if self.sequence_[0][:2] in ['CC', 'DC', 'SC', 'VC', 'TD']:
+        # VC - Vision Cmd, SC - Servo Cmd - CS Coord Speed
+        if self.sequence_[0][:2] in ['CC', 'DC', 'SC', 'VC', 'TD', 'CS']:
             self.command_type_ = self.sequence_[0][:2]
             self.sequence_.pop(0)
             return
@@ -216,6 +216,14 @@ class Sequencer:
                 self.mvm_.move_gantry_abs(x_coord = float(coords[0]), 
                                           y_coord = float(coords[1]), 
                                           z_coord = float(coords[2]))
+                self.sequence_.pop(0)
+                return
+            if self.command_type_ == 'CS':
+                coords = self.sequence_[0].split(' ')
+                self.mvm_.move_gantry_s(x_coord = float(coords[0]), 
+                                          y_coord = float(coords[1]), 
+                                          z_coord = float(coords[2]),
+                                          speed = float(coords[3]))
                 self.sequence_.pop(0)
                 return
             # Node a servo to the parsed angle
