@@ -1,15 +1,14 @@
 from rclpy.node import Node
-
-from farmbot_interfaces.msg import ParameterCommand
+from std_msgs.msg import String
 
 class Parameters:
     def __init__(self, node: Node):
         self.node = node
         
         # Used for reading and writing to the FarmBot Parameters
-        self.paramHandler_ = ParameterCommand() 
+        self.paramHandler_ = String() 
         # Parameter Command Publisher
-        self.paramCmdPub_ = self.node.create_publisher(ParameterCommand, 'parameter_command', 10)
+        self.paramCmdPub_ = self.node.create_publisher(String, 'parameter_command', 10)
 
     ## Parameter Handling Commands
 
@@ -60,11 +59,7 @@ class Parameters:
             param {Int}: Parameter in question
             value {Int}: Value written to param if write or update modes are active
         '''
-        self.paramHandler_.list = list
-        self.paramHandler_.write = write
-        self.paramHandler_.read = read
-        self.paramHandler_.update = update
-        self.paramHandler_.param = param
-        self.paramHandler_.value = value
+        
+        self.paramHandler_.data = str(list) + ' ' + str(write) + ' ' + str(read) + ' ' + str(update) + ' ' + str(param) + ' ' + str(value)
 
         self.paramCmdPub_.publish(self.paramHandler_)

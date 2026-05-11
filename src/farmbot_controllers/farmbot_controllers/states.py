@@ -1,5 +1,5 @@
 from rclpy.node import Node
-from farmbot_interfaces.msg import StateCommand
+from std_msgs.msg import String
 
 class State:
     '''
@@ -16,9 +16,9 @@ class State:
         self.node = node
 
         # The state interface object
-        self.state_ = StateCommand()
+        self.state_ = String()
         # The publisher for the state commands
-        self.state_pub_ = self.node.create_publisher(StateCommand, 'state_command', 10)
+        self.state_pub_ = self.node.create_publisher(String, 'state_command', 10)
     
     ## State handling functions
     
@@ -71,12 +71,7 @@ class State:
             rep_curr_pos {Bool}: Requests the current position of the gantry
             rep_sw_ver   {Bool}: Requests the software version
         '''
-        
-        self.state_.estop = estop
-        self.state_.abort_movement = abort_movement
-        self.state_.reset_estop = reset_estop
-        self.state_.rep_end_stop = rep_end_stop
-        self.state_.rep_curr_pos = rep_curr_pos
-        self.state_.rep_sw_ver = rep_sw_ver
+
+        self.state_.data = str(estop) + ' ' + str (abort_movement) + ' ' + str(reset_estop) + ' ' + str(rep_end_stop) + ' ' + str(rep_curr_pos) + ' ' + str(rep_sw_ver)
 
         self.state_pub_.publish(self.state_)
