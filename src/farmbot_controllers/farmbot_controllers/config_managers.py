@@ -51,8 +51,8 @@ class ConfigServer(Node):
         self.config_loading_server_ = self.create_service(StringRepReq, 'load_param_config', self.param_loading_server)
 
         # Parameter Command publisher (Used for loading up parameters)
-        self.param_cmd_ = ParameterCommand()
-        self.param_cmd_pub_ = self.create_publisher(ParameterCommand, 'parameter_command', 10)
+        self.param_cmd_ = String()
+        self.param_cmd_pub_ = self.create_publisher(String, 'parameter_command', 10)
 
         # UART Rx Subscriber
         self.uart_rx_sub_ = self.create_subscription(String, 'uart_receive', self.uart_rx_callback, 10)
@@ -119,19 +119,19 @@ class ConfigServer(Node):
     def load_params(self):
         '''
         Loading all the parameters on the farmduino
+        list = False
+        write = True
+        read = False
+        update = False
         '''
-        self.param_cmd_.list = False
-        self.param_cmd_.write = True
-        self.param_cmd_.read = False
-        self.param_cmd_.update = False
+        self.param_cmd_.data = 'False True False False '
 
         # Loading only the parameters that are not loaded to the desired value (Greatly increases upload speed)
         with open(os.path.join(self.default_path_, self.base_config_), 'r') as yaml_file:
             loaded_firmware_config = yaml.safe_load(yaml_file)
             for key, value in self.param_vals.items():
-                if(loaded_firmware_config[key] != value):
-                    self.param_cmd_.param = key
-                    self.param_cmd_.value = value
+                if(loaded_firmware_config[key] != value) :
+                    self.param_cmd_.data += str(key) + ' ' + str(value)
                     self.param_cmd_pub_.publish(self.param_cmd_)
                     time.sleep(0.1)
 

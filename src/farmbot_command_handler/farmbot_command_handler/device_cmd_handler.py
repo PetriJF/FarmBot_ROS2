@@ -34,7 +34,7 @@ class DeviceCmdHandler(Node):
         measured using a flow meter (2)
         '''
         command : list = cmd.data.split(' ')
-        print(command)
+        
         # Valid watering commands
         valid_commands = (1, 2)
 
@@ -42,7 +42,7 @@ class DeviceCmdHandler(Node):
             if int(command[1]) <= 0:
                 self.get_logger().warning('The time constraint/volume constraint was not set!')
             else:
-                self.uart_cmd_.data = 'F0' + command[0] + (' T' if int(command[0]) == 1 else ' N') + command[1]
+                self.uart_cmd_.data = 'F0' + command[0] + (' T' if command[0] == '1' else ' N') + command[1]
 
                 self.uart_tx_pub_.publish(self.uart_cmd_)
                 self.get_logger().info(self.uart_cmd_.data)
@@ -60,9 +60,9 @@ class DeviceCmdHandler(Node):
         command : list = cmd.data.split(' ')
 
         if command[0] == 'True':    # I2C SET
-            self.uart_cmd_.data = 'F51 E' + str(command[1]) + ' P' + str(command[2]) + ' V' + str(command[3])
+            self.uart_cmd_.data = 'F51 E' + command[1] + ' P' + command[2] + ' V' + command[3]
         else:           # I2C READ
-            self.uart_cmd_.data = 'F52 E' + str(command[1]) + ' P' + str(command[2])
+            self.uart_cmd_.data = 'F52 E' + command[1] + ' P' + command[2]
         
         self.uart_tx_pub_.publish(self.uart_cmd_)
         self.get_logger().info(self.uart_cmd_.data)

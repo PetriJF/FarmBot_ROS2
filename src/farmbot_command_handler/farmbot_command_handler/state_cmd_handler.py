@@ -47,11 +47,11 @@ class StateCmdHandler(Node):
             self.uart_cmd_.data = 'F20'
         else:
             if command[2] == 'True':    # Read a parameter
-                self.uart_cmd_.data = 'F21 P' + str(command[4])
+                self.uart_cmd_.data = 'F21 P' + command[4]
             elif command[1] == 'True': # Write to a parameter
-                self.uart_cmd_.data = 'F22 P' + str(command[4]) + ' V' + str(command[5])
+                self.uart_cmd_.data = 'F22 P' + command[4] + ' V' + command[5]
             elif command[3] == 'True': # Update a parameter (in the calibration state)
-                self.uart_cmd_.data = 'F23 P' + str(command[4]) + ' V' + str(command[5])
+                self.uart_cmd_.data = 'F23 P' + command[4] + ' V' + command[5]
 
         self.uart_tx_pub_.publish(self.uart_cmd_)
         self.get_logger().info(self.uart_cmd_.data)
