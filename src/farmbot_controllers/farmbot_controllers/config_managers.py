@@ -124,14 +124,13 @@ class ConfigServer(Node):
         read = False
         update = False
         '''
-        self.param_cmd_.data = 'False True False False '
 
         # Loading only the parameters that are not loaded to the desired value (Greatly increases upload speed)
         with open(os.path.join(self.default_path_, self.base_config_), 'r') as yaml_file:
             loaded_firmware_config = yaml.safe_load(yaml_file)
             for key, value in self.param_vals.items():
                 if(loaded_firmware_config[key] != value) :
-                    self.param_cmd_.data += str(key) + ' ' + str(value)
+                    self.param_cmd_.data = 'False True False False ' + str(key) + ' ' + str(value)
                     self.param_cmd_pub_.publish(self.param_cmd_)
                     time.sleep(0.1)
 
