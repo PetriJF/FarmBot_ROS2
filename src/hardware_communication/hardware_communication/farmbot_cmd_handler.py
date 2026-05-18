@@ -6,8 +6,11 @@ class DeviceCmdHandler :
     Module handling device and peripheral commands.
     '''
     def __init__(self, node: Node):
-        self.node = node
+        self.node_ = node
         self.uart_cmd_ = str()
+
+        # Log the initialization
+        self.node_.get_logger().info('Device Command Handler Initialized..')
 
     def water_cmd(self, command : list):
         '''
@@ -20,12 +23,14 @@ class DeviceCmdHandler :
 
         if int(command[0]) in valid_commands:
             if int(command[1]) <= 0:
-                return (['warning' , 'The time constraint/volume constraint was not set!'])
+                self.node_.get_logger().warning('The time constraint/volume constraint was not set!')
             else:
                 self.uart_cmd_ = 'F0' + command[0] + (' T' if command[0] == '1' else ' N') + command[1]
+
+                self.node_.get_logger().info(self.uart_cmd_)
                 return self.uart_cmd_
         else:
-            return (['error' , 'Wrong watering command type! First element should be 1 (timed pulses msec) or 2 (volume pulses)!'])
+            self.node_.get_logger().error('Wrong watering command type! First element should be 1 (timed pulses msec) or 2 (volume pulses)!')
 
     def i2c_cmd(self, command : list):
         '''
@@ -37,7 +42,8 @@ class DeviceCmdHandler :
             self.uart_cmd_ = 'F51 E' + command[1] + ' P' + command[2] + ' V' + command[3]
         else:           # I2C READ
             self.uart_cmd_ = 'F52 E' + command[1] + ' P' + command[2]
-        
+
+        self.node_.get_logger().info(self.uart_cmd_)
         return self.uart_cmd_
 
     def pin_cmd(self, command : list):
@@ -49,8 +55,8 @@ class DeviceCmdHandler :
 
         # Check if in set mode, but no set command selected
         if command[0] == 'True' and command[1] == 'False' and command[2] == 'False' and command[3] == 'False':
-            return (['error' , 'Pin is in SET mode, but no SET CASE was selected. Use set_io, set_value or set_value2 to indicate\
-                                        what set mode you want!'])
+            self.node_.get_logger().error('Pin is in SET mode, but no SET CASE was selected. Use set_io, set_value or set_value2 to indicate\
+                                        what set mode you want!')
         else:
             # SET mode for the pin
             if command[0] == 'True':
@@ -64,6 +70,7 @@ class DeviceCmdHandler :
             else:
                 self.uart_cmd_ = 'F42 P' + command[5] + ' M' + command[8]
 
+            self.node_.get_logger().info(self.uart_cmd_)
             return self.uart_cmd_
         
 
@@ -72,8 +79,11 @@ class MotorCmdHandler :
     Module handling motor and actuator commands.
     '''
     def __init__(self, node: Node):
-        self.node = node
+        self.node_ = node
         self.uart_cmd_ = str()
+
+        # Log the initialization
+        self.node_.get_logger().info('Motor Command Handler Initialized..')
 
     def gantry_cmd(self, command : list):
         '''
@@ -90,6 +100,7 @@ class MotorCmdHandler :
         self.uart_cmd_ = ('G01 ' if mode == 'True' else 'G00 ') + 'X' + x + ' Y' + y + ' Z' + z \
                             + ('' if mode == 'True' else (' A' + max_x + ' B' + max_y + ' C' + max_z))
 
+        self.node_.get_logger().info(self.uart_cmd_)
         return self.uart_cmd_
 
     def home_cmd(self, command : list):
@@ -105,7 +116,7 @@ class MotorCmdHandler :
                                          + 'Z' + ("1" if command[5]=='True' else '0')
         else:
             if command[3] == 'False' and  command[4] == 'False' and command[5] == 'False':
-                return (['error' , 'No axis selected for homing/calibration!'])
+                self.node_.get_logger().error('No axis selected for homing/calibration!')
             else:
                 if command[3] == 'True' :              # Find home or calibrate x axis
                     self.uart_cmd_ = 'F11' if command[2]=='False' else 'F14'
@@ -114,7 +125,7 @@ class MotorCmdHandler :
                 if command[5] == 'True':            # Find home or calibrate z axis
                     self.uart_cmd_ = 'F13' if command[2]=='False' else 'F16'
 
-        
+        self.node_.get_logger().info(self.uart_cmd_)
         return self.uart_cmd_
 
     def servo_cmd(self, command : list):
@@ -131,9 +142,10 @@ class MotorCmdHandler :
             # Request servo attached to PIN to be rotated to ANGLE
             self.uart_cmd_ = 'F61 P' + command[0] + ' V' + command[1]
 
+            self.node_.get_logger().info(self.uart_cmd_)
             return self.uart_cmd_
         else:
-            return (['error' , command[0] + ' is not within the valid servo pins(4, 5, 6, 11)!'])
+            self.node_.get_logger().error(command[0] + ' is not within the valid servo pins(4, 5, 6, 11)!')
         
 
 class StateCmdHandler :
@@ -141,8 +153,11 @@ class StateCmdHandler :
     Module handling commands for manipulating the farmbot's parameters, state and status
     '''
     def __init__(self, node: Node):
-        self.node = node
+        self.node_ = node
         self.uart_cmd_ = str()
+
+        # Log the initialization
+        self.node_.get_logger().info('State Command Handler Initialized..')
 
     def param_cmd(self, command : list):
         '''
@@ -161,7 +176,8 @@ class StateCmdHandler :
                 self.uart_cmd_ = 'F22 P' + command[4] + ' V' + command[5]
             elif command[3] == 'True': # Update a parameter (in the calibration state)
                 self.uart_cmd_ = 'F23 P' + command[4] + ' V' + command[5]
-
+                
+        self.node_.get_logger().info(self.uart_cmd_)
         return self.uart_cmd_
 
     def state_cmd(self, command : list):
@@ -174,7 +190,7 @@ class StateCmdHandler :
         
         # Check that only one start command is in effect
         if state_counter != 1:
-            return (['error' , 'Make sure to include only 1 state handler command! Your input has ' + str(state_counter) + ' commands'])
+            self.node_.get_logger().error('Make sure to include only 1 state handler command! Your input has ' + str(state_counter) + ' commands')
         else:
             if command[0] == 'True':               # Electronic stop
                 self.uart_cmd_ = 'E'
@@ -189,6 +205,7 @@ class StateCmdHandler :
             elif command[5] == 'True':        # Report Software Version
                 self.uart_cmd_ = 'F83'
 
+            self.node_.get_logger().info(self.uart_cmd_)
             return self.uart_cmd_
 
     def status_cmd(self, cmd: StatusCommand):
@@ -200,5 +217,6 @@ class StateCmdHandler :
             self.uart_cmd_ = 'F32 P' + str(cmd.p) + ' V' + str(cmd.v)
         else:           # Read mode
             self.uart_cmd_ = 'F31 P' + str(cmd.p)
-        
+
+        self.node_.get_logger().info(self.uart_cmd_)
         return self.uart_cmd_

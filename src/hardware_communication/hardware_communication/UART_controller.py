@@ -35,7 +35,7 @@ class UARTController(Node):
         super().__init__('UARTController')
 
         self.uart_cmd_ = String()
-        self.message_cmd_ = String()
+        self.temp = String()
 
         serial_port = '/dev/ttyACM0'
         serial_speed = 115200
@@ -115,72 +115,47 @@ class UARTController(Node):
 
             ## Device Command Handler Cases
             case 'i2c_command':
-                self.message_cmd_.data = self.device_cmd_handler_.i2c_cmd(command[1:])
+                self.temp.data = self.device_cmd_handler_.i2c_cmd(command[1:])
 
             case 'pin_command':
-                msg = self.device_cmd_handler_.pin_cmd(command[1:])
-                if type(msg) is list and msg[0] == 'error':
-                        self.get_logger().error(msg[1])
-                elif type(msg) is str:
-                    self.message_cmd_.data = msg
+                self.temp.data = self.device_cmd_handler_.pin_cmd(command[1:])
 
             case 'water_command':
-                msg = self.device_cmd_handler_.water_cmd(command[1:])
-                if type(msg) is list :
-                    if msg[0] == 'error':
-                        self.get_logger().error(msg[1])
-                    elif msg[0] == 'warning':
-                        self.get_logger().warning(msg[1])
-                elif type(msg) is str:
-                    self.message_cmd_.data = msg
-
+                self.temp.data = self.device_cmd_handler_.water_cmd(command[1:])
 
             ## Motor Command Handler Cases
             case 'home_handler':
-                msg = self.motor_cmd_handler_.home_cmd(command[1:])
-                if type(msg) is list and msg[0] == 'error' :
-                        self.get_logger().error(msg[1])
-                elif type(msg) is str:
-                    self.message_cmd_.data = msg
+                self.temp.data = self.motor_cmd_handler_.home_cmd(command[1:])
 
             case 'move_gantry':
-                self.message_cmd_.data = self.motor_cmd_handler_.gantry_cmd(command[1:])
+                self.temp.data = self.motor_cmd_handler_.gantry_cmd(command[1:])
 
             case 'move_servo':
-                msg = self.motor_cmd_handler_.servo_cmd(command[1:])
-                if type(msg) is list and msg[0] == 'error' :
-                        self.get_logger().error(msg[1])
-                elif type(msg) is str:
-                    self.message_cmd_.data = msg
-
+                self.temp.data = self.motor_cmd_handler_.servo_cmd(command[1:])
         
             ## State Command Handler Cases
             case 'parameter_command':
-                self.message_cmd_.data = self.state_cmd_handler_.param_cmd(command[1:])
+                self.temp.data = self.state_cmd_handler_.param_cmd(command[1:])
 
             case 'state_command':
-                msg =self.state_cmd_handler_.state_cmd(command[1:])
-                if type(msg) is list and msg[0] == 'error' :
-                        self.get_logger().error(msg[1])
-                elif type(msg) is str:
-                    self.message_cmd_.data = msg
+                self.temp.data =self.state_cmd_handler_.state_cmd(command[1:])
 
         # Priority commands
-        if self.message_cmd_.data in ['E', 'F09', '@']:
-            self.get_logger().info(f'Sent message: {self.message_cmd_.data}')
+        if self.temp.data in ['E', 'F09', '@']:
+            self.get_logger().info(f'Sent message: {self.temp.data}')
             # Ensure the endline char at the end of the command
-            if self.message_cmd_.data[-1] != '\n':
-                self.message_cmd_.data += "\n"
+            if self.temp.data[-1] != '\n':
+                self.temp.data += "\n"
 
             # Send command and reset everything
-            self.ser_.write(self.message_cmd_.data.encode('utf-8'))
+            self.ser_.write(self.temp.data.encode('utf-8'))
             self.tx_queue_.clear()
             self.farmbot_busy_.data = False
             self.farmbot_state_pub_.publish(self.farmbot_busy_)
         # Standard commands
         else:
             # Add the command to the queue
-            self.tx_queue_.append(self.message_cmd_.data)
+            self.tx_queue_.append(self.temp.data)
 
     def uart_receive(self):
         '''
