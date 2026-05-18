@@ -21,8 +21,7 @@ class Movement:
         self.gantry_config_ = String()    # Used for gantry configuration (homing, calibration)
         self.move_gantry_ = String()  # Used for moving the gantry along the 3 axis
 
-        self.gantry_mvm_pub_ = self.node_.create_publisher(String, 'move_gantry', 10)
-        self.gantry_config_pub_ = self.node_.create_publisher(String, 'home_handler', 10)
+        self.movement_pub_ = self.node_.create_publisher(String, 'farmbot_command', 10)
 
     ## Calibration and Homing Functions
 
@@ -101,9 +100,9 @@ class Movement:
             y_axis {Bool}: Specifies wheather the command manipulates the Y-Axis. Defaults to False
             z_axis {Bool}: Specifies wheather the command manipulates the Z-Axis. Defaults to False
         '''
-        self.gantry_config_.data = str(all_home) + ' ' + str(set_this_home) + ' ' + str(calibrate) + ' ' + str(x_axis) + ' ' + str(y_axis) + ' ' + str(z_axis)
+        self.gantry_config_.data = 'home_handler ' + str(all_home) + ' ' + str(set_this_home) + ' ' + str(calibrate) + ' ' + str(x_axis) + ' ' + str(y_axis) + ' ' + str(z_axis)
 
-        self.gantry_config_pub_.publish(self.gantry_config_)
+        self.movement_pub_.publish(self.gantry_config_)
 
     ## Gantry Movement Functions
 
@@ -161,6 +160,6 @@ class Movement:
             y_speed {Int}: The speed used to reach the y coordinate
             z_speed {Int}: The speed used to reach the z coordinate
         '''
-        self.move_gantry_.data = str(mode) + ' ' + str(x_coord) + ' ' + str(y_coord) + ' ' + str(z_coord) + ' ' + str(x_speed) + ' ' + str(y_speed) + ' ' + str(z_speed)
+        self.move_gantry_.data = 'move_gantry ' + str(mode) + ' ' + str(x_coord) + ' ' + str(y_coord) + ' ' + str(z_coord) + ' ' + str(x_speed) + ' ' + str(y_speed) + ' ' + str(z_speed)
 
-        self.gantry_mvm_pub_.publish(self.move_gantry_)
+        self.movement_pub_.publish(self.move_gantry_)

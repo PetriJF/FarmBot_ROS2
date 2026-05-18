@@ -23,7 +23,6 @@ setup(
             "motor_command_handler = farmbot_command_handler.motor_cmd_handler:main",
             "device_command_handler = farmbot_command_handler.device_cmd_handler:main",
             "state_command_handler = farmbot_command_handler.state_cmd_handler:main",
-            "uart_controller = farmbot_command_handler.UART_controller:main"
         ],
     },
 )

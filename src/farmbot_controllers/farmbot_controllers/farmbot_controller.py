@@ -37,13 +37,13 @@ class FarmbotControl(Node):
         self.cur_increment_ = 10.0
         self.input_sub_ = self.create_subscription(String, 'input_topic', self.cmd_interp_callback, 10)
 
-        # UART Rx Subscriber
-        self.uart_rx_sub_ = self.create_subscription(String, 'uart_receive', self.uart_feedback_callback, 10)
+        # Farmbot Feedback Subscriber
+        self.fb_feedback_sub_ = self.create_subscription(String, 'farmbot_feedback', self.fb_feedback_callback, 10)
 
         # Map publishers
         self.plant_conf_ = PlantManage()
         self.plant_manage_pub_ = self.create_publisher(PlantManage, 'plant_mng', 10)
-        self.plant_cmd_pub_ = self.create_publisher(String, 'plant_cmd', 10)
+        self.plant_cmd_pub_ = self.create_publisher(String, 'plant_cmd', 10)  # TODO: remove
 
         # Log the initialization
         self.get_logger().info('Farmbot Controller Initialized..')
@@ -207,9 +207,9 @@ class FarmbotControl(Node):
                 self.get_logger().info(f'Trying to move servo {int(code[1])} to {int(code[2])}')
                 self.devices_.move_servo(pin = int(code[1]), angle = float(code[2]))
 
-    ## UART Handling Callback
+    ## Farmbot Handling Callback
     
-    def uart_feedback_callback(self, msg: String):
+    def fb_feedback_callback(self, msg: String):
         '''
         Takes the feedback from the Serial Receiver and updates
         information accordingly 

@@ -6,11 +6,14 @@ import serial
 from rclpy.node import Node
 from std_msgs.msg import String, Bool
 
+# Modules
+from hardware_communication.farmbot_cmd_handler import  DeviceCmdHandler, MotorCmdHandler, StateCmdHandler
+
 class UARTController(Node):
     '''
     Farmbot ROS2 node that handles the UART messages going to and from the Farmduino.
     
-    The Node receives commands through the /uart_transmit topic and sends them to the
+    The Node receives commands through the /farmbot_cmd topic and sends them to the
     Farmduino. If the Farmduino is busy with another task, the node populates a queue
     that is manipulated using FIFO structure.
 
@@ -19,9 +22,9 @@ class UARTController(Node):
     feedback, the node sets the ROS2 Farmbot busy state.
 
     Input Topics:
-        - /uart_transmit {String} -> the information that is to be transmitted to the farmduino through Serial.
+        - /farmbot_cmd {String} -> the information that is to be transmitted to the farmduino through Serial.
     Output Topics:
-        - /uart_receive {String} -> Tinformation that is received from serial and is carried on through the system.
+        - /farmbot_feedback {String} -> Tinformation that is received from serial and is carried on through the system.
         - /busy_state {Bool} -> used to set the busy state of the system.
     '''
     # Node contructor
@@ -32,14 +35,20 @@ class UARTController(Node):
         super().__init__('UARTController')
 
         self.uart_cmd_ = String()
+        self.message_cmd_ = String()
 
         serial_port = '/dev/ttyACM0'
         serial_speed = 115200
         check_uart_freq = 100
         tx_freq = 10
 
+        # Initializing farmbot command handler modules
+        self.device_cmd_handler_ = DeviceCmdHandler(self)
+        self.motor_cmd_handler_ = MotorCmdHandler(self)
+        self.state_cmd_handler_ = StateCmdHandler(self)
+
         # UART receive publisher
-        self.uart_rx_pub_ = self.create_publisher(String, 'uart_receive', 10)
+        self.fb_feedback_pub_ = self.create_publisher(String, 'farmbot_feedback', 10)
 
         # Farmbot state publisher
         self.farmbot_busy_ = Bool()
@@ -48,7 +57,7 @@ class UARTController(Node):
 
         # Node subscripters and publishers
         self.tx_queue_ = []
-        self.uart_tx_sub_ = self.create_subscription(String, 'uart_transmit', self.uart_transmit_callback, 10)
+        self.fb_cmd_sub_ = self.create_subscription(String, 'farmbot_command', self.farmbot_cmd_callback, 10)
         
         # Initialize Serial Communication
         self.ser_ = serial.Serial(serial_port, serial_speed, timeout=1)
@@ -90,7 +99,7 @@ class UARTController(Node):
             # Send through UART the command
             self.ser_.write(message.encode('utf-8'))
 
-    def uart_transmit_callback(self, message: String):
+    def farmbot_cmd_callback(self, cmd: String):
         '''
         Callback handling the commands that are queued to be sent
         to the farmbot through UART.
@@ -100,22 +109,78 @@ class UARTController(Node):
             b) standard command:
                 The command is added at the end of the queue
         '''
+        command : list = cmd.data.split(' ')
+
+        match command[0]:
+
+            ## Device Command Handler Cases
+            case 'i2c_command':
+                self.message_cmd_.data = self.device_cmd_handler_.i2c_cmd(command[1:])
+
+            case 'pin_command':
+                msg = self.device_cmd_handler_.pin_cmd(command[1:])
+                if type(msg) is list and msg[0] == 'error':
+                        self.get_logger().error(msg[1])
+                elif type(msg) is str:
+                    self.message_cmd_.data = msg
+
+            case 'water_command':
+                msg = self.device_cmd_handler_.water_cmd(command[1:])
+                if type(msg) is list :
+                    if msg[0] == 'error':
+                        self.get_logger().error(msg[1])
+                    elif msg[0] == 'warning':
+                        self.get_logger().warning(msg[1])
+                elif type(msg) is str:
+                    self.message_cmd_.data = msg
+
+
+            ## Motor Command Handler Cases
+            case 'home_handler':
+                msg = self.motor_cmd_handler_.home_cmd(command[1:])
+                if type(msg) is list and msg[0] == 'error' :
+                        self.get_logger().error(msg[1])
+                elif type(msg) is str:
+                    self.message_cmd_.data = msg
+
+            case 'move_gantry':
+                self.message_cmd_.data = self.motor_cmd_handler_.gantry_cmd(command[1:])
+
+            case 'move_servo':
+                msg = self.motor_cmd_handler_.servo_cmd(command[1:])
+                if type(msg) is list and msg[0] == 'error' :
+                        self.get_logger().error(msg[1])
+                elif type(msg) is str:
+                    self.message_cmd_.data = msg
+
+        
+            ## State Command Handler Cases
+            case 'parameter_command':
+                self.message_cmd_.data = self.state_cmd_handler_.param_cmd(command[1:])
+
+            case 'state_command':
+                msg =self.state_cmd_handler_.state_cmd(command[1:])
+                if type(msg) is list and msg[0] == 'error' :
+                        self.get_logger().error(msg[1])
+                elif type(msg) is str:
+                    self.message_cmd_.data = msg
+
         # Priority commands
-        if message.data in ['E', 'F09', '@']:
-            self.get_logger().info(f'Sent message: {message.data}')
+        if self.message_cmd_.data in ['E', 'F09', '@']:
+            self.get_logger().info(f'Sent message: {self.message_cmd_.data}')
             # Ensure the endline char at the end of the command
-            if message.data[-1] != '\n':
-                message.data += "\n"
+            if self.message_cmd_.data[-1] != '\n':
+                self.message_cmd_.data += "\n"
 
             # Send command and reset everything
-            self.ser_.write(message.data.encode('utf-8'))
+            self.ser_.write(self.message_cmd_.data.encode('utf-8'))
             self.tx_queue_.clear()
             self.farmbot_busy_.data = False
             self.farmbot_state_pub_.publish(self.farmbot_busy_)
         # Standard commands
         else:
             # Add the command to the queue
-            self.tx_queue_.append(message.data)
+            self.tx_queue_.append(self.message_cmd_.data)
 
     def uart_receive(self):
         '''
@@ -165,7 +230,7 @@ class UARTController(Node):
             self.farmbot_state_pub_.publish(self.farmbot_busy_)
         
         # Send the reporting message for further processing by other nodes
-        self.uart_rx_pub_.publish(self.uart_cmd_)
+        self.fb_feedback_pub_.publish(self.uart_cmd_)
     
     def destroy_node(self):
         # Close the UART when the node is destroyed

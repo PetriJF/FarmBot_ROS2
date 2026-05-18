@@ -66,7 +66,7 @@ def generate_launch_description():
             actions=[
                 # Start uart_controller after the delay
                 Node(
-                    package='farmbot_command_handler',
+                    package='hardware_communication',
                     executable='uart_controller',
                     name='uart_controller',
                     output='screen'

@@ -15,10 +15,7 @@ class DeviceControl:
         self.servo_cmd_ = String()
 
         # Publishers for the command types
-        self.pin_pub_ = self.node_.create_publisher(String, 'pin_command', 10)
-        self.i2c_pub_ = self.node_.create_publisher(String, 'i2c_command', 10)
-        self.water_pub_ = self.node_.create_publisher(String, 'water_command', 10)
-        self.servo_pub_ = self.node_.create_publisher(String, 'move_servo', 10)
+        self.devices_pub_ = self.node_.create_publisher(String, 'farmbot_command', 10)
 
     ## I2C Control Handlers
     
@@ -40,13 +37,13 @@ class DeviceControl:
 
         Args:
             mode {bool}: False for READ, True for SET
-            p {int}: Pin number
-            e {int}: Element in tool mount
-            v {int}: Value number
+            pin {int}: Pin number
+            element {int}: Element in tool mount
+            value {int}: Value number
         '''
-        self.i2c_cmd_.data = str(mode) + ' ' + str(element) + ' ' + str(pin) + ' ' + str(value)
+        self.i2c_cmd_.data = 'i2c_command ' + str(mode) + ' ' + str(element) + ' ' + str(pin) + ' ' + str(value)
 
-        self.i2c_pub_.publish(self.i2c_cmd_)
+        self.devices_pub_.publish(self.i2c_cmd_)
 
     ## Water Control Handlers
     ## NOTE: The documentation mentions that the commands are not implemented. Need to invesigate
@@ -63,8 +60,9 @@ class DeviceControl:
                         count of the flow meter.
         '''
 
-        self.water_cmd_.data = str(int(mode)+1) + ' ' + str(unit)
-        self.water_pub_.publish(self.water_cmd_)
+        self.water_cmd_.data = 'water_command ' + str(int(mode)+1) + ' ' + str(unit)
+        
+        self.devices_pub_.publish(self.water_cmd_)
 
     ## Pin Control Handlers
 
@@ -133,10 +131,10 @@ class DeviceControl:
             pin_mode{bool}: (0-digital / 1-analog) OR (0-input / 1-output)
         '''
         
-        self.pin_cmd_.data = str(mode) + ' ' + str(set_io) + ' ' + str(set_value1) + ' ' + str(set_value2) + ' ' + str(pin) + ' ' + str(value1) + ' ' + str(value2) +  ' ' + str(delay) + ' ' + str(int(pin_mode))
+        self.pin_cmd_.data = 'pin_command ' + str(mode) + ' ' + str(set_io) + ' ' + str(set_value1) + ' ' + str(set_value2) + ' ' + str(pin) + ' ' + str(value1) + ' ' + str(value2) +  ' ' + str(delay) + ' ' + str(int(pin_mode))
         
-        self.pin_pub_.publish(self.pin_cmd_)
+        self.devices_pub_.publish(self.pin_cmd_)
 
     def move_servo(self, pin: int, angle: float):
-        self.servo_cmd_.data = str(pin) + ' ' + str(angle)
-        self.servo_pub_.publish(self.servo_cmd_)
+        self.servo_cmd_.data = 'move_servo ' + str(pin) + ' ' + str(angle)
+        self.devices_pub_.publish(self.servo_cmd_)

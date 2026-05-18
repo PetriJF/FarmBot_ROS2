@@ -52,10 +52,10 @@ class ConfigServer(Node):
 
         # Parameter Command publisher (Used for loading up parameters)
         self.param_cmd_ = String()
-        self.param_cmd_pub_ = self.create_publisher(String, 'parameter_command', 10)
+        self.param_cmd_pub_ = self.create_publisher(String, 'farmbot_command', 10)
 
-        # UART Rx Subscriber
-        self.uart_rx_sub_ = self.create_subscription(String, 'uart_receive', self.uart_rx_callback, 10)
+        # Farmbot Feedback Subscriber
+        self.fb_feedback_sub_ = self.create_subscription(String, 'farmbot_feedback', self.fb_feedback_callback, 10)
 
         # Map updating publisher
         self.map_cmd_ = MapCommand()
@@ -64,7 +64,7 @@ class ConfigServer(Node):
         # Log the initialization
         self.get_logger().info('Config Server Initialized..')
 
-    def uart_rx_callback(self, msg: String):
+    def fb_feedback_callback(self, msg: String):
         '''
         Subscriber to the Serial Response from the Farmduino.
         Checks for parameter value updates and for when the farmduino startup completes 
@@ -130,7 +130,7 @@ class ConfigServer(Node):
             loaded_firmware_config = yaml.safe_load(yaml_file)
             for key, value in self.param_vals.items():
                 if(loaded_firmware_config[key] != value) :
-                    self.param_cmd_.data = 'False True False False ' + str(key) + ' ' + str(value)
+                    self.param_cmd_.data = 'parameter_command False True False False ' + str(key) + ' ' + str(value)
                     self.param_cmd_pub_.publish(self.param_cmd_)
                     time.sleep(0.1)
 
