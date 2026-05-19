@@ -64,10 +64,6 @@ class GPIOController(Node):
 
         self.led_panel_server_ = self.create_service(LedPanelHandler, 'set_led', self.LED_server)
 
-        self.LED_client(FBPanel.ESTOP_LED, FBPanel.ON)
-        self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
-
-
         self.directory_ = os.path.join(
             get_package_share_directory('hardware_communication '),
             'config'
