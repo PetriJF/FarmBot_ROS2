@@ -24,24 +24,6 @@ def generate_launch_description():
             output='screen'
         ),
         Node(
-            package='farmbot_command_handler',
-            executable='motor_command_handler',
-            name='motor_command_handler',
-            output='screen'
-        ),
-        Node(
-            package='farmbot_command_handler',
-            executable='state_command_handler',
-            name='state_command_handler',
-            output='screen'
-        ),
-        Node(
-            package='farmbot_command_handler',
-            executable='device_command_handler',
-            name='device_command_handler',
-            output='screen'
-        ),
-        Node(
             package='map_handler',
             executable='map_controller',
             name='map_controller',

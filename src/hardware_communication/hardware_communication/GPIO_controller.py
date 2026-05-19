@@ -65,7 +65,7 @@ class GPIOController(Node):
         self.led_panel_server_ = self.create_service(LedPanelHandler, 'set_led', self.LED_server)
 
         self.directory_ = os.path.join(
-            get_package_share_directory('hardware_communication '),
+            get_package_share_directory('hardware_communication'),
             'config'
         )
         self.button_ = yaml.safe_load(open(os.path.join(self.directory_, 'ButtonCommand.yaml'), 'r'))

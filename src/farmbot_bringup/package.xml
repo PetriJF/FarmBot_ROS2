@@ -10,7 +10,7 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <exec_depend>farmbot_controllers</exec_depend>
-  <exec_depend>farmbot_command_handler</exec_depend>
+  <exec_depend>hardware_communication</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
