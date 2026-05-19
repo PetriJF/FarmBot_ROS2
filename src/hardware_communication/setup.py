@@ -1,4 +1,5 @@
 from setuptools import find_packages, setup
+import os
 
 package_name = 'hardware_communication'
 
@@ -10,6 +11,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name, 'config'), [os.path.join(package_name, 'config', 'ButtonCommand.yaml')]),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -25,6 +27,7 @@ setup(
     entry_points={
         'console_scripts': [
             "uart_controller = hardware_communication.UART_controller:main",
+            "gpio_controller = hardware_communication.GPIO_controller:main"
         ],
     },
 )

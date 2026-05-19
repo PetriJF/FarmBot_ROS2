@@ -6,6 +6,9 @@ import serial
 from rclpy.node import Node
 from std_msgs.msg import String, Bool
 
+from farmbot_interfaces.srv import LedPanelHandler
+from farmbot_interfaces.msg import FBPanel
+
 # Modules
 from hardware_communication.farmbot_cmd_handler import  DeviceCmdHandler, MotorCmdHandler, StateCmdHandler
 
@@ -13,7 +16,7 @@ class UARTController(Node):
     '''
     Farmbot ROS2 node that handles the UART messages going to and from the Farmduino.
     
-    The Node receives commands through the /farmbot_cmd topic and sends them to the
+    The Node receives commands through the /farmbot_command topic and sends them to the
     Farmduino. If the Farmduino is busy with another task, the node populates a queue
     that is manipulated using FIFO structure.
 
@@ -22,7 +25,7 @@ class UARTController(Node):
     feedback, the node sets the ROS2 Farmbot busy state.
 
     Input Topics:
-        - /farmbot_cmd {String} -> the information that is to be transmitted to the farmduino through Serial.
+        - /farmbot_command {String} -> the information that is to be transmitted to the farmduino through Serial.
     Output Topics:
         - /farmbot_feedback {String} -> Tinformation that is received from serial and is carried on through the system.
         - /busy_state {Bool} -> used to set the busy state of the system.
@@ -68,6 +71,10 @@ class UARTController(Node):
 
         # Used for setting the busy status on the ROS2 arch. while a command is running
         self.previous_cmd_ = ''
+        
+        # Initialize the LED states
+        self.LED_client(FBPanel.ESTOP_LED, FBPanel.ON)
+        self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
 
         # Log the initialization
         self.get_logger().info('UART Controller Initialized..')
@@ -139,7 +146,15 @@ class UARTController(Node):
 
             case 'state_command':
                 self.temp.data =self.state_cmd_handler_.state_cmd(command[1:])
+            
+            case 'E' :
+                self.LED_client(FBPanel.ESTOP_LED, FBPanel.OFF)
+                self.LED_client(FBPanel.UNLOCK_LED, FBPanel.FLASHING)
 
+            case 'F09' :
+                self.LED_client(FBPanel.ESTOP_LED, FBPanel.ON)
+                self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
+        
         # Priority commands
         if self.temp.data in ['E', 'F09', '@']:
             self.get_logger().info(f'Sent message: {self.temp.data}')
@@ -206,6 +221,33 @@ class UARTController(Node):
         
         # Send the reporting message for further processing by other nodes
         self.fb_feedback_pub_.publish(self.uart_cmd_)
+    
+    ### Service Client
+    def LED_client(self, led_pin, state):
+        '''
+        Service client for switching an LED on or off
+        '''
+        client = self.create_client(LedPanelHandler, 'set_led')
+        while not client.wait_for_service(1.0):
+            self.get_logger().warn('Waiting for LED Handling Server...')
+        
+        request = LedPanelHandler.Request()
+        request.led_pin = led_pin
+        request.state = state
+
+        future = client.call_async(request = request)
+        future.add_done_callback(self.LED_panel_callback)
+
+    def LED_panel_callback(self, future):
+        '''
+        Service client callback once the LED switching server ends.
+        '''
+        try:
+            response = future.result()
+            if not response:
+                self.get_logger().warn('Failure in LED Panel Handling!')
+        except Exception as e:
+            self.get_logger().error('Service call failed %r' % (e, ))
     
     def destroy_node(self):
         # Close the UART when the node is destroyed

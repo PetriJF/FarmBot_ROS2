@@ -15,7 +15,9 @@ class KeyboardTeleOp(Node):
 
         # Keyboard publisher
         self.cmd_ = String()
-        self.input_pub_ = self.create_publisher(String, 'keyboard_topic', 10)
+        self.input_pub_ = self.create_publisher(String, 'input_topic', 10)
+        self.priority_pub_ = self.create_publisher(String, 'farmbot_command', 10)
+
 
         # Log the initialization
         self.get_logger().info('Keyboard Controller Initialized..')
@@ -47,9 +49,23 @@ class KeyboardTeleOp(Node):
                          'S_3_0', 'M', 'M_S', 'CONF', 'H_2', 'M_S')
         # Record the user input
         user_input = input('\nEnter command: ')
-        
+
         # Send the user input to the farmbot controller if it is a valid key or command
         if user_input in valid_keys or user_input.split(' ')[0] in compound_cmds:
+            #Send the command with priority at the UART controller
+            if user_input == 'e' :
+                self.cmd_.data = 'E' 
+                self.priority_pub_.publish(self.cmd_)
+                self.cmd_.data = 'e'
+                self.input_pub_.publish(self.cmd_)
+                self.get_logger().info('ESTOP button pressed')
+            elif user_input == 'E':
+                self.cmd_.data = 'F09'
+                self.priority_pub_.publish(self.cmd_)
+                self.cmd_.data = 'E'
+                self.input_pub_.publish(self.cmd_)
+                self.get_logger().info('RESET button pressed')
+            
             self.cmd_.data = user_input
             self.input_pub_.publish(self.cmd_)
         else:

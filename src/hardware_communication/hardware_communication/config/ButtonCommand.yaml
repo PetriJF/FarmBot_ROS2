@@ -1,0 +1,27 @@
+# Used to change the functions associated with each button 
+
+button_A:            ### Button associated with the command
+  command_name : 'Homing'
+  command : 'H_0'              # Code of the command
+  command_type: 'HIGH_LEVEL'        # command type : LOW_LEVEL or HIGH_LEVEL
+
+button_B:         
+  command_name : 'Calibration'   
+  command : 'C_0'             
+  command_type: 'HIGH_LEVEL' 
+
+button_C:            
+  command_name : 'Watering'
+  command : 'P_4'             
+  command_type: 'HIGH_LEVEL' 
+
+button_RESET:            
+  command_name : 'Reset'
+  command : 'F09'             
+  command_type: 'LOW_LEVEL' 
+
+button_ESTOP :            
+  command_name : 'estop'
+  command : 'E'             
+  command_type: 'LOW_LEVEL' 
+

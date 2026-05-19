@@ -12,9 +12,9 @@ def generate_launch_description():
             output='screen'
         ),
         Node(
-            package='farmbot_controllers',
-            executable='panel_controller',
-            name='panel_controller',
+            package='hardware_communication',
+            executable='gpio_controller',
+            name='gpio_controller',
             output='screen'
         ),
         Node(
