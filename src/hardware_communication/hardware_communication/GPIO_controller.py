@@ -200,6 +200,28 @@ class GPIOController(Node):
             self.get_logger().info('BUTTON C pressed : ' + self.button_['button_C']['command_name'] + ' is triggered')
             self.level_command(self.button_['button_C']['command_type'], self.button_['button_C']['command'])
 
+    def buttonHandler(self, channel, button_key):
+        '''
+        Generic Button Handler that can be used for any button by providing the button key in the yaml config file.
+        '''
+        current_state = GPIO.input(channel)
+        if current_state == GPIO.LOW:
+            if button_key == 'ESTOP' :
+                self.cmd_.data = 'E'
+                self.lowlevel_command_pub_.publish(self.cmd_)
+                self.cmd_.data = 'e'
+                self.highlevel_command_pub_.publish(self.cmd_)
+                self.get_logger().info('ESTOP button pressed')
+            elif button_key == 'RESET' :
+                self.cmd_.data = 'F09'
+                self.lowlevel_command_pub_.publish(self.cmd_)
+                self.cmd_.data = 'E'
+                self.highlevel_command_pub_.publish(self.cmd_)
+                self.get_logger().info('RESET button pressed')
+            elif button_key in ['button_A', 'button_B', 'button_C'] :
+                self.level_command(self.button_[button_key]['command_type'], self.button_[button_key]['command'])
+                self.get_logger().info( button_key + ' pressed : ' + self.button_[button_key]['command_name'] + ' is triggered')
+
     def level_command(self, level, cmd) :
         '''
         determines the topic to which the command should be sent based on the command level (LOW_LEVEL or HIGH_LEVEL)
@@ -224,11 +246,11 @@ def main(args = None):
     gpio_node = GPIOController()
     
     # GPIO Button
-    GPIO.add_event_detect(FBPanel.BUTTON_ESTOP, GPIO.FALLING, callback=gpio_node.estop_button_handler, bouncetime=200)
-    GPIO.add_event_detect(FBPanel.BUTTON_UNLOCK, GPIO.FALLING, callback=gpio_node.reset_button_handler, bouncetime=200)
-    GPIO.add_event_detect(FBPanel.BUTTON_A, GPIO.FALLING, callback=gpio_node.buttonAHandler, bouncetime=1000)
-    GPIO.add_event_detect(FBPanel.BUTTON_B, GPIO.FALLING, callback=gpio_node.buttonBHandler, bouncetime=1000)
-    GPIO.add_event_detect(FBPanel.BUTTON_C, GPIO.FALLING, callback=gpio_node.buttonCHandler, bouncetime=1000)
+    GPIO.add_event_detect(FBPanel.BUTTON_ESTOP, GPIO.FALLING, callback=gpio_node.buttonHandler('ESTOP'), bouncetime=200)
+    GPIO.add_event_detect(FBPanel.BUTTON_UNLOCK, GPIO.FALLING, callback=gpio_node.buttonHandler('RESET'), bouncetime=200)
+    GPIO.add_event_detect(FBPanel.BUTTON_A, GPIO.FALLING, callback=gpio_node.buttonHandler('button_A'), bouncetime=1000)
+    GPIO.add_event_detect(FBPanel.BUTTON_B, GPIO.FALLING, callback=gpio_node.buttonHandler('button_B'), bouncetime=1000)
+    GPIO.add_event_detect(FBPanel.BUTTON_C, GPIO.FALLING, callback=gpio_node.buttonHandler('button_C'), bouncetime=1000)
     
 
     try:

@@ -15,13 +15,3 @@ button_C:
   command : 'P_4'             
   command_type: 'HIGH_LEVEL' 
 
-button_RESET:            
-  command_name : 'Reset'
-  command : 'F09'             
-  command_type: 'LOW_LEVEL' 
-
-button_ESTOP :            
-  command_name : 'estop'
-  command : 'E'             
-  command_type: 'LOW_LEVEL' 
-
