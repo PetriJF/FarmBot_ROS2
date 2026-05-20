@@ -3,7 +3,6 @@ from rclpy.node import Node
 from farmbot_interfaces.msg import MapCommand
 from ament_index_python.packages import get_package_share_directory
 from std_msgs.msg import String
-from farmbot_interfaces.msg import ParameterCommand
 from farmbot_interfaces.srv import ParameterConfig, StringRepReq
 
 import os

@@ -183,27 +183,28 @@ class GPIOController(Node):
     def buttonAHandler(self, channel):
         current_state = GPIO.input(FBPanel.BUTTON_A)
         if current_state == GPIO.LOW:
-            self.cmd_.data = self.button_['button_A']['command']
-            self.level_command(self.button_['button_A']['level'])
+            self.get_logger().info('BUTTON A pressed : ' + self.button_['button_A']['command_name'] + ' is triggered')
+            self.level_command(self.button_['button_A']['command_type'], self.button_['button_A']['command'])
     
     # Example of mapping Button B to something (E.g. Calibrating)
     def buttonBHandler(self, channel):
         current_state = GPIO.input(FBPanel.BUTTON_B)
         if current_state == GPIO.LOW:
-            self.cmd_.data = self.button_['button_B']['command']
-            self.level_command(self.button_['button_B']['level'])
+            self.get_logger().info('BUTTON B pressed : ' + self.button_['button_B']['command_name'] + ' is triggered')
+            self.level_command(self.button_['button_B']['command_type'], self.button_['button_B']['command'])
 
     # Example of mapping Button C to something (E.g. Watering)
     def buttonCHandler(self, channel):
         current_state = GPIO.input(FBPanel.BUTTON_C)
         if current_state == GPIO.LOW:
-            self.cmd_.data = self.button_['button_C']['command']
-            self.level_command(self.button_['button_C']['level'])
+            self.get_logger().info('BUTTON C pressed : ' + self.button_['button_C']['command_name'] + ' is triggered')
+            self.level_command(self.button_['button_C']['command_type'], self.button_['button_C']['command'])
 
-    def level_command(self, level) :
+    def level_command(self, level, cmd) :
         '''
         determines the topic to which the command should be sent based on the command level (LOW_LEVEL or HIGH_LEVEL)
         '''
+        self.cmd_.data = cmd
         if level == 'LOW_LEVEL':
             self.lowlevel_command_pub_.publish(self.cmd_)
         elif level == 'HIGH_LEVEL' :

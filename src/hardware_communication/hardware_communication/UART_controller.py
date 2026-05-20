@@ -121,6 +121,16 @@ class UARTController(Node):
         match command[0]:
 
             ## Device Command Handler Cases
+            case 'E' :
+                self.temp.data = 'E'
+                self.LED_client(FBPanel.ESTOP_LED, FBPanel.OFF)
+                self.LED_client(FBPanel.UNLOCK_LED, FBPanel.FLASHING)
+
+            case 'F09' :
+                self.temp.data = 'F09'
+                self.LED_client(FBPanel.ESTOP_LED, FBPanel.ON)
+                self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
+
             case 'i2c_command':
                 self.temp.data = self.device_cmd_handler_.i2c_cmd(command[1:])
 
@@ -146,14 +156,6 @@ class UARTController(Node):
 
             case 'state_command':
                 self.temp.data =self.state_cmd_handler_.state_cmd(command[1:])
-            
-            case 'E' :
-                self.LED_client(FBPanel.ESTOP_LED, FBPanel.OFF)
-                self.LED_client(FBPanel.UNLOCK_LED, FBPanel.FLASHING)
-
-            case 'F09' :
-                self.LED_client(FBPanel.ESTOP_LED, FBPanel.ON)
-                self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
         
         # Priority commands
         if self.temp.data in ['E', 'F09', '@']:
