@@ -1,9 +1,9 @@
 # Used to change the functions associated with each button 
 
 button_A:            ### Button associated with the command
-  command_name : 'Homing'
-  command : 'H_0'              # Code of the command
-  command_type: 'HIGH_LEVEL'        # command type : LOW_LEVEL or HIGH_LEVEL
+  command_name : 'ESTOP'
+  command : 'E'              # Code of the command
+  command_type: 'LOW_LEVEL'        # command type : LOW_LEVEL or HIGH_LEVEL
 
 button_B:         
   command_name : 'Calibration'   

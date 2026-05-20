@@ -219,8 +219,8 @@ class GPIOController(Node):
                 self.highlevel_command_pub_.publish(self.cmd_)
                 self.get_logger().info('RESET button pressed')
             elif button_key in ['button_A', 'button_B', 'button_C'] :
-                self.level_command(self.button_[button_key]['command_type'], self.button_[button_key]['command'])
                 self.get_logger().info( button_key + ' pressed : ' + self.button_[button_key]['command_name'] + ' is triggered')
+                self.level_command(self.button_[button_key]['command_type'], self.button_[button_key]['command'])
 
     def level_command(self, level, cmd) :
         '''
