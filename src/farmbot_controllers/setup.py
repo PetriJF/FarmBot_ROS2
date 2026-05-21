@@ -23,8 +23,6 @@ setup(
     entry_points={
         'console_scripts': [
             "farmbot_controller = farmbot_controllers.farmbot_controller:main",
-            "keyboard_controller = farmbot_controllers.keyboard_teleop:main",
-            "autonomous_controller = farmbot_controllers.autonomous_controller:main",
             "param_conf_server = farmbot_controllers.config_managers:main"
         ],
     },

@@ -1,0 +1,10 @@
+# Used to change the autonomous commands
+
+#'time' :
+#   command : 'command to execute at this time'
+
+'11:07' :
+  command : 'P_4'    
+
+'12:00' :
+  command : 'H_0'       
