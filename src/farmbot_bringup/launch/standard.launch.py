@@ -14,7 +14,7 @@ def generate_launch_description():
             default_value = 'False'
         ),
         Node(
-            package='farmbot_controllers',
+            package='parameters_manager',
             executable='param_conf_server',
             name='param_conf_server',
             output='screen'

@@ -8,9 +8,9 @@ from farmbot_interfaces.srv import ParameterConfig, StringRepReq
 import os
 import time
 import yaml
-from farmbot_controllers.param_info import ParameterList
+from parameters_manager.param_info import ParameterList
 
-class ConfigServer(Node):
+class ParameterManager(Node):
     '''
     Node handling the parameter recording and loading onto the farmduino
     '''
@@ -20,7 +20,7 @@ class ConfigServer(Node):
          Config Handling Node Constructor
          Sets up all the paths, servers, publishers and subscribers for the node
         '''
-        super().__init__('ConfigServer')
+        super().__init__('ParameterManager')
         # Flag waiting for initialization to be done before the config is loaded
         self.firmware_init_done = False
 
@@ -33,8 +33,8 @@ class ConfigServer(Node):
         }
 
         # The share directory path and the file names for all the files
-        self.default_path = os.path.join(
-            get_package_share_directory('farmbot_controllers'),
+        self.default_path_ = os.path.join(
+            get_package_share_directory('parameters_manager'),
             'config'
         )
         self.base_config = 'firmwareDefault.yaml'  # default config loaded by the firmware
@@ -251,14 +251,14 @@ class ConfigServer(Node):
 def main(args = None):
     rclpy.init(args = args)
 
-    config_server = ConfigServer()
+    parameter_manager = ParameterManager()
 
     try:
-        rclpy.spin(config_server)
+        rclpy.spin(parameter_manager)
     except KeyboardInterrupt:
         pass
     finally:
-        config_server.destroy_node()
+        parameter_manager.destroy_node()
         rclpy.shutdown()
 
 if __name__ == '__main__':

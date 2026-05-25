@@ -6,7 +6,7 @@ from launch.actions import TimerAction
 def generate_launch_description():
     return LaunchDescription([
         Node(
-            package='farmbot_controllers',
+            package='parameters_manager',
             executable='param_conf_server',
             name='param_conf_server',
             output='screen'

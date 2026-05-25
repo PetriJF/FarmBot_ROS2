@@ -23,7 +23,6 @@ setup(
     entry_points={
         'console_scripts': [
             "farmbot_controller = farmbot_controllers.farmbot_controller:main",
-            "param_conf_server = farmbot_controllers.config_managers:main"
         ],
     },
 )
