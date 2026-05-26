@@ -5,12 +5,12 @@
   <version>1.0.0</version>
   <description>Package containing all the launch files for the ROS2 Farmbot</description>
   <maintainer email="jamespetri28@gmail.com">James</maintainer>
-  <license>TODO: License declaration</license>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <exec_depend>farmbot_controllers</exec_depend>
-  <exec_depend>hardware_communication</exec_depend>
+  <exec_depend>farmbot_hardware_comm</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

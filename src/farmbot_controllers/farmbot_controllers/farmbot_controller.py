@@ -18,32 +18,32 @@ class FarmbotControl(Node):
         super().__init__('FarmbotController')
 
         # Initializing movemement module
-        self.mvm_ = Movement(self)
+        self.mvm = Movement(self)
         # Initializing the state module
-        self.state_ = State(self)
+        self.state = State(self)
         # Initializing the devices and peripherals modules
-        self.devices_ = DeviceControl(self)
+        self.devices = DeviceControl(self)
         # Initializing the tool module
-        self.tools_ = Sequencer(self, self.mvm_, self.devices_)
+        self.tools = Sequencer(self, self.mvm, self.devices)
         # Initializing the parameter manipulator
-        self.params_ = Parameters(self)
+        self.params = Parameters(self)
 
         # Memory
-        self.cur_x_ = 0.0
-        self.cur_y_ = 0.0
-        self.cur_z_ = 0.0
+        self.cur_x = 0.0
+        self.cur_y = 0.0
+        self.cur_z = 0.0
 
         # Temporary Keyboard subscriber
-        self.cur_increment_ = 10.0
-        self.input_sub_ = self.create_subscription(String, 'input_topic', self.cmd_interp_callback, 10)
+        self.cur_increment = 10.0
+        self.input_sub = self.create_subscription(String, 'input_topic', self.cmd_interp_callback, 10)
 
         # Farmbot Feedback Subscriber
-        self.fb_feedback_sub_ = self.create_subscription(String, 'farmbot_feedback', self.fb_feedback_callback, 10)
+        self.fb_feedback_sub = self.create_subscription(String, 'farmbot_feedback', self.fb_feedback_callback, 10)
 
         # Map publishers
-        self.plant_conf_ = PlantManage()
-        self.plant_manage_pub_ = self.create_publisher(PlantManage, 'plant_mng', 10)
-        self.plant_cmd_pub_ = self.create_publisher(String, 'plant_cmd', 10)  # TODO: remove
+        self.plant_conf = PlantManage()
+        self.plant_manage_pub = self.create_publisher(PlantManage, 'plant_mng', 10)
+        self.plant_cmd_pub = self.create_publisher(String, 'plant_cmd', 10)  # TODO: remove
 
         # Log the initialization
         self.get_logger().info('Farmbot Controller Initialized..')
@@ -54,40 +54,40 @@ class FarmbotControl(Node):
             ## Electronic Stop
             case 'e':
                 self.get_logger().info('CLEARING SEQUENCE')
-                self.tools_.clear_sequence()
+                self.tools.clear_sequence()
             ## Movement Commands
             case 'M':
                 if len(code) != 4:
                     self.get_logger().warning("You need to include all 3 coordinates! Command ignored!")
                 else:
-                    self.mvm_.move_gantry_abs(x_coord = float(code[1]), y_coord = float(code[2]), z_coord = float(code[3]))
+                    self.mvm.move_gantry_abs(x_coord = float(code[1]), y_coord = float(code[2]), z_coord = float(code[3]))
             case 'M_S':
                 if len(code) != 5:
                     self.get_logger().warning("You need to include all 3 coordinates and a speed percentage! Command ignored!")
                 else:
-                    self.mvm_.move_gantry_s(x_coord = float(code[1]), y_coord = float(code[2]),
+                    self.mvm.move_gantry_s(x_coord = float(code[1]), y_coord = float(code[2]),
                                             z_coord = float(code[3]), speed = float(code[4]))
             case 'w' | 's':
-                self.mvm_.move_gantry_abs(x_coord = self.cur_x_ + (self.cur_increment_ * (-1 if code[0] == 's' else 1)),
-                                          y_coord = self.cur_y_,
-                                          z_coord = self.cur_z_)
+                self.mvm.move_gantry_abs(x_coord = self.cur_x + (self.cur_increment * (-1 if code[0] == 's' else 1)),
+                                          y_coord = self.cur_y,
+                                          z_coord = self.cur_z)
             case 'a' | 'd':
-                self.mvm_.move_gantry_abs(x_coord = self.cur_x_,
-                                          y_coord = self.cur_y_ + self.cur_increment_ * (-1 if code[0] == 'a' else 1),
-                                          z_coord = self.cur_z_)
+                self.mvm.move_gantry_abs(x_coord = self.cur_x,
+                                          y_coord = self.cur_y + self.cur_increment * (-1 if code[0] == 'a' else 1),
+                                          z_coord = self.cur_z)
             case '1':
-                self.cur_increment_ = 10.0
+                self.cur_increment = 10.0
             case '2':
-                self.cur_increment_ = 100.0
+                self.cur_increment = 100.0
             case '3':
-                self.cur_increment_ = 500.0
+                self.cur_increment = 500.0
             ## Homing commands
             case 'H_0': 
-                self.mvm_.go_home()
+                self.mvm.go_home()
             case 'H_1':
-                self.mvm_.find_all_homes()
+                self.mvm.find_all_homes()
             case 'H_2':
-                self.mvm_.find_axis_home(x = True if code[1] == 'X' else False,
+                self.mvm.find_axis_home(x = True if code[1] == 'X' else False,
                                          y = True if code[1] == 'Y' else False,
                                          z = True if code[1] == 'Z' else False)
             ## Parameter configuration commands
@@ -103,9 +103,9 @@ class FarmbotControl(Node):
             ## Axis Calibration commands
             case 'C_0': # C_0 for calib. all axis, C_0 X for calib. x axis and so on
                 if len(code) == 1:
-                    self.mvm_.calibrate_all_axis()
+                    self.mvm.calibrate_all_axis()
                 else:
-                    self.mvm_.calibrate_axis(x = True if code[1] == 'X' else False,
+                    self.mvm.calibrate_axis(x = True if code[1] == 'X' else False,
                                              y = True if code[1] == 'Y' else False,
                                              z = True if code[1] == 'Z' else False)
             ## Load parameter configuration commands
@@ -124,88 +124,88 @@ class FarmbotControl(Node):
                                        (2 if code[1] == 'Y' else 0) +
                                        (3 if code[1] == 'Z' else 0))
                         self.param_config_client('F22 P' + str(param) + ' V1')
-                        self.params_.writeParam(param, 1)
+                        self.params.writeParam(param, 1)
                     else:
                         self.get_logger().warning('C_2: Invalid option selected. Choose: X, Y, Z')
             ## Tool commands
             case 'T_1_0' | 'T_2_0' | 'T_3_0': # e.g. T_1_0 Seeder 1198.0 332.4 -240.0 1
                 tool = code[0] + '\n' + code[1] + '\n' + code[2] + ' ' + code[3] + ' ' + code[4] + ' ' + code[5]
-                self.tools_.map_cmd_client(cmd = tool)
+                self.tools.map_cmd_client(cmd = tool)
             case 'T_1_1' | 'T_1_2' | 'T_2_1' | 'T_2_2' | 'T_3_1' | 'T_3_2':
-                self.tools_.map_cmd_client(cmd = cmd.data)
+                self.tools.map_cmd_client(cmd = cmd.data)
             ## Plant commands
             case 'P_1':
-                self.plant_conf_.add = True
-                self.plant_conf_.autopos = False
-                self.plant_conf_.x = float(code[1])
-                self.plant_conf_.y = float(code[2])
-                self.plant_conf_.z = float(code[3])
-                self.plant_conf_.exclusion_radius = float(code[4])
-                self.plant_conf_.canopy_radius = float(code[5])
-                self.plant_conf_.water_quantity = float(code[6])
-                self.plant_conf_.max_z = float(code[7])
-                self.plant_conf_.plant_name = code[8]
-                self.plant_conf_.growth_stage = code[9]
-                self.plant_conf_.remove = False
-                self.plant_conf_.index = -1
+                self.plant_conf.add = True
+                self.plant_conf.autopos = False
+                self.plant_conf.x = float(code[1])
+                self.plant_conf.y = float(code[2])
+                self.plant_conf.z = float(code[3])
+                self.plant_conf.exclusion_radius = float(code[4])
+                self.plant_conf.canopy_radius = float(code[5])
+                self.plant_conf.water_quantity = float(code[6])
+                self.plant_conf.max_z = float(code[7])
+                self.plant_conf.plant_name = code[8]
+                self.plant_conf.growth_stage = code[9]
+                self.plant_conf.remove = False
+                self.plant_conf.index = -1
 
-                self.plant_manage_pub_.publish(self.plant_conf_)
+                self.plant_manage_pub.publish(self.plant_conf)
             case 'P_2':
-                self.plant_conf_.add = False
-                self.plant_conf_.autopos = False
-                self.plant_conf_.x = -1.0
-                self.plant_conf_.y = -1.0
-                self.plant_conf_.z = -1.0
-                self.plant_conf_.exclusion_radius = -1.0
-                self.plant_conf_.canopy_radius = -1.0
-                self.plant_conf_.water_quantity = -1.0
-                self.plant_conf_.max_z = -1.0
-                self.plant_conf_.plant_name = ''
-                self.plant_conf_.growth_stage = ''
-                self.plant_conf_.remove = True
-                self.plant_conf_.index = int(code[1])
+                self.plant_conf.add = False
+                self.plant_conf.autopos = False
+                self.plant_conf.x = -1.0
+                self.plant_conf.y = -1.0
+                self.plant_conf.z = -1.0
+                self.plant_conf.exclusion_radius = -1.0
+                self.plant_conf.canopy_radius = -1.0
+                self.plant_conf.water_quantity = -1.0
+                self.plant_conf.max_z = -1.0
+                self.plant_conf.plant_name = ''
+                self.plant_conf.growth_stage = ''
+                self.plant_conf.remove = True
+                self.plant_conf.index = int(code[1])
 
-                self.plant_manage_pub_.publish(self.plant_conf_)
+                self.plant_manage_pub.publish(self.plant_conf)
             case 'P_3' | 'P_4' | 'P_5' | 'P_9': # Seed/water all plants in Planning stage
-                self.tools_.map_cmd_client(cmd = cmd.data)
+                self.tools.map_cmd_client(cmd = cmd.data)
             ## Seed Tray commands
             case 'S_1_0' | 'S_2_0' | 'S_3_0': # e.g. S_1_0 0 Tray1 Radish 1198.0 332.4 -240.0
                 tray = (code[0] + (('_' + code[1]) if code[1] in ['0', '1'] else '_0') 
                         + '\n' + code[2] + '\n' + code[3] + '\n' 
                         + code[4] + ' ' + code[5] + ' ' + code[6])
-                self.tools_.map_cmd_client(cmd = tray)
+                self.tools.map_cmd_client(cmd = tray)
             case 'I_0': # Calibrate Camera
-                self.tools_.cam_calib_client(cmd = 'GET')
+                self.tools.cam_calib_client(cmd = 'GET')
             case 'I_1': # Stitch panorama at current position
-                self.tools_.stitch_panorama_client(calib = False, detect_weeds = False, update_map = False, mosaic = False,
-                                                    x = self.cur_x_, y = self.cur_y_,
-                                                    z = self.cur_z_)
+                self.tools.stitch_panorama_client(calib = False, detect_weeds = False, update_map = False, mosaic = False,
+                                                    x = self.cur_x, y = self.cur_y,
+                                                    z = self.cur_z)
             case 'I_2':
-                self.tools_.panorama_client()
+                self.tools.panorama_client()
             case 'I_3':
-                self.tools_.panorama_client(mosaic = True)
+                self.tools.panorama_client(mosaic = True)
             case 'I_4':
-                self.tools_.stitch_panorama_client(calib = False, detect_weeds = True, update_map = False, mosaic = False,
-                                                    x = self.cur_x_, y = self.cur_y_,
-                                                    z = self.cur_z_)
+                self.tools.stitch_panorama_client(calib = False, detect_weeds = True, update_map = False, mosaic = False,
+                                                    x = self.cur_x, y = self.cur_y,
+                                                    z = self.cur_z)
             ## Device commands
             case 'D_L_1' | 'D_L_0':
-                self.tools_.led_strip(state = int(code[0][4]))
+                self.tools.led_strip(state = int(code[0][4]))
             case 'D_V_0' | 'D_V_1':
-                self.tools_.vacuum_pump(state = int(code[0][4]))
+                self.tools.vacuum_pump(state = int(code[0][4]))
             case 'D_W_0' | 'D_W_1':
-                self.tools_.water_pump(state = int(code[0][4]))
+                self.tools.water_pump(state = int(code[0][4]))
             case 'D_C':
-                self.devices_.read_pin(63, False)
+                self.devices.read_pin(63, False)
             case 'D_S_C':
-                self.devices_.read_pin(59, True)
+                self.devices.read_pin(59, True)
             case 'P4_0' | 'P4_1':
-                self.tools_.peripheral_4(state = int(code[0][3]))
+                self.tools.peripheral_4(state = int(code[0][3]))
             case 'P5_0' | 'P5_1':
-                self.tools_.peripheral_5(state = int(code[0][3]))
+                self.tools.peripheral_5(state = int(code[0][3]))
             case 'M_S':
                 self.get_logger().info(f'Trying to move servo {int(code[1])} to {int(code[2])}')
-                self.devices_.move_servo(pin = int(code[1]), angle = float(code[2]))
+                self.devices.move_servo(pin = int(code[1]), angle = float(code[2]))
 
     ## Farmbot Handling Callback
     
@@ -218,16 +218,16 @@ class FarmbotControl(Node):
         reportCode = msgSplit[0]
 
         if reportCode == 'R82':
-            self.cur_x_ = float(msgSplit[1][1:])
-            self.cur_y_ = float(msgSplit[2][1:])
-            self.cur_z_ = float(msgSplit[3][1:])
+            self.cur_x = float(msgSplit[1][1:])
+            self.cur_y = float(msgSplit[2][1:])
+            self.cur_z = float(msgSplit[3][1:])
             
             # Update the position reference within the sequencing module
-            self.tools_.x = self.cur_x_
-            self.tools_.y = self.cur_y_
-            self.tools_.z = self.cur_z_
+            self.tools.x = self.cur_x
+            self.tools.y = self.cur_y
+            self.tools.z = self.cur_z
         elif reportCode == 'R41':
-            self.tools_.uart_message(msg.data)
+            self.tools.uart_message(msg.data)
     
     ## Parameter Manager Clients and Future Callbacks
 
@@ -298,7 +298,7 @@ class FarmbotControl(Node):
             if future.result().cmd:
                 info = future.result().cmd.split(' ')
                 if info[0] == 'MAP':
-                    self.tools_.stitch_panorama_client(calib = False, update_map = True, mosaic = False,
+                    self.tools.stitch_panorama_client(calib = False, update_map = True, mosaic = False,
                                                        x = float(info[2]), y = float(info[4]),
                                                        z = float(info[6]))
         except Exception as e:

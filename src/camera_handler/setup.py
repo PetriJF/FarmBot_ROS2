@@ -1,5 +1,5 @@
 from setuptools import find_packages, setup
-import os
+import os, glob
 package_name = 'camera_handler'
 
 setup(
@@ -10,15 +10,14 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        (os.path.join('share', package_name, 'config'), [os.path.join(package_name, 'config', 'luxonis_camera_config.yaml')]),
-        (os.path.join('share', package_name, 'config'), [os.path.join(package_name, 'config', 'standard_camera_config.yaml')]),
+        (os.path.join('share', package_name, 'config'), glob.glob('config/*.yaml')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='Edward',
     maintainer_email='ejakunskas@gmail.com',
     description='TODO: Package description',
-    license='TODO: License declaration',
+    license='MIT',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [

@@ -10,7 +10,7 @@ from farmbot_interfaces.srv import LedPanelHandler
 from farmbot_interfaces.msg import FBPanel
 
 # Modules
-from hardware_communication.farmbot_cmd_handler import  DeviceCmdHandler, MotorCmdHandler, StateCmdHandler
+from farmbot_hardware_comm.farmbot_hardware_comm.fcode_encoder import  DeviceCmdHandler, MotorCmdHandler, StateCmdHandler
 
 class UARTController(Node):
     '''
@@ -27,7 +27,7 @@ class UARTController(Node):
     Input Topics:
         - /farmbot_command {String} -> the information that is to be transmitted to the farmduino through Serial.
     Output Topics:
-        - /farmbot_feedback {String} -> Tinformation that is received from serial and is carried on through the system.
+        - /farmbot_feedback {String} -> The information that is received from serial and is carried on through the system.
         - /busy_state {Bool} -> used to set the busy state of the system.
     '''
     # Node contructor
@@ -37,40 +37,40 @@ class UARTController(Node):
         '''
         super().__init__('UARTController')
 
-        self.uart_cmd_ = String()
+        self.uart_cmd = String()
         self.temp = String()
 
-        serial_port = '/dev/ttyACM0'
-        serial_speed = 115200
-        check_uart_freq = 100
-        tx_freq = 10
+        serial_port  = self.get_parameter('serial_port').get_parameter_value().string_value
+        serial_speed = self.get_parameter('serial_speed').get_parameter_value().integer_value
+        check_uart_freq = self.get_parameter('check_uart_freq').get_parameter_value().integer_value
+        tx_freq = self.get_parameter('tx_freq').get_parameter_value().integer_value
 
         # Initializing farmbot command handler modules
-        self.device_cmd_handler_ = DeviceCmdHandler(self)
-        self.motor_cmd_handler_ = MotorCmdHandler(self)
-        self.state_cmd_handler_ = StateCmdHandler(self)
+        self.device_cmd_handler = DeviceCmdHandler(self)
+        self.motor_cmd_handler = MotorCmdHandler(self)
+        self.state_cmd_handler = StateCmdHandler(self)
 
         # UART receive publisher
-        self.fb_feedback_pub_ = self.create_publisher(String, 'farmbot_feedback', 10)
+        self.fb_feedback_pub = self.create_publisher(String, 'farmbot_feedback', 10)
 
         # Farmbot state publisher
-        self.farmbot_busy_ = Bool()
-        self.farmbot_busy_.data = False
-        self.farmbot_state_pub_ = self.create_publisher(Bool, 'busy_state', 10)
+        self.farmbot_busy = Bool()
+        self.farmbot_busy.data = False
+        self.farmbot_state_pub = self.create_publisher(Bool, 'busy_state', 10)
 
         # Node subscripters and publishers
-        self.tx_queue_ = []
-        self.fb_cmd_sub_ = self.create_subscription(String, 'farmbot_command', self.farmbot_cmd_callback, 10)
+        self.tx_queue = []
+        self.fb_cmd_sub = self.create_subscription(String, 'farmbot_command', self.farmbot_cmd_callback, 10)
         
         # Initialize Serial Communication
-        self.ser_ = serial.Serial(serial_port, serial_speed, timeout=1)
-        self.ser_.reset_input_buffer()
+        self.ser = serial.Serial(serial_port, serial_speed, timeout=1)
+        self.ser.reset_input_buffer()
         # Create a timer to periodically check for incoming serial messages
-        self.rx_timer_ = self.create_timer(1.0 / check_uart_freq, self.uart_receive)
-        self.tx_timer_ = self.create_timer(1.0 / tx_freq, self.uart_transmit)
+        self.rx_timer = self.create_timer(1.0 / check_uart_freq, self.uart_receive)
+        self.tx_timer = self.create_timer(1.0 / tx_freq, self.uart_transmit)
 
         # Used for setting the busy status on the ROS2 arch. while a command is running
-        self.previous_cmd_ = ''
+        self.previous_cmd = ''
         
         # Initialize the LED states
         self.LED_client(FBPanel.ESTOP_LED, FBPanel.ON)
@@ -89,22 +89,22 @@ class UARTController(Node):
         '''
         
         # If the blocker is not up, and there are commands in the queue
-        if not self.farmbot_busy_.data and self.tx_queue_:
+        if not self.farmbot_busy.data and self.tx_queue:
             # Set the blocker flag
-            self.farmbot_busy_.data = True
-            self.farmbot_state_pub_.publish(self.farmbot_busy_)
+            self.farmbot_busy.data = True
+            self.farmbot_state_pub.publish(self.farmbot_busy)
             # Clear the command from the queue
-            message = self.tx_queue_.pop(0)
+            message = self.tx_queue.pop(0)
             
             # Ensure the command has an endline character at the end
             if message[-1] != '\n':
                 message += "\n"
 
             # Record the transmitted command
-            self.previous_cmd_ = message.split(' ')[0] if ' ' in message else message.split('\n')[0]
+            self.previous_cmd = message.split(' ')[0] if ' ' in message else message.split('\n')[0]
             self.get_logger().info(f'Sent message: {message}')
             # Send through UART the command
-            self.ser_.write(message.encode('utf-8'))
+            self.ser.write(message.encode('utf-8'))
 
     def farmbot_cmd_callback(self, cmd: String):
         '''
@@ -132,30 +132,30 @@ class UARTController(Node):
                 self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
 
             case 'i2c_command':
-                self.temp.data = self.device_cmd_handler_.i2c_cmd(command[1:])
+                self.temp.data = self.device_cmd_handler.i2c_cmd(command[1:])
 
             case 'pin_command':
-                self.temp.data = self.device_cmd_handler_.pin_cmd(command[1:])
+                self.temp.data = self.device_cmd_handler.pin_cmd(command[1:])
 
             case 'water_command':
-                self.temp.data = self.device_cmd_handler_.water_cmd(command[1:])
+                self.temp.data = self.device_cmd_handler.water_cmd(command[1:])
 
             ## Motor Command Handler Cases
             case 'home_handler':
-                self.temp.data = self.motor_cmd_handler_.home_cmd(command[1:])
+                self.temp.data = self.motor_cmd_handler.home_cmd(command[1:])
 
             case 'move_gantry':
-                self.temp.data = self.motor_cmd_handler_.gantry_cmd(command[1:])
+                self.temp.data = self.motor_cmd_handler.gantry_cmd(command[1:])
 
             case 'move_servo':
-                self.temp.data = self.motor_cmd_handler_.servo_cmd(command[1:])
+                self.temp.data = self.motor_cmd_handler.servo_cmd(command[1:])
         
             ## State Command Handler Cases
             case 'parameter_command':
-                self.temp.data = self.state_cmd_handler_.param_cmd(command[1:])
+                self.temp.data = self.state_cmd_handler.param_cmd(command[1:])
 
             case 'state_command':
-                self.temp.data =self.state_cmd_handler_.state_cmd(command[1:])
+                self.temp.data =self.state_cmd_handler.state_cmd(command[1:])
         
         # Priority commands
         if self.temp.data in ['E', 'F09', '@']:
@@ -165,14 +165,14 @@ class UARTController(Node):
                 self.temp.data += "\n"
 
             # Send command and reset everything
-            self.ser_.write(self.temp.data.encode('utf-8'))
-            self.tx_queue_.clear()
-            self.farmbot_busy_.data = False
-            self.farmbot_state_pub_.publish(self.farmbot_busy_)
+            self.ser.write(self.temp.data.encode('utf-8'))
+            self.tx_queue.clear()
+            self.farmbot_busy.data = False
+            self.farmbot_state_pub.publish(self.farmbot_busy)
         # Standard commands
         else:
             # Add the command to the queue
-            self.tx_queue_.append(self.temp.data)
+            self.tx_queue.append(self.temp.data)
 
     def uart_receive(self):
         '''
@@ -180,7 +180,7 @@ class UARTController(Node):
         codes and commands.
         '''
         # Read from serial
-        line = self.ser_.readline().decode('utf-8').rstrip()
+        line = self.ser.readline().decode('utf-8').rstrip()
         
         # If a command is read, handle it
         if line:
@@ -197,7 +197,7 @@ class UARTController(Node):
             message {str}: the command string
         '''
         # Record the message
-        self.uart_cmd_.data = message
+        self.uart_cmd.data = message
         
         # Blocking command codes
         blocking_cmds = ['G00', 'G01', 'G28', 'F11', 'F12', 'F13',
@@ -212,17 +212,17 @@ class UARTController(Node):
         
         # If a running command has finished OR the response for a request was retrieved
         # OR the sent command was acknowledged by the farmbot
-        if ((self.previous_cmd_ in blocking_cmds and rep_code in blocking_responses)
-                or (self.previous_cmd_ in request_cmds and rep_code in response_cmds)
-                or (self.previous_cmd_ not in blocking_cmds 
-                    and self.previous_cmd_ not in request_cmds
+        if ((self.previous_cmd in blocking_cmds and rep_code in blocking_responses)
+                or (self.previous_cmd in request_cmds and rep_code in response_cmds)
+                or (self.previous_cmd not in blocking_cmds 
+                    and self.previous_cmd not in request_cmds
                     and rep_code in ['R08'])):
             # Lower the blocking flag
-            self.farmbot_busy_.data = False
-            self.farmbot_state_pub_.publish(self.farmbot_busy_)
+            self.farmbot_busy.data = False
+            self.farmbot_state_pub.publish(self.farmbot_busy)
         
         # Send the reporting message for further processing by other nodes
-        self.fb_feedback_pub_.publish(self.uart_cmd_)
+        self.fb_feedback_pub.publish(self.uart_cmd)
     
     ### Service Client
     def LED_client(self, led_pin, state):
@@ -253,7 +253,7 @@ class UARTController(Node):
     
     def destroy_node(self):
         # Close the UART when the node is destroyed
-        self.ser_.close()
+        self.ser.close()
 
 # Main Function called on the initialization of the ROS2 Node
 def main(args = None):

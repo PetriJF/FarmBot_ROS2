@@ -16,9 +16,9 @@ class State:
         self.node = node
 
         # The state interface object
-        self.state_ = String()
+        self.state = String()
         # The publisher for the state commands
-        self.state_pub_ = self.node.create_publisher(String, 'farmbot_command', 10)
+        self.state_pub = self.node.create_publisher(String, 'farmbot_command', 10)
     
     ## State handling functions
     
@@ -72,6 +72,6 @@ class State:
             rep_sw_ver   {Bool}: Requests the software version
         '''
 
-        self.state_.data = 'state_command ' +str(estop) + ' ' + str (abort_movement) + ' ' + str(reset_estop) + ' ' + str(rep_end_stop) + ' ' + str(rep_curr_pos) + ' ' + str(rep_sw_ver)
+        self.state.data = 'state_command ' +str(estop) + ' ' + str (abort_movement) + ' ' + str(reset_estop) + ' ' + str(rep_end_stop) + ' ' + str(rep_curr_pos) + ' ' + str(rep_sw_ver)
 
-        self.state_pub_.publish(self.state_)
+        self.state_pub.publish(self.state)

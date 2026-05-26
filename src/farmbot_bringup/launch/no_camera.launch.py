@@ -12,7 +12,7 @@ def generate_launch_description():
             output='screen'
         ),
         Node(
-            package='hardware_communication',
+            package='farmbot_hardware_comm',
             executable='gpio_controller',
             name='gpio_controller',
             output='screen'
@@ -36,10 +36,16 @@ def generate_launch_description():
             actions=[
                 # Start uart_controller after the delay
                 Node(
-                    package='hardware_communication',
+                    package='farmbot_hardware_comm',
                     executable='uart_controller',
                     name='uart_controller',
-                    output='screen'
+                    output='screen',
+                    parameters = [
+                        {'serial_port': '/dev/ttyACM0'},
+                        {'serial_speed': 115200},
+                        {'check_uart_freq': 100},
+                        {'tx_freq': 10},
+                    ]
                 )
             ]
         )

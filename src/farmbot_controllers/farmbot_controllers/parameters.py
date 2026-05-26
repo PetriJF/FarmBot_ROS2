@@ -6,9 +6,9 @@ class Parameters:
         self.node = node
         
         # Used for reading and writing to the FarmBot Parameters
-        self.paramHandler_ = String() 
+        self.paramHandler = String() 
         # Parameter Command Publisher
-        self.paramCmdPub_ = self.node.create_publisher(String, 'farmbot_command', 10)
+        self.paramCmdPub = self.node.create_publisher(String, 'farmbot_command', 10)
 
     ## Parameter Handling Commands
 
@@ -60,6 +60,6 @@ class Parameters:
             value {Int}: Value written to param if write or update modes are active
         '''
         
-        self.paramHandler_.data = 'parameter_command ' + str(list) + ' ' + str(write) + ' ' + str(read) + ' ' + str(update) + ' ' + str(param) + ' ' + str(value)
+        self.paramHandler.data = 'parameter_command ' + str(list) + ' ' + str(write) + ' ' + str(read) + ' ' + str(update) + ' ' + str(param) + ' ' + str(value)
 
-        self.paramCmdPub_.publish(self.paramHandler_)
+        self.paramCmdPub.publish(self.paramHandler)
