@@ -40,6 +40,11 @@ class UARTController(Node):
         self.uart_cmd = String()
         self.temp = String()
 
+        self.declare_parameter('serial_port')
+        self.declare_parameter('serial_speed')
+        self.declare_parameter('check_uart_freq')
+        self.declare_parameter('tx_freq')
+
         serial_port  = self.get_parameter('serial_port').get_parameter_value().string_value
         serial_speed = self.get_parameter('serial_speed').get_parameter_value().integer_value
         check_uart_freq = self.get_parameter('check_uart_freq').get_parameter_value().integer_value
