@@ -10,7 +10,7 @@ from farmbot_interfaces.srv import LedPanelHandler
 from farmbot_interfaces.msg import FBPanel
 
 # Modules
-from farmbot_hardware_comm.farmbot_hardware_comm.fcode_encoder import  DeviceCmdHandler, MotorCmdHandler, StateCmdHandler
+from farmbot_hardware_comm.fcode_encoder import  DeviceCmdHandler, MotorCmdHandler, StateCmdHandler
 
 class UARTController(Node):
     '''
