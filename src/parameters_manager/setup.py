@@ -4,7 +4,7 @@ package_name = 'parameters_manager'
 
 setup(
     name=package_name,
-    version='0.0.0',
+    version='1.0.0',
     packages=find_packages(exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages',
@@ -13,10 +13,10 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='aura_ws',
+    maintainer='Salome',
     maintainer_email='salome.deoliveira.2026@mumail.ie',
     description='Package containing the parameter manager for the ROS2 Farmbot',
-    license='TODO: License declaration',
+    license='MIT',
     extras_require={
         'test': [
             'pytest',
@@ -24,7 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            "param_conf_server = parameters_manager.config_managers:main",
+            "param_conf_server = parameters_manager.parameter_manager:main",
         ],
     },
 )
