@@ -5,7 +5,7 @@
   <version>1.0.0</version>
   <description>Package handling map information and seed mapping. Also handles sequencing for some tasks</description>
   <maintainer email="jamespetri28@gmail.com">James</maintainer>
-  <license>TODO: License declaration</license>
+  <license>MIT</license>
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>

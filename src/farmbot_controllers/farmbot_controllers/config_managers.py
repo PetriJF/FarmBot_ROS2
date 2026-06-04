@@ -3,7 +3,6 @@ from rclpy.node import Node
 from farmbot_interfaces.msg import MapCommand
 from ament_index_python.packages import get_package_share_directory
 from std_msgs.msg import String
-from farmbot_interfaces.msg import ParameterCommand
 from farmbot_interfaces.srv import ParameterConfig, StringRepReq
 
 import os
@@ -23,7 +22,7 @@ class ConfigServer(Node):
         '''
         super().__init__('ConfigServer')
         # Flag waiting for initialization to be done before the config is loaded
-        self.firmware_init_done_ = False
+        self.firmware_init_done = False
 
         # The dictionary containing all of the parameters for the farmbot
         self.params = ParameterList()
@@ -34,45 +33,45 @@ class ConfigServer(Node):
         }
 
         # The share directory path and the file names for all the files
-        self.default_path_ = os.path.join(
+        self.default_path = os.path.join(
             get_package_share_directory('farmbot_controllers'),
             'config'
         )
-        self.base_config_ = 'firmwareDefault.yaml'  # default config loaded by the firmware
-        self.custom1_config_ = 'Custom1.yaml'       # custom configuration. modify in source directory and build
-        self.genesis_config_ = 'Genesis.yaml'       # farmbot genesis config
-        self.express_config_ = 'Express.yaml'       # farmbot express config
-        self.active_config_ = 'activeConfig.yaml'   # configuration loaded from previous run
+        self.base_config = 'firmwareDefault.yaml'  # default config loaded by the firmware
+        self.custom1_config = 'Custom1.yaml'       # custom configuration. modify in source directory and build
+        self.genesis_config = 'Genesis.yaml'       # farmbot genesis config
+        self.express_config = 'Express.yaml'       # farmbot express config
+        self.active_config = 'activeConfig.yaml'   # configuration loaded from previous run
         
         # TODO: Add more default configurations other than the labFB one
 
         # Config Service Servers
-        self.config_server_ = self.create_service(ParameterConfig, 'manage_param_config', self.config_request_server)
-        self.config_loading_server_ = self.create_service(StringRepReq, 'load_param_config', self.param_loading_server)
+        self.config_server = self.create_service(ParameterConfig, 'manage_param_config', self.config_request_server)
+        self.config_loading_server = self.create_service(StringRepReq, 'load_param_config', self.param_loading_server)
 
         # Parameter Command publisher (Used for loading up parameters)
-        self.param_cmd_ = ParameterCommand()
-        self.param_cmd_pub_ = self.create_publisher(ParameterCommand, 'parameter_command', 10)
+        self.param_cmd = String()
+        self.param_cmd_pub = self.create_publisher(String, 'farmbot_command', 10)
 
-        # UART Rx Subscriber
-        self.uart_rx_sub_ = self.create_subscription(String, 'uart_receive', self.uart_rx_callback, 10)
+        # Farmbot Feedback Subscriber
+        self.fb_feedback_sub = self.create_subscription(String, 'farmbot_feedback', self.fb_feedback_callback, 10)
 
         # Map updating publisher
-        self.map_cmd_ = MapCommand()
-        self.map_cmd_pub_ = self.create_publisher(MapCommand, 'map_cmd', 10)
+        self.map_cmd = MapCommand()
+        self.map_cmd_pub = self.create_publisher(MapCommand, 'map_cmd', 10)
 
         # Log the initialization
         self.get_logger().info('Config Server Initialized..')
 
-    def uart_rx_callback(self, msg: String):
+    def fb_feedback_callback(self, msg: String):
         '''
         Subscriber to the Serial Response from the Farmduino.
         Checks for parameter value updates and for when the farmduino startup completes 
         '''
         msg_split = (msg.data).split(' ')
         reportCode = msg_split[0]
-        if msg.data == 'R99 ARDUINO STARTUP COMPLETE' and not self.firmware_init_done_:
-            self.firmware_init_done_ = True
+        if msg.data == 'R99 ARDUINO STARTUP COMPLETE' and not self.firmware_init_done:
+            self.firmware_init_done = True
             self.retrieve_config()
         if reportCode == 'R21' or reportCode == 'R23':
             self.__set_value(int(float(msg_split[1][1:])), int(float(msg_split[2][1:])))
@@ -83,9 +82,9 @@ class ConfigServer(Node):
         If it exists, the active parameter configuration file is loaded in and
         written to the Farmduino
         '''
-        active_config_path = os.path.join(self.default_path_, self.active_config_)
+        active_config_path = os.path.join(self.default_path, self.active_config)
         if os.path.exists(active_config_path):
-            self.load_from_yaml(self.default_path_, self.active_config_)
+            self.load_from_yaml(self.default_path, self.active_config)
             self.load_params()
             self.get_logger().info('Initialized with active config from previous run')
         else:
@@ -96,16 +95,16 @@ class ConfigServer(Node):
         Service Server that loads the default parameter configurations onto the Farmduino.
         '''
         if request.data in ['Genesis', 'genesis', 'Gen', 'gen']: 
-            self.load_from_yaml(path = self.default_path_, file_name = self.genesis_config_)
+            self.load_from_yaml(path = self.default_path, file_name = self.genesis_config)
             self.get_logger().info("Loading the genesis configuration")
             self.load_params()
         elif request.data in ['Express', 'express', 'exp', 'Exp']: 
-            self.load_from_yaml(path = self.default_path_, file_name = self.express_config_)
+            self.load_from_yaml(path = self.default_path, file_name = self.express_config)
             self.get_logger().info("Loading the express configuration")
             self.load_params()
         # A configuration more specific to the model you are running
         elif request.data in ['Custom', 'custom']:
-            self.load_from_yaml(path = self.default_path_, file_name = self.custom1_config_)
+            self.load_from_yaml(path = self.default_path, file_name = self.custom1_config)
             self.get_logger().info("Loading the custom configuration")
             self.load_params()
         else:
@@ -119,20 +118,19 @@ class ConfigServer(Node):
     def load_params(self):
         '''
         Loading all the parameters on the farmduino
+        list = False
+        write = True
+        read = False
+        update = False
         '''
-        self.param_cmd_.list = False
-        self.param_cmd_.write = True
-        self.param_cmd_.read = False
-        self.param_cmd_.update = False
 
         # Loading only the parameters that are not loaded to the desired value (Greatly increases upload speed)
-        with open(os.path.join(self.default_path_, self.base_config_), 'r') as yaml_file:
+        with open(os.path.join(self.default_path, self.base_config), 'r') as yaml_file:
             loaded_firmware_config = yaml.safe_load(yaml_file)
             for key, value in self.param_vals.items():
-                if(loaded_firmware_config[key] != value):
-                    self.param_cmd_.param = key
-                    self.param_cmd_.value = value
-                    self.param_cmd_pub_.publish(self.param_cmd_)
+                if(loaded_firmware_config[key] != value) :
+                    self.param_cmd.data = 'parameter_command False True False False ' + str(key) + ' ' + str(value)
+                    self.param_cmd_pub.publish(self.param_cmd)
                     time.sleep(0.1)
 
         self.get_logger().info('Parameter loading complete!')
@@ -166,11 +164,11 @@ class ConfigServer(Node):
             return response
         if code == 'MAP':
             response.value = 0
-            self.map_cmd_.sort = False
-            self.map_cmd_.reindex = False
-            self.map_cmd_.back_up = False
-            self.map_cmd_.update = True
-            self.map_cmd_.update_info = [
+            self.map_cmd.sort = False
+            self.map_cmd.reindex = False
+            self.map_cmd.back_up = False
+            self.map_cmd.update = True
+            self.map_cmd.update_info = [
                 'X ' + str(self.param_vals[self.params.MOVEMENT_AXIS_NR_STEPS_X] / 
                                 self.param_vals[self.params.MOVEMENT_STEP_PER_MM_X]),
                 'Y ' + str(self.param_vals[self.params.MOVEMENT_AXIS_NR_STEPS_Y] / 
@@ -179,16 +177,16 @@ class ConfigServer(Node):
                                 self.param_vals[self.params.MOVEMENT_STEP_PER_MM_Z]),
             ]
             
-            response.cmd = ('MAP ' + self.map_cmd_.update_info[0] 
-                            + ' ' + self.map_cmd_.update_info[1]
-                            + ' ' + self.map_cmd_.update_info[2])
+            response.cmd = ('MAP ' + self.map_cmd.update_info[0] 
+                            + ' ' + self.map_cmd.update_info[1]
+                            + ' ' + self.map_cmd.update_info[2])
 
-            self.map_cmd_pub_.publish(self.map_cmd_)
+            self.map_cmd_pub.publish(self.map_cmd)
             return response
         if code == 'SAVE':
             response.value = 0
-            os.makedirs(os.path.dirname(os.path.join(self.default_path_, self.active_config_)), exist_ok=True)
-            self.save_to_yaml(self.default_path_, self.active_config_)
+            os.makedirs(os.path.dirname(os.path.join(self.default_path, self.active_config)), exist_ok=True)
+            self.save_to_yaml(self.default_path, self.active_config)
             return response
 
         # If the service gets here, the request could not be processed

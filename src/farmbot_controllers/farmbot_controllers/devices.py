@@ -1,6 +1,5 @@
 from rclpy.node import Node
-from farmbot_interfaces.msg import PinCommand, I2CCommand, ServoCommand
-from std_msgs.msg import Int64MultiArray
+from std_msgs.msg import String
 
 class DeviceControl:
     '''
@@ -8,18 +7,15 @@ class DeviceControl:
     that are connected to the Farmbot
     '''
     def __init__(self, node: Node):
-        self.node_ = node
+        self.node = node
         # Variables used to store the device commands
-        self.pin_cmd_ = PinCommand()
-        self.water_cmd_ = Int64MultiArray()
-        self.i2c_cmd_ = I2CCommand()
-        self.servo_cmd_ = ServoCommand()
+        self.pin_cmd = String()
+        self.water_cmd = String()
+        self.i2c_cmd = String()
+        self.servo_cmd = String()
 
         # Publishers for the command types
-        self.pin_pub_ = self.node_.create_publisher(PinCommand, 'pin_command', 10)
-        self.i2c_pub_ = self.node_.create_publisher(I2CCommand, 'i2c_command', 10)
-        self.water_pub_ = self.node_.create_publisher(Int64MultiArray, 'water_command', 10)
-        self.servo_pub_ = self.node_.create_publisher(ServoCommand, 'move_servo', 10)
+        self.devices_pub = self.node.create_publisher(String, 'farmbot_command', 10)
 
     ## I2C Control Handlers
     
@@ -41,17 +37,13 @@ class DeviceControl:
 
         Args:
             mode {bool}: False for READ, True for SET
-            p {int}: Pin number
-            e {int}: Element in tool mount
-            v {int}: Value number
+            pin {int}: Pin number
+            element {int}: Element in tool mount
+            value {int}: Value number
         '''
-        
-        self.i2c_cmd_.mode = mode
-        self.i2c_cmd_.e = element
-        self.i2c_cmd_.p = pin
-        self.i2c_cmd_.v = value
+        self.i2c_cmd.data = 'i2c_command ' + str(mode) + ' ' + str(element) + ' ' + str(pin) + ' ' + str(value)
 
-        self.i2c_pub_.publish(self.i2c_cmd_)
+        self.devices_pub.publish(self.i2c_cmd)
 
     ## Water Control Handlers
     ## NOTE: The documentation mentions that the commands are not implemented. Need to invesigate
@@ -63,13 +55,14 @@ class DeviceControl:
         anyway if support will be added to the arduino firmware.
 
         Args:
-            mode {bool}: False for time based watering, True for valume flow based watering
+            mode {bool}: False (or 1) for time based watering, True (or 2) for valume flow based watering
             unit {int}: The amount of time (in time based watering) in millisec. or the pulse
                         count of the flow meter.
         '''
 
-        self.water_cmd_.data = [int(mode), unit]
-        self.water_pub_.publish(self.water_cmd_)
+        self.water_cmd.data = 'water_command ' + str(int(mode)+1) + ' ' + str(unit)
+        
+        self.devices_pub.publish(self.water_cmd)
 
     ## Pin Control Handlers
 
@@ -127,7 +120,7 @@ class DeviceControl:
         commands.
 
         Args:
-            mode{bool}: 1 for SET, 0 for READ
+            mode{bool}: 1 (True) for SET, 0 (False) for READ
             set_io{bool}: If mode = True, and set_IO, the IO state of the pin will be set
             set_value1{bool}: If mode = True, and set)value, the value on the pin will be set
             set_value2{bool}: If mode and set_value2 are true, the double value set command will be used
@@ -138,19 +131,10 @@ class DeviceControl:
             pin_mode{bool}: (0-digital / 1-analog) OR (0-input / 1-output)
         '''
         
-        self.pin_cmd_.mode = mode
-        self.pin_cmd_.set_io = set_io
-        self.pin_cmd_.set_value = set_value1
-        self.pin_cmd_.set_value2 = set_value2
-        self.pin_cmd_.pin = pin
-        self.pin_cmd_.value = value1
-        self.pin_cmd_.value2 = value2
-        self.pin_cmd_.delay = delay
-        self.pin_cmd_.pin_mode = pin_mode
-
-        self.pin_pub_.publish(self.pin_cmd_)
+        self.pin_cmd.data = 'pin_command ' + str(mode) + ' ' + str(set_io) + ' ' + str(set_value1) + ' ' + str(set_value2) + ' ' + str(pin) + ' ' + str(value1) + ' ' + str(value2) +  ' ' + str(delay) + ' ' + str(int(pin_mode))
+        
+        self.devices_pub.publish(self.pin_cmd)
 
     def move_servo(self, pin: int, angle: float):
-        self.servo_cmd_.pin = pin
-        self.servo_cmd_.ang = angle
-        self.servo_pub_.publish(self.servo_cmd_)
+        self.servo_cmd.data = 'move_servo ' + str(pin) + ' ' + str(angle)
+        self.devices_pub.publish(self.servo_cmd)

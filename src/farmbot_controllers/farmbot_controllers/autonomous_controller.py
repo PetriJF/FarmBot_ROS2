@@ -7,7 +7,7 @@ from datetime import datetime
 class AutonomousCmds(Node):
     def __init__(self):
         super().__init__('command_sender')
-        self.publisher_ = self.create_publisher(String, '/input_topic', 10)
+        self.publisher = self.create_publisher(String, '/input_topic', 10)
         timer_period = 60  # seconds
         self.timer = self.create_timer(timer_period, self.send_command)
 
@@ -28,14 +28,14 @@ class AutonomousCmds(Node):
         #             self.get_logger().info('Publishing: "%s"' % command)
         #             msg = String()
         #             msg.data = command
-        #             self.publisher_.publish(msg)
+        #             self.publisher.publish(msg)
         #             time.sleep(0.5)
 
         if command:
             self.get_logger().info('Publishing: "%s"' % command)
             msg = String()
             msg.data = command
-            self.publisher_.publish(msg)
+            self.publisher.publish(msg)
 
 def main(args=None):
     rclpy.init(args=args)

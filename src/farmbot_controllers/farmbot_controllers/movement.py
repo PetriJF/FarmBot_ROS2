@@ -1,5 +1,5 @@
 from rclpy.node import Node
-from farmbot_interfaces.msg import GantryCommand, HomeCommand
+from std_msgs.msg import String
 
 class Movement:
     '''
@@ -12,17 +12,16 @@ class Movement:
         Args:
             node {Node}: the node the module extends
         '''
-        self.node_ = node
+        self.node = node
 
         self.X_MAX_SPEED = 400.0
         self.Y_MAX_SPEED = 400.0
         self.Z_MAX_SPEED = 400.0
 
-        self.gantry_config_ = HomeCommand()    # Used for gantry configuration (homing, calibration)
-        self.move_gantry_ = GantryCommand()  # Used for moving the gantry along the 3 axis
+        self.gantry_config = String()    # Used for gantry configuration (homing, calibration)
+        self.move_gantry_cmd = String()  # Used for moving the gantry along the 3 axis
 
-        self.gantry_mvm_pub_ = self.node_.create_publisher(GantryCommand, 'move_gantry', 10)
-        self.gantry_config_pub_ = self.node_.create_publisher(HomeCommand, 'home_handler', 10)
+        self.movement_pub = self.node.create_publisher(String, 'farmbot_command', 10)
 
     ## Calibration and Homing Functions
 
@@ -101,14 +100,9 @@ class Movement:
             y_axis {Bool}: Specifies wheather the command manipulates the Y-Axis. Defaults to False
             z_axis {Bool}: Specifies wheather the command manipulates the Z-Axis. Defaults to False
         '''
-        self.gantry_config_.go_home = all_home
-        self.gantry_config_.current_pos_home = set_this_home
-        self.gantry_config_.calib = calibrate
-        self.gantry_config_.x = x_axis
-        self.gantry_config_.y = y_axis
-        self.gantry_config_.z = z_axis
+        self.gantry_config.data = 'home_handler ' + str(all_home) + ' ' + str(set_this_home) + ' ' + str(calibrate) + ' ' + str(x_axis) + ' ' + str(y_axis) + ' ' + str(z_axis)
 
-        self.gantry_config_pub_.publish(self.gantry_config_)
+        self.movement_pub.publish(self.gantry_config)
 
     ## Gantry Movement Functions
 
@@ -166,12 +160,6 @@ class Movement:
             y_speed {Int}: The speed used to reach the y coordinate
             z_speed {Int}: The speed used to reach the z coordinate
         '''
-        self.move_gantry_.mode = mode
-        self.move_gantry_.x = x_coord
-        self.move_gantry_.y = y_coord
-        self.move_gantry_.z = z_coord
-        self.move_gantry_.a = x_speed
-        self.move_gantry_.b = y_speed
-        self.move_gantry_.c = z_speed
+        self.move_gantry_cmd.data = 'move_gantry ' + str(mode) + ' ' + str(x_coord) + ' ' + str(y_coord) + ' ' + str(z_coord) + ' ' + str(x_speed) + ' ' + str(y_speed) + ' ' + str(z_speed)
 
-        self.gantry_mvm_pub_.publish(self.move_gantry_)
+        self.movement_pub.publish(self.move_gantry_cmd)

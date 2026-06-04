@@ -102,8 +102,8 @@ class CalibrateCamera:
         self.rotation_angles = []
         self.success_flag = True
         self.bridge = CvBridge()
-        self.rgb_image_ = None
-        self.depth_image_ = None
+        self.rgb_image = None
+        self.depth_image = None
 
         # Camera feed subscribers
         self.rgb_sub = self.node_.create_subscription(Image, '/rgb_img', self.__rgb_callback, 10)
@@ -115,13 +115,13 @@ class CalibrateCamera:
         '''
         Subscriber for the RGB camera feed
         '''
-        self.rgb_image_ = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+        self.rgb_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
 
     def __depth_callback(self, msg):
         '''
         Subscriber for the depth camera feed
         '''
-        self.depth_image_ = self.bridge.imgmsg_to_cv2(msg, "mono8")
+        self.depth_image = self.bridge.imgmsg_to_cv2(msg, "mono8")
 
     ## Forming the Calibration Sequence
     
@@ -172,7 +172,7 @@ class CalibrateCamera:
         self.node_.get_logger().info('Taking camera calibration photo. ({}/3)'.format(run))
         coordinates = {'x': x,'y': y,'z': z}
         self.node_.get_logger().info(f"Trying to load image from: {self.rgb_dir_}")
-        img_rgb = self.rgb_image_
+        img_rgb = self.rgb_image
         ret, centers = self.find_pattern(img_rgb)
         if not self.success_flag:
             self.save_image(img_rgb, str(run + 1))
