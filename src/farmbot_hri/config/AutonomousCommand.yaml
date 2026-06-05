@@ -1,12 +1,13 @@
 # Used to change the autonomous commands
 
-#'time' :
+#Task_number :
+#   time : 'time to execute the command' 
 #   command : 'command to execute at this time'
 
-Task 1  :
+Task_1 :
   time : '11:07'
   command : 'P_4'    
 
-Task 2  :
+Task_2 :
   time : '12:00'
   command : 'H_0'       
