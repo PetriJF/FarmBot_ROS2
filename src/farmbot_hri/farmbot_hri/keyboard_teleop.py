@@ -53,7 +53,7 @@ class KeyboardTeleOp(Node):
         # Send the user input to the farmbot controller if it is a valid key or command
         if user_input in valid_keys or user_input.split(' ')[0] in compound_cmds:
             #Send the command with priority at the UART controller
-            if user_input == 'e' :
+            if user_input == 'e':
                 self.cmd.data = 'E' 
                 self.priority_pub.publish(self.cmd)
                 self.cmd.data = 'e'

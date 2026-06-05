@@ -25,8 +25,8 @@ class AutonomousCmds(Node):
         now = datetime.now().time()
         current_time = now.strftime('%H:%M')
 
-        for task in self.auto_command :
-            if current_time == self.auto_command[task]['time'] :
+        for task in self.auto_command:
+            if current_time == self.auto_command[task]['time']:
                 command = self.auto_command[task]['command']
                 self.get_logger().info('Publishing: "%s"' % command)
                 msg = String()
