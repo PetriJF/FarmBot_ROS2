@@ -3,8 +3,10 @@
 #'time' :
 #   command : 'command to execute at this time'
 
-'11:07' :
+Task 1  :
+  time : '11:07'
   command : 'P_4'    
 
-'12:00' :
+Task 2  :
+  time : '12:00'
   command : 'H_0'       

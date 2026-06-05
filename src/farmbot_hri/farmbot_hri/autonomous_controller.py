@@ -19,18 +19,19 @@ class AutonomousCmds(Node):
             'config'
         )
 
-        self.auto_command_ = yaml.safe_load(open(os.path.join(self.directory_, 'AutonomousCommand.yaml'), 'r'))
+        self.auto_command = yaml.safe_load(open(os.path.join(self.directory_, 'AutonomousCommand.yaml'), 'r'))
 
     def send_command(self):
         now = datetime.now().time()
         current_time = now.strftime('%H:%M')
 
-        if current_time in self.auto_command_ :
-            command = self.auto_command_[current_time]['command']
-            self.get_logger().info('Publishing: "%s"' % command)
-            msg = String()
-            msg.data = command
-            self.publisher.publish(msg)
+        for task in self.auto_command :
+            if current_time == self.auto_command[task]['time'] :
+                command = self.auto_command[task]['command']
+                self.get_logger().info('Publishing: "%s"' % command)
+                msg = String()
+                msg.data = command
+                self.publisher.publish(msg)
 
 def main(args=None):
     rclpy.init(args=args)

@@ -5,7 +5,7 @@ package_name = 'farmbot_hri'
 
 setup(
     name=package_name,
-    version='0.0.1',
+    version='0.1.0',
     packages=find_packages(exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages',
@@ -17,7 +17,7 @@ setup(
     zip_safe=True,
     maintainer='Salome',
     maintainer_email='salome.deoliveira.2026@mumail.ie',
-    description='Package containing the Keyboard and Autonomous controllers for the HRI',
+    description='Package used for human robot interaction',
     license='MIT',
     extras_require={
         'test': [
