@@ -1,10 +1,18 @@
 import launch
 from launch import LaunchDescription, LaunchService
 from launch_ros.actions import Node
-from launch.actions import TimerAction
+from launch.conditions import IfCondition
+from launch.substitutions import PythonExpression, LaunchConfiguration
+from launch.actions import TimerAction, DeclareLaunchArgument
 
 def generate_launch_description():
+    use_camera = LaunchConfiguration('use_camera')
+
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'use_camera',
+            default_value = 'False'
+        ),
         Node(
             package='farmbot_controllers',
             executable='param_conf_server',
@@ -33,15 +41,26 @@ def generate_launch_description():
             package='camera_handler',
             executable='camera_controller',
             name='camera_controller',
-            output='screen'
+            output='screen',
+            condition = IfCondition(
+                PythonExpression([
+                    use_camera, 
+                    '== True'
+                ])
+            )
         ),
         Node(
             package='camera_handler',
             executable='standard_camera',
             name='standard_camera',
-            output='screen'
+            output='screen',
+            condition = IfCondition(
+                PythonExpression([
+                    use_camera, 
+                    '== True'
+                ])
+            )
         ),
-        
         # Delay for 10 seconds
         TimerAction(
             period=10.0,

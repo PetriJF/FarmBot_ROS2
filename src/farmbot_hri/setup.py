@@ -1,11 +1,11 @@
 from setuptools import find_packages, setup
-import os, glob
-
-package_name = 'farmbot_controllers'
+import glob
+import os
+package_name = 'farmbot_hri'
 
 setup(
     name=package_name,
-    version='1.0.1',
+    version='0.1.0',
     packages=find_packages(exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages',
@@ -15,15 +15,19 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='James',
-    maintainer_email='jamespetri28@gmail.com',
-    description='Package containing the main controllers and modules for the ROS2 Farmbot',
+    maintainer='Salome',
+    maintainer_email='salome.deoliveira.2026@mumail.ie',
+    description='Package used for human robot interaction',
     license='MIT',
-    tests_require=['pytest'],
+    extras_require={
+        'test': [
+            'pytest',
+        ],
+    },
     entry_points={
         'console_scripts': [
-            "farmbot_controller = farmbot_controllers.farmbot_controller:main",
-            "param_conf_server = farmbot_controllers.config_managers:main"
+            "keyboard_controller = farmbot_hri.keyboard_teleop:main",
+            "autonomous_controller = farmbot_hri.autonomous_controller:main"
         ],
     },
 )
