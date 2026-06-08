@@ -23,13 +23,13 @@ class DeviceControl:
         '''
         Reading from an I2C device
         '''
-        self.i2c_handler(self, mode = False, pin = pin, element = element, value = 0)
+        self.i2c_handler(mode = False, pin = pin, element = element, value = 0)
 
     def i2c_set(self, pin: int, element: int, value: int):
         '''
         Setting a value to an I2C device
         '''
-        self.i2c_handler(self, mode = True, pin = pin, element = element, value = value)
+        self.i2c_handler(mode = True, pin = pin, element = element, value = value)
 
     def i2c_handler(self, mode: bool, element: int, pin: int, value: int):
         '''

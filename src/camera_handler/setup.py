@@ -24,7 +24,6 @@ setup(
             'camera_controller = camera_handler.camera_controller:main',
             'luxonis_camera = camera_handler.luxonis_camera:main',
             'standard_camera = camera_handler.standard_camera:main',
-            'realsense_405_camera = camera_handler.realsense_405_camera:main',
         ],
     },
 )
