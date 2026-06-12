@@ -5,6 +5,10 @@ Farmbot serial controller module.
 Handles ROS2 /farmbot_command input, forwards commands to the Farmduino over serial,
 and publishes feedback and busy state updates.
 """
+import os
+
+from ament_index_python.packages import get_package_share_directory
+
 from farmbot_hardware_comm.fcode_encoder import DeviceCmdHandler, MotorCmdHandler, StateCmdHandler
 
 from farmbot_interfaces.action import FarmbotControl
@@ -21,6 +25,8 @@ from rclpy.node import Node
 import serial
 
 from std_msgs.msg import String
+
+import yaml
 
 
 class SerialController(Node):
@@ -88,6 +94,13 @@ class SerialController(Node):
         # Initialize the LED states
         self.LED_client(FBPanel.ESTOP_LED, FBPanel.ON)
         self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
+
+        self.directory = os.path.join(
+            get_package_share_directory('farmbot_hardware_comm'),
+            'config'
+        )
+        self.non_immediate_cmds = yaml.safe_load(open(os.path.join(self.directory,
+                                                                   'CommandsResponses.yaml'), 'r'))
 
         # Log the initialization
         self.get_logger().info('Serial Controller Initialized..')
@@ -213,7 +226,7 @@ class SerialController(Node):
         # Send through UART the command
         self.ser.write(self.temp.data.encode('utf-8'))
 
-    def uart_receive(self, cmd: String):
+    def uart_receive(self):
         """Timer callback that reads from UART and handles the response codes and commands."""
         # Read from serial
         line = self.ser.readline().decode('utf-8').rstrip()
@@ -234,24 +247,18 @@ class SerialController(Node):
         # Record the message
         self.uart_cmd.data = message
 
-        # Blocking command codes
-        blocking_cmds = ['G00', 'G01', 'G28', 'F09', 'F11', 'F12', 'F13',
-                         'F14', 'F15', 'F16', 'F20', 'F44']
-        blocking_responses = ['R02', 'R03']
-        # Commands that block until a response is reached
-        request_cmds = ['F42', 'F21']
-        response_cmds = ['R41', 'R21']
-
         # Extract the command code
         rep_code = (message).split(' ')[0]
 
         # If a running command has finished OR the response for a request was retrieved
         # OR the sent command was acknowledged by the farmbot
-        if ((self.previous_cmd in blocking_cmds and rep_code in blocking_responses)
-                or (self.previous_cmd in request_cmds and rep_code in response_cmds)
-                or (self.previous_cmd not in blocking_cmds
-                    and self.previous_cmd not in request_cmds
-                    and rep_code in ['R08'])):
+        if (
+            (
+                self.previous_cmd in self.non_immediate_cmds
+                and rep_code in self.non_immediate_cmds[self.previous_cmd]['responses']
+            )
+            or rep_code == self.non_immediate_cmds['command_echo']
+        ):
             # Lower the blocking flag
             self.command_is_finished = True
 
