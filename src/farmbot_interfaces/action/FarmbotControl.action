@@ -1,0 +1,10 @@
+# Goal
+string command
+
+---
+# Result
+bool status               # True if the command is finished and False otherwise
+
+---
+# Feedback
+string current_position

@@ -34,7 +34,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'uart_controller = farmbot_hardware_comm.uart_controller:main',
+            'serial_controller = farmbot_hardware_comm.serial_controller:main',
             'gpio_controller = farmbot_hardware_comm.gpio_controller:main'
         ],
     },

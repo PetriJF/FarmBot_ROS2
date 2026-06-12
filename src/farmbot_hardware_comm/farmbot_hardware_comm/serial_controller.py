@@ -1,63 +1,59 @@
 #!/usr/bin/env python3
 """
-ROS2 UART controller for Farmbot.
+Farmbot serial controller module.
 
-Handles UART communication between ROS2 and the Farmduino, including command
-dispatch, serial feedback, and busy-state management.
+Handles ROS2 /farmbot_command input, forwards commands to the Farmduino over serial,
+and publishes feedback and busy state updates.
 """
-
-# ROS2 Imports
 from farmbot_hardware_comm.fcode_encoder import DeviceCmdHandler, MotorCmdHandler, StateCmdHandler
 
+from farmbot_interfaces.action import FarmbotControl
 from farmbot_interfaces.msg import FBPanel
 from farmbot_interfaces.srv import LedPanelHandler
 
 import rclpy
+from rclpy.action import ActionServer, CancelResponse, GoalResponse
+from rclpy.action.server import ServerGoalHandle
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 
 import serial
 
-from std_msgs.msg import Bool, String
+from std_msgs.msg import String
 
 
-class UARTController(Node):
+class SerialController(Node):
     """
-    Farmbot ROS2 node that handles the UART messages going to and from the Farmduino.
+    Farmbot ROS2 node that handles the Serial messages going to and from the Farmduino.
 
-    The Node receives commands through the /farmbot_command topic and sends them to the
-    Farmduino. If the Farmduino is busy with another task, the node populates a queue
-    that is manipulated using FIFO structure.
+    The Node receives commands through the FarmbotControl action and sends them to the
+    Farmduino.
 
     When the node receives feedback from the Farmduino through Serial, the message is
-    decoded and carried on to the relevant nodes. Also, by utilizing the serial
-    feedback, the node sets the ROS2 Farmbot busy state.
+    decoded and carried on to the relevant nodes.
 
-    Input Topics:
-        - /farmbot_command {String} -> the information that is to be transmitted to the farmduino
-                                       through Serial.
     Output Topics:
         - /farmbot_feedback {String} -> The information that is received from serial and is carried
-                                        on through the system.
-        - /busy_state {Bool} -> used to set the busy state of the system.
+            on through the system.
     """
 
     # Node contructor
     def __init__(self):
         """Node Constructor."""
-        super().__init__('UARTController')
+        super().__init__('SerialController')
 
         self.uart_cmd = String()
         self.temp = String()
 
-        self.declare_parameter('serial_port')
-        self.declare_parameter('serial_speed')
-        self.declare_parameter('check_uart_freq')
-        self.declare_parameter('tx_freq')
+        self.declare_parameter('serial_port', rclpy.Parameter.Type.STRING)
+        self.declare_parameter('serial_speed', rclpy.Parameter.Type.INTEGER)
+        self.declare_parameter('check_uart_freq', rclpy.Parameter.Type.INTEGER)
 
         serial_port = self.get_parameter('serial_port').get_parameter_value().string_value
         serial_speed = self.get_parameter('serial_speed').get_parameter_value().integer_value
-        check_uart_freq = self.get_parameter('check_uart_freq').get_parameter_value().integer_value
-        tx_freq = self.get_parameter('tx_freq').get_parameter_value().integer_value
+        self.check_uart_freq = self.get_parameter(
+            'check_uart_freq').get_parameter_value().integer_value
 
         # Initializing farmbot command handler modules
         self.device_cmd_handler = DeviceCmdHandler(self)
@@ -67,59 +63,94 @@ class UARTController(Node):
         # UART receive publisher
         self.fb_feedback_pub = self.create_publisher(String, 'farmbot_feedback', 10)
 
-        # Farmbot state publisher
-        self.farmbot_busy = Bool()
-        self.farmbot_busy.data = False
-        self.farmbot_state_pub = self.create_publisher(Bool, 'busy_state', 10)
-
-        # Node subscripters and publishers
-        self.tx_queue = []
-        self.fb_cmd_sub = self.create_subscription(String, 'farmbot_command',
-                                                   self.farmbot_cmd_callback, 10)
+        # Initialize the Action Server
+        self.farmbot_control_server = ActionServer(
+            self,
+            FarmbotControl,
+            'farmbot_control',
+            goal_callback=self.goal_callback,
+            execute_callback=self.execute_callback,
+            cancel_callback=self.cancel_callback,
+            handle_accepted_callback=self.handle_callback,
+            callback_group=ReentrantCallbackGroup()
+        )
 
         # Initialize Serial Communication
         self.ser = serial.Serial(serial_port, serial_speed, timeout=1)
         self.ser.reset_input_buffer()
         # Create a timer to periodically check for incoming serial messages
-        self.rx_timer = self.create_timer(1.0 / check_uart_freq, self.uart_receive)
-        self.tx_timer = self.create_timer(1.0 / tx_freq, self.uart_transmit)
+        self.rx_timer = self.create_timer(1.0 / self.check_uart_freq, self.uart_receive)
 
         # Used for setting the busy status on the ROS2 arch. while a command is running
         self.previous_cmd = ''
+        self.command_is_finished = False
 
         # Initialize the LED states
         self.LED_client(FBPanel.ESTOP_LED, FBPanel.ON)
         self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
 
         # Log the initialization
-        self.get_logger().info('UART Controller Initialized..')
+        self.get_logger().info('Serial Controller Initialized..')
 
-    def uart_transmit(self):
+    def goal_callback(self, goal_request):
+        """Accept the goal request."""
+        self.get_logger().info('Received goal request')
+        return GoalResponse.ACCEPT
+
+    def cancel_callback(self, goal_handle):
+        """Accept the cancel request."""
+        self.get_logger().info('Received cancel request')
+        return CancelResponse.ACCEPT
+
+    def handle_callback(self, goal_handle):
+        """Create a timer to track the command status."""
+        self.goal_handle = goal_handle
+        command = goal_handle.request.command
+
+        self.farmbot_cmd_sender(command)
+        self.get_logger().info('Executing goal...')
+        self.check_status_timer = self.create_timer(1.0 / self.check_uart_freq, self.check_status)
+
+    def check_status(self):
         """
-        Take commands from the queue (tx_queue_) and sends them to the farmbot through UART.
+        Check command execution status and handle completion or cancellation.
 
-        The command is popped from the queue only if the blocker is not active (i.e. a command
-        is not in the process of running or a response is not expected).
+        Publishes feedback, handles goal cancellation requests, and triggers
+        the next callback based on command completion state.
         """
-        # If the blocker is not up, and there are commands in the queue
-        if not self.farmbot_busy.data and self.tx_queue:
-            # Set the blocker flag
-            self.farmbot_busy.data = True
-            self.farmbot_state_pub.publish(self.farmbot_busy)
-            # Clear the command from the queue
-            message = self.tx_queue.pop(0)
+        goal_handle = self.goal_handle
 
-            # Ensure the command has an endline character at the end
-            if message[-1] != '\n':
-                message += '\n'
+        # Create Feedback object
+        # feedback = FarmbotControl.Feedback()
+        # goal_handle.publish_feedback(feedback)
 
-            # Record the transmitted command
-            self.previous_cmd = message.split(' ')[0] if ' ' in message else message.split('\n')[0]
-            self.get_logger().info(f'Sent message: {message}')
-            # Send through UART the command
-            self.ser.write(message.encode('utf-8'))
+        if self.command_is_finished and not self.check_status_timer.is_canceled():
+            self.get_logger().info('Goal completed.')
+            goal_handle.execute()
 
-    def farmbot_cmd_callback(self, cmd: String):
+    def execute_callback(self, goal_handle: ServerGoalHandle):
+        """
+        Execute the FarmbotControl action goal.
+
+        Checks if the command has finished executing. If so, cancels the
+        status timer and returns the result. Otherwise, sends the command
+        to the Farmduino and logs execution status.
+        """
+        self.command_is_finished = False
+        self.check_status_timer.cancel()
+
+        # Create Result object
+        result = FarmbotControl.Result()
+
+        if goal_handle.is_cancel_requested:
+            goal_handle.canceled()
+            return result
+
+        self.get_logger().info('Command is sucessful')
+        goal_handle.succeed()
+        return result
+
+    def farmbot_cmd_sender(self, cmd: str):
         """
         Handle the commands that are queued to be sent to the farmbot through UART.
 
@@ -129,7 +160,7 @@ class UARTController(Node):
             b) standard command:
                 The command is added at the end of the queue
         """
-        command: list = cmd.data.split(' ')
+        command: list = cmd.split(' ')
 
         match command[0]:
 
@@ -170,28 +201,22 @@ class UARTController(Node):
             case 'state_command':
                 self.temp.data = self.state_cmd_handler.state_cmd(command[1:])
 
-        # Priority commands
-        if self.temp.data in ['E', 'F09', '@']:
-            self.get_logger().info(f'Sent message: {self.temp.data}')
-            # Ensure the endline char at the end of the command
-            if self.temp.data[-1] != '\n':
-                self.temp.data += '\n'
+        # Ensure the endline char at the end of the command
+        if self.temp.data[-1] != '\n':
+            self.temp.data += '\n'
 
-            # Send command and reset everything
-            self.ser.write(self.temp.data.encode('utf-8'))
-            self.tx_queue.clear()
-            self.farmbot_busy.data = False
-            self.farmbot_state_pub.publish(self.farmbot_busy)
-        # Standard commands
-        else:
-            # Add the command to the queue
-            self.tx_queue.append(self.temp.data)
+        # Record the transmitted command
+        self.previous_cmd = (
+            self.temp.data.split(' ')[0]
+            if ' ' in self.temp.data else self.temp.data.split('\n')[0])
+        self.get_logger().info(f'Sent message: {self.temp.data}')
+        # Send through UART the command
+        self.ser.write(self.temp.data.encode('utf-8'))
 
-    def uart_receive(self):
+    def uart_receive(self, cmd: String):
         """Timer callback that reads from UART and handles the response codes and commands."""
         # Read from serial
         line = self.ser.readline().decode('utf-8').rstrip()
-
         # If a command is read, handle it
         if line:
             self.get_logger().info(f'Received message: {line}')
@@ -210,7 +235,7 @@ class UARTController(Node):
         self.uart_cmd.data = message
 
         # Blocking command codes
-        blocking_cmds = ['G00', 'G01', 'G28', 'F11', 'F12', 'F13',
+        blocking_cmds = ['G00', 'G01', 'G28', 'F09', 'F11', 'F12', 'F13',
                          'F14', 'F15', 'F16', 'F20', 'F44']
         blocking_responses = ['R02', 'R03']
         # Commands that block until a response is reached
@@ -228,8 +253,7 @@ class UARTController(Node):
                     and self.previous_cmd not in request_cmds
                     and rep_code in ['R08'])):
             # Lower the blocking flag
-            self.farmbot_busy.data = False
-            self.farmbot_state_pub.publish(self.farmbot_busy)
+            self.command_is_finished = True
 
         # Send the reporting message for further processing by other nodes
         self.fb_feedback_pub.publish(self.uart_cmd)
@@ -266,12 +290,14 @@ def main(args=None):
     """Initialize and run the Serial controller node."""
     rclpy.init(args=args)
 
-    uart_node = UARTController()
+    serial_node = SerialController()
+    executor = MultiThreadedExecutor()
+    executor.add_node(serial_node)
 
     try:
-        rclpy.spin(uart_node)
+        executor.spin()
     except KeyboardInterrupt:
-        uart_node.destroy_node()
+        serial_node.destroy_node()
 
     rclpy.shutdown()
 
