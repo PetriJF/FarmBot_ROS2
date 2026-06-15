@@ -189,7 +189,7 @@ class StateCmdHandler:
         if command[0] == 'True':        # List all parameters
             self.uart_cmd = 'F20'
         else:
-            if command[2] == 'True':    # Read a parameter
+            if command[2] == 'True':  # Read a parameter
                 self.uart_cmd = 'F21 P' + command[4]
             elif command[1] == 'True':  # Write to a parameter
                 self.uart_cmd = 'F22 P' + command[4] + ' V' + command[5]

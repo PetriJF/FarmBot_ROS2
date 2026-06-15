@@ -257,7 +257,10 @@ class SerialController(Node):
                 self.previous_cmd in self.non_immediate_cmds
                 and rep_code in self.non_immediate_cmds[self.previous_cmd]['responses']
             )
-            or rep_code == self.non_immediate_cmds['command_echo']
+            or (
+                self.previous_cmd not in self.non_immediate_cmds
+                and rep_code == self.non_immediate_cmds['command_echo']
+                )
         ):
             # Lower the blocking flag
             self.command_is_finished = True

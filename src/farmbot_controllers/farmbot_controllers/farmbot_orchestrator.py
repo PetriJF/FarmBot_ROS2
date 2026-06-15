@@ -115,9 +115,9 @@ class FarmbotOrchestrator(Node):
 
     def goal_feedback_callback(self, feedback_msg):
         """Handle feedback messages from the FarmbotControl action server."""
-        current_position = feedback_msg.feedback.current_position
+        self.current_position = feedback_msg.feedback.current_position
 
-        self.get_logger().info(f'Current Position: {current_position}')
+        # self.get_logger().info(f'Current Position: {current_position}')
 
     def goal_result_callback(self, future):
         """Handle the final result from the FarmbotControl action server."""
