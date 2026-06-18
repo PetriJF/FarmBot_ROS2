@@ -1,16 +1,27 @@
 #!/usr/bin/env python3
+"""
+Keyboard teleoperation node for ROS2 Farmbot.
+
+Publishes keyboard commands to the farmbot controller for execution and
+demonstrates command priority handling versus sequencer commands.
+"""
 import rclpy
 from rclpy.node import Node
+
 from std_msgs.msg import String
 
+
 class KeyboardTeleOp(Node):
-    '''
+    """
+    ROS2 node that publishes keyboard commands for the Farmbot controller.
+
     Node used for recording keyboard commands and sending them forward to the
-    farmbot controller for interpretation and execution
-    '''
-    
+    farmbot controller for interpretation and execution.
+    """
+
     # Node contructor
     def __init__(self):
+        """Initialize the KeyboardTeleOp node and its ROS2 publishers."""
         super().__init__('KeyboardController')
 
         # Keyboard publisher
@@ -18,31 +29,31 @@ class KeyboardTeleOp(Node):
         self.input_pub = self.create_publisher(String, 'input_topic', 10)
         self.priority_pub = self.create_publisher(String, 'farmbot_command', 10)
 
-
         # Log the initialization
         self.get_logger().info('Keyboard Controller Initialized..')
 
-        self.get_logger().info('''\n
-                               This is a keyboard based controller for the ROS2 Farmbot 
-                               Controllers. The commands accepted can be found in the 
+        self.get_logger().info("""\n
+                               This is a keyboard based controller for the ROS2 Farmbot
+                               Controllers. The commands accepted can be found in the
                                Documentation under High Level Commands.\n
                                NOTE: The commands here DO NOT automatically enter the
                                sequencer as they hold execution priority! An exception
-                               is shown for sequencing commands such as 'P_4' for watering.''')
+                               is shown for sequencing commands such as 'P_4' for watering.""")
 
     def check_input(self):
-        '''
-        Checks the input stream for valid commands and sends them on.
+        """
+        Check the input stream for valid commands and sends them on.
+
         Commands can be simple keys (e.g. T_1_1) or compound commands (e.g. P_1), where the
         key is followed by more information that is to be used by the farmbot
-        '''
+        """
         # Valid Keys and Commands
         valid_keys = ('e', 'E', 'w', 'a', 's', 'd', '1', '2', '3', 'h', 'j', 'k', 'l', 'fh',
                       'o', 'p',
                       'T_1_1', 'T_1_2', 'T_2_1', 'T_2_2', 'T_3_1', 'T_3_2',
                       'T_4_1', 'T_4_2', 'T_5_1', 'T_5_2', 'T_6_1', 'T_6_2',
-                      'P_3', 'P_4', 'P_5', 'P_9', 'I_0', 'I_1', 'I_2', 'I_3', 'I_4', 'D_C', 'D_L_1', 'D_L_0',
-                      'D_W_1', 'D_W_0', 'D_V_1', 'D_V_0',
+                      'P_3', 'P_4', 'P_5', 'P_9', 'I_0', 'I_1', 'I_2', 'I_3', 'I_4', 'D_C', 'D_L_1',
+                      'D_L_0', 'D_W_1', 'D_W_0', 'D_V_1', 'D_V_0',
                       'H_0', 'H_1', 'D_S_C', 'P4_0', 'P4_1')
         compound_cmds = ('C_0', 'P_1', 'P_2', 'C_1', 'C_2', 'T_1_0', 'T_2_0',
                          'T_3_0', 'T_4_0', 'T_5_0', 'T_6_0', 'S_1_0', 'S_2_0',
@@ -52,9 +63,9 @@ class KeyboardTeleOp(Node):
 
         # Send the user input to the farmbot controller if it is a valid key or command
         if user_input in valid_keys or user_input.split(' ')[0] in compound_cmds:
-            #Send the command with priority at the UART controller
+            # Send the command with priority at the UART controller
             if user_input == 'e':
-                self.cmd.data = 'E' 
+                self.cmd.data = 'E'
                 self.priority_pub.publish(self.cmd)
                 self.cmd.data = 'e'
                 self.input_pub.publish(self.cmd)
@@ -65,17 +76,19 @@ class KeyboardTeleOp(Node):
                 self.cmd.data = 'E'
                 self.input_pub.publish(self.cmd)
                 self.get_logger().info('RESET button pressed')
-            
+
             self.cmd.data = user_input
             self.input_pub.publish(self.cmd)
         else:
             print('Invalid input\n')
 
-def main(args = None):
-    rclpy.init(args = args)
+
+def main(args=None):
+    """Initialize and run the keyboard teleoperation node."""
+    rclpy.init(args=args)
 
     keyboard_node = KeyboardTeleOp()
-    
+
     try:
         while rclpy.ok():
             keyboard_node.check_input()
