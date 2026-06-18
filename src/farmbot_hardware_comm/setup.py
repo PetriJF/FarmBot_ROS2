@@ -1,5 +1,13 @@
+"""Packaging for farmbot_hardware_comm.
+
+Defines package metadata and console entry points for the ROS2 Farmbot hardware
+communication package.
+"""
+import glob
+import os
+
 from setuptools import find_packages, setup
-import os, glob
+
 
 package_name = 'farmbot_hardware_comm'
 
@@ -26,8 +34,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            "uart_controller = farmbot_hardware_comm.uart_controller:main",
-            "gpio_controller = farmbot_hardware_comm.gpio_controller:main"
+            'uart_controller = farmbot_hardware_comm.uart_controller:main',
+            'gpio_controller = farmbot_hardware_comm.gpio_controller:main'
         ],
     },
 )

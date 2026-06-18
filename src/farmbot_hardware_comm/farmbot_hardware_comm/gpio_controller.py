@@ -1,20 +1,39 @@
 #!/usr/bin/env python3
-import rclpy
-import yaml
-import os
-from ament_index_python.packages import get_package_share_directory
-from rclpy.node import Node
-from std_msgs.msg import String
+"""
+GPIO controller module for FarmBot panel interface.
 
-from farmbot_interfaces.srv import LedPanelHandler
-from farmbot_interfaces.msg import FBPanel
+Manages hardware GPIO pins for LEDs, buttons, and emergency stop functionality.
+Handles button press events and LED state control via ROS2 services and callbacks.
+"""
+import os
 
 import RPi.GPIO as GPIO
 
+from ament_index_python.packages import get_package_share_directory
+
+from farmbot_interfaces.msg import FBPanel
+from farmbot_interfaces.srv import LedPanelHandler
+
+import rclpy
+from rclpy.node import Node
+
+from std_msgs.msg import String
+
+import yaml
+
+
 class GPIOController(Node):
-    
+    """
+    Manage GPIO pins for FarmBot panel LEDs and buttons.
+
+    Initializes and controls hardware GPIO pins for status LEDs, button LEDs,
+    and button inputs. Handles button press events and provides LED control
+    via ROS2 services.
+    """
+
     # Node contructor
     def __init__(self):
+        """Initialize the GPIO controller node and configure hardware pins."""
         super().__init__('GPIOController')
 
         GPIO.setmode(GPIO.BCM)
@@ -37,7 +56,6 @@ class GPIOController(Node):
         GPIO.setup(FBPanel.BUTTON_B, GPIO.IN)
         GPIO.setup(FBPanel.BUTTON_C, GPIO.IN)
 
-        
         self.cmd = String()
         self.lowlevel_command_pub = self.create_publisher(String, 'farmbot_command', 10)
 
@@ -47,7 +65,7 @@ class GPIOController(Node):
         self.flash_state = False
         flashing_frequency = 2.0
         self.leds_to_flash = []
-        
+
         self.led_flasher_timer = self.create_timer(1.0 / flashing_frequency, self.LED_flasher)
 
         self.led_pin_list = [
@@ -64,7 +82,7 @@ class GPIOController(Node):
 
         self.led_panel_server = self.create_service(LedPanelHandler, 'set_led', self.LED_server)
 
-        self.directory= os.path.join(
+        self.directory = os.path.join(
             get_package_share_directory('farmbot_hardware_comm'),
             'config'
         )
@@ -72,14 +90,15 @@ class GPIOController(Node):
 
         # Log the initialization
         self.get_logger().info('GPIO Controller Initialized..')
-        
-    ### Service Server
+
+    # Service Server
 
     def LED_server(self, request, response):
-        '''
+        """
         Service Server handling LED State manipulation.
+
         It sets the LEDS to ON, OFF or FLASHING.
-        '''
+        """
         # Check if the LED Pin is correct
         if request.led_pin not in self.led_pin_list:
             self.get_logger().warn('Selected LED pin is not recorded as having an LED attached')
@@ -90,7 +109,7 @@ class GPIOController(Node):
             self.get_logger().warn('Selected LED status is not recognized')
             response.success = False
             return response
-        
+
         if request.state == FBPanel.ON:
             GPIO.output(request.led_pin, GPIO.HIGH)
             self.remove_flashing_led(request.led_pin)
@@ -104,40 +123,32 @@ class GPIOController(Node):
         return response
 
     def add_flashing_led(self, led_pin):
-        '''
-        Add a LED from the flashing LED list
-        '''
+        """Add a LED from the flashing LED list."""
         if led_pin not in self.leds_to_flash:
             self.leds_to_flash.append(led_pin)
-    
+
     def remove_flashing_led(self, led_pin):
-        '''
-        Remove a LED from the flashing LED list
-        '''
+        """Remove a LED from the flashing LED list."""
         if led_pin in self.leds_to_flash:
             self.leds_to_flash.remove(led_pin)
 
-    ### Service Client
+    # Service Client
 
     def _LED_client(self, led_pin, state):
-        '''
-        Service client for switching an LED on or off
-        '''
+        """Service client for switching an LED on or off."""
         client = self.create_client(LedPanelHandler, 'set_led')
         while not client.wait_for_service(1.0):
             self.get_logger().warn('Waiting for LED Handling Server...')
-        
+
         request = LedPanelHandler.Request()
         request.led_pin = led_pin
         request.state = state
 
-        future = client.call_async(request = request)
+        future = client.call_async(request=request)
         future.add_done_callback(self.LED_panel_callback)
 
     def LED_panel_callback(self, future):
-        '''
-        Service client callback once the LED switching server ends.
-        '''
+        """Service client callback once the LED switching server ends."""
         try:
             response = future.result()
             if not response:
@@ -145,20 +156,16 @@ class GPIOController(Node):
         except Exception as e:
             self.get_logger().error('Service call failed %r' % (e, ))
 
-    ### LED states for the panel
+    # LED states for the panel
 
     def LED_flasher(self):
-        '''
-        Timer Callback that flashes the LEDs in the self.leds_to_flash list.
-        '''
+        """Timer Callback that flashes the LEDs in the self.leds_to_flash list."""
         for led_pin in self.leds_to_flash:
             GPIO.output(led_pin, GPIO.HIGH if self.flash_state else GPIO.LOW)
         self.flash_state = not self.flash_state
-    
+
     def estop_button_handler(self, channel):
-        '''
-        EStop Button Event Handler for the panel controller
-        '''
+        """Estop Button Event Handler for the panel controller."""
         current_state = GPIO.input(FBPanel.BUTTON_ESTOP)
         if current_state == GPIO.LOW:
             self.cmd.data = 'E'
@@ -168,9 +175,7 @@ class GPIOController(Node):
             self.get_logger().info('ESTOP button pressed')
 
     def reset_button_handler(self, channel):
-        '''
-        Reset Button Event Handler for the panel controller
-        '''
+        """Reset Button Event Handler for the panel controller."""
         current_state = GPIO.input(FBPanel.BUTTON_UNLOCK)
         if current_state == GPIO.LOW:
             self.cmd.data = 'F09'
@@ -178,50 +183,63 @@ class GPIOController(Node):
             self.cmd.data = 'E'
             self.highlevel_command_pub.publish(self.cmd)
             self.get_logger().info('RESET button pressed')
-    
+
     def buttonHandler(self, channel):
+        """
+        Handle button press events for buttons A, B, and C.
+
+        Reads the GPIO channel state and triggers the corresponding command
+        for the pressed button.
+        """
         current_state = GPIO.input(channel)
         if current_state == GPIO.LOW:
             if channel == FBPanel.BUTTON_A:
-                self.get_logger().info('BUTTON A pressed : ' + self.button['button_A']['command_name'] + ' is triggered')
-                self.process_button_command(self.button['button_A']['command_type'], self.button['button_A']['command'])
+                self.get_logger().info('BUTTON A pressed : ' +
+                                       self.button['button_A']['command_name'] + ' is triggered')
+                self.process_button_command(self.button['button_A']['command_type'],
+                                            self.button['button_A']['command'])
             elif channel == FBPanel.BUTTON_B:
-                self.get_logger().info('BUTTON B pressed : ' + self.button['button_B']['command_name'] + ' is triggered')
-                self.process_button_command(self.button['button_B']['command_type'], self.button['button_B']['command'])
+                self.get_logger().info('BUTTON B pressed : ' +
+                                       self.button['button_B']['command_name'] + ' is triggered')
+                self.process_button_command(self.button['button_B']['command_type'],
+                                            self.button['button_B']['command'])
             elif channel == FBPanel.BUTTON_C:
-               self.get_logger().info('BUTTON C pressed : ' + self.button['button_C']['command_name'] + ' is triggered')
-               self.process_button_command(self.button['button_C']['command_type'], self.button['button_C']['command'])
+                self.get_logger().info('BUTTON C pressed : ' +
+                                       self.button['button_C']['command_name'] + ' is triggered')
+                self.process_button_command(self.button['button_C']['command_type'],
+                                            self.button['button_C']['command'])
 
-    def process_button_command(self, level, cmd) :
-        '''
-        determines the topic to which the command should be sent based on the command level (LOW_LEVEL or HIGH_LEVEL)
-        '''
+    def process_button_command(self, level, cmd):
+        """Determine the topic to which the command should be sent based on the command level."""
         self.cmd.data = cmd
         if level == 'LOW_LEVEL':
             self.lowlevel_command_pub.publish(self.cmd)
-        elif level == 'HIGH_LEVEL' :
+        elif level == 'HIGH_LEVEL':
             self.highlevel_command_pub.publish(self.cmd)
 
     def destroy_node(self):
-        '''
-        destroy_node overloading for cleaning up the GPIO
-        '''
+        """Destroy_node overloading for cleaning up the GPIO."""
         # gpio cleanup
         GPIO.cleanup()
 
 
-def main(args = None):
-    rclpy.init(args = args)
+def main(args=None):
+    """Initialize and run the GPIO controller node."""
+    rclpy.init(args=args)
 
     gpio_node = GPIOController()
-    
+
     # GPIO Button
-    GPIO.add_event_detect(FBPanel.BUTTON_ESTOP, GPIO.FALLING, callback=gpio_node.estop_button_handler, bouncetime=200)
-    GPIO.add_event_detect(FBPanel.BUTTON_UNLOCK, GPIO.FALLING, callback=gpio_node.reset_button_handler, bouncetime=200)
-    GPIO.add_event_detect(FBPanel.BUTTON_A, GPIO.FALLING, callback=gpio_node.buttonHandler, bouncetime=1000)
-    GPIO.add_event_detect(FBPanel.BUTTON_B, GPIO.FALLING, callback=gpio_node.buttonHandler, bouncetime=1000)
-    GPIO.add_event_detect(FBPanel.BUTTON_C, GPIO.FALLING, callback=gpio_node.buttonHandler, bouncetime=1000)
-    
+    GPIO.add_event_detect(FBPanel.BUTTON_ESTOP, GPIO.FALLING,
+                          callback=gpio_node.estop_button_handler, bouncetime=200)
+    GPIO.add_event_detect(FBPanel.BUTTON_UNLOCK, GPIO.FALLING,
+                          callback=gpio_node.reset_button_handler, bouncetime=200)
+    GPIO.add_event_detect(FBPanel.BUTTON_A, GPIO.FALLING,
+                          callback=gpio_node.buttonHandler, bouncetime=1000)
+    GPIO.add_event_detect(FBPanel.BUTTON_B, GPIO.FALLING,
+                          callback=gpio_node.buttonHandler, bouncetime=1000)
+    GPIO.add_event_detect(FBPanel.BUTTON_C, GPIO.FALLING,
+                          callback=gpio_node.buttonHandler, bouncetime=1000)
 
     try:
         rclpy.spin(gpio_node)
@@ -235,7 +253,6 @@ def main(args = None):
         GPIO.remove_event_detect(FBPanel.BUTTON_C)
         gpio_node.destroy_node()
         rclpy.shutdown()
-
 
 
 if __name__ == '__main__':
