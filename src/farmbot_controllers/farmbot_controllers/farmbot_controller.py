@@ -1,20 +1,32 @@
 #!/usr/bin/env python3
-import rclpy
-from rclpy.node import Node
-from std_msgs.msg import String
+"""
+Farmbot controller ROS2 node.
+
+Defines the FarmbotControl node and initializes movement, state,
+device, tool sequencer, and parameter modules.
+"""
+# Modules
+from farmbot_controllers.devices import DeviceControl
+from farmbot_controllers.movement import Movement
+from farmbot_controllers.parameters import Parameters
+from farmbot_controllers.sequencer import Sequencer
+from farmbot_controllers.states import State
+
 from farmbot_interfaces.msg import PlantManage
 from farmbot_interfaces.srv import ParameterConfig, StringRepReq
 
-# Modules
-from farmbot_controllers.sequencer import Sequencer
-from farmbot_controllers.movement import Movement
-from farmbot_controllers.states import State
-from farmbot_controllers.devices import DeviceControl
-from farmbot_controllers.parameters import Parameters
+import rclpy
+from rclpy.node import Node
+
+from std_msgs.msg import String
+
 
 class FarmbotControl(Node):
+    """ROS2 node for FarmBot control, coordinating movement, devices, and tools."""
+
     # Node contructor
     def __init__(self):
+        """Initialize the FarmbotControl node and its modules."""
         super().__init__('FarmbotController')
 
         # Initializing movemement module
@@ -35,10 +47,13 @@ class FarmbotControl(Node):
 
         # Temporary Keyboard subscriber
         self.cur_increment = 10.0
-        self.input_sub = self.create_subscription(String, 'input_topic', self.cmd_interp_callback, 10)
+        self.input_sub = self.create_subscription(String,
+                                                  'input_topic', self.cmd_interp_callback, 10)
 
         # Farmbot Feedback Subscriber
-        self.fb_feedback_sub = self.create_subscription(String, 'farmbot_feedback', self.fb_feedback_callback, 10)
+        self.fb_feedback_sub = self.create_subscription(String,
+                                                        'farmbot_feedback',
+                                                        self.fb_feedback_callback, 10)
 
         # Map publishers
         self.plant_conf = PlantManage()
@@ -49,75 +64,83 @@ class FarmbotControl(Node):
         self.get_logger().info('Farmbot Controller Initialized..')
 
     def cmd_interp_callback(self, cmd: String):
+        """Parse the incoming command string and dispatch the corresponding FarmBot action."""
         code = cmd.data.split(' ')
         match code[0]:
-            ## Electronic Stop
+            # Electronic Stop
             case 'e':
                 self.get_logger().info('CLEARING SEQUENCE')
                 self.tools.clear_sequence()
-            ## Movement Commands
+            # Movement Commands
             case 'M':
                 if len(code) != 4:
-                    self.get_logger().warning("You need to include all 3 coordinates! Command ignored!")
+                    self.get_logger().warning('You need to include all 3 coordinates!\
+                                              Command ignored!')
                 else:
-                    self.mvm.move_gantry_abs(x_coord = float(code[1]), y_coord = float(code[2]), z_coord = float(code[3]))
+                    self.mvm.move_gantry_abs(x_coord=float(code[1]),
+                                             y_coord=float(code[2]),
+                                             z_coord=float(code[3]))
             case 'M_S':
                 if len(code) != 5:
-                    self.get_logger().warning("You need to include all 3 coordinates and a speed percentage! Command ignored!")
+                    self.get_logger().warning('You need to include all 3 coordinates and a speed\
+                                              percentage! Command ignored!')
                 else:
-                    self.mvm.move_gantry_s(x_coord = float(code[1]), y_coord = float(code[2]),
-                                            z_coord = float(code[3]), speed = float(code[4]))
+                    self.mvm.move_gantry_s(x_coord=float(code[1]), y_coord=float(code[2]),
+                                           z_coord=float(code[3]), speed=float(code[4]))
             case 'w' | 's':
-                self.mvm.move_gantry_abs(x_coord = self.cur_x + (self.cur_increment * (-1 if code[0] == 's' else 1)),
-                                          y_coord = self.cur_y,
-                                          z_coord = self.cur_z)
+                self.mvm.move_gantry_abs(x_coord=self.cur_x
+                                         + (self.cur_increment * (-1 if code[0] == 's' else 1)),
+                                         y_coord=self.cur_y,
+                                         z_coord=self.cur_z)
             case 'a' | 'd':
-                self.mvm.move_gantry_abs(x_coord = self.cur_x,
-                                          y_coord = self.cur_y + self.cur_increment * (-1 if code[0] == 'a' else 1),
-                                          z_coord = self.cur_z)
+                self.mvm.move_gantry_abs(x_coord=self.cur_x,
+                                         y_coord=self.cur_y + self.cur_increment
+                                         * (-1 if code[0] == 'a' else 1),
+                                         z_coord=self.cur_z)
             case '1':
                 self.cur_increment = 10.0
             case '2':
                 self.cur_increment = 100.0
             case '3':
                 self.cur_increment = 500.0
-            ## Homing commands
-            case 'H_0': 
+            # Homing commands
+            case 'H_0':
                 self.mvm.go_home()
             case 'H_1':
                 self.mvm.find_all_homes()
             case 'H_2':
-                self.mvm.find_axis_home(x = True if code[1] == 'X' else False,
-                                         y = True if code[1] == 'Y' else False,
-                                         z = True if code[1] == 'Z' else False)
-            ## Parameter configuration commands
+                self.mvm.find_axis_home(x=True if code[1] == 'X' else False,
+                                        y=True if code[1] == 'Y' else False,
+                                        z=True if code[1] == 'Z' else False)
+            # Parameter configuration commands
             case 'CONF':
                 if len(code) == 1:
-                    self.param_config_client(cmd = 'SAVE')
-                    self.param_config_client(cmd = 'MAP')
+                    self.param_config_client(cmd='SAVE')
+                    self.param_config_client(cmd='MAP')
                 else:
                     if code[1] == 'S':
-                        self.param_config_client(cmd = 'SAVE')
+                        self.param_config_client(cmd='SAVE')
                     elif code[1] == 'M':
-                        self.param_config_client(cmd = 'MAP')
-            ## Axis Calibration commands
-            case 'C_0': # C_0 for calib. all axis, C_0 X for calib. x axis and so on
+                        self.param_config_client(cmd='MAP')
+            # Axis Calibration commands
+            case 'C_0':  # C_0 for calib. all axis, C_0 X for calib. x axis and so on
                 if len(code) == 1:
                     self.mvm.calibrate_all_axis()
                 else:
-                    self.mvm.calibrate_axis(x = True if code[1] == 'X' else False,
-                                             y = True if code[1] == 'Y' else False,
-                                             z = True if code[1] == 'Z' else False)
-            ## Load parameter configuration commands
-            case 'C_1': # e.g. C_1 Genesis
+                    self.mvm.calibrate_axis(x=True if code[1] == 'X' else False,
+                                            y=True if code[1] == 'Y' else False,
+                                            z=True if code[1] == 'Z' else False)
+            # Load parameter configuration commands
+            case 'C_1':  # e.g. C_1 Genesis
                 if code[1]:
-                    self.config_loader_client(ver = code[1])
+                    self.config_loader_client(ver=code[1])
                 else:
                     self.get_logger().warn('No parameter config set')
-            ## Invert the encoder direction for a specified axis
+            # Invert the encoder direction for a specified axis
             case 'C_2':
                 if len(code) == 1:
-                    self.get_logger().warning('You have not selected the axis encoder you want to flip. Command ignored')
+                    self.get_logger().warning('You have not selected the axis encoder you want to\
+                                              flip. Command ignored')
                 else:
                     if code[1] in ['X', 'Y', 'Z']:
                         param = 130 + ((1 if code[1] == 'X' else 0) +
@@ -127,13 +150,14 @@ class FarmbotControl(Node):
                         self.params.writeParam(param, 1)
                     else:
                         self.get_logger().warning('C_2: Invalid option selected. Choose: X, Y, Z')
-            ## Tool commands
-            case 'T_1_0' | 'T_2_0' | 'T_3_0': # e.g. T_1_0 Seeder 1198.0 332.4 -240.0 1
-                tool = code[0] + '\n' + code[1] + '\n' + code[2] + ' ' + code[3] + ' ' + code[4] + ' ' + code[5]
-                self.tools.map_cmd_client(cmd = tool)
+            # Tool commands
+            case 'T_1_0' | 'T_2_0' | 'T_3_0':  # e.g. T_1_0 Seeder 1198.0 332.4 -240.0 1
+                tool = (code[0] + '\n' + code[1] + '\n' + code[2] + ' ' + code[3] + ' ' + code[4]
+                        + ' ' + code[5])
+                self.tools.map_cmd_client(cmd=tool)
             case 'T_1_1' | 'T_1_2' | 'T_2_1' | 'T_2_2' | 'T_3_1' | 'T_3_2':
-                self.tools.map_cmd_client(cmd = cmd.data)
-            ## Plant commands
+                self.tools.map_cmd_client(cmd=cmd.data)
+            # Plant commands
             case 'P_1':
                 self.plant_conf.add = True
                 self.plant_conf.autopos = False
@@ -166,54 +190,51 @@ class FarmbotControl(Node):
                 self.plant_conf.index = int(code[1])
 
                 self.plant_manage_pub.publish(self.plant_conf)
-            case 'P_3' | 'P_4' | 'P_5' | 'P_9': # Seed/water all plants in Planning stage
-                self.tools.map_cmd_client(cmd = cmd.data)
-            ## Seed Tray commands
-            case 'S_1_0' | 'S_2_0' | 'S_3_0': # e.g. S_1_0 0 Tray1 Radish 1198.0 332.4 -240.0
-                tray = (code[0] + (('_' + code[1]) if code[1] in ['0', '1'] else '_0') 
-                        + '\n' + code[2] + '\n' + code[3] + '\n' 
+            case 'P_3' | 'P_4' | 'P_5' | 'P_9':  # Seed/water all plants in Planning stage
+                self.tools.map_cmd_client(cmd=cmd.data)
+            # Seed Tray commands
+            case 'S_1_0' | 'S_2_0' | 'S_3_0':  # e.g. S_1_0 0 Tray1 Radish 1198.0 332.4 -240.0
+                tray = (code[0] + (('_' + code[1]) if code[1] in ['0', '1'] else '_0')
+                        + '\n' + code[2] + '\n' + code[3] + '\n'
                         + code[4] + ' ' + code[5] + ' ' + code[6])
-                self.tools.map_cmd_client(cmd = tray)
-            case 'I_0': # Calibrate Camera
-                self.tools.cam_calib_client(cmd = 'GET')
-            case 'I_1': # Stitch panorama at current position
-                self.tools.stitch_panorama_client(calib = False, detect_weeds = False, update_map = False, mosaic = False,
-                                                    x = self.cur_x, y = self.cur_y,
-                                                    z = self.cur_z)
+                self.tools.map_cmd_client(cmd=tray)
+            case 'I_0':  # Calibrate Camera
+                self.tools.cam_calib_client(cmd='GET')
+            case 'I_1':  # Stitch panorama at current position
+                self.tools.stitch_panorama_client(calib=False, detect_weeds=False, update_map=False,
+                                                  mosaic=False, x=self.cur_x,
+                                                  y=self.cur_y, z=self.cur_z)
             case 'I_2':
                 self.tools.panorama_client()
             case 'I_3':
-                self.tools.panorama_client(mosaic = True)
+                self.tools.panorama_client(mosaic=True)
             case 'I_4':
-                self.tools.stitch_panorama_client(calib = False, detect_weeds = True, update_map = False, mosaic = False,
-                                                    x = self.cur_x, y = self.cur_y,
-                                                    z = self.cur_z)
-            ## Device commands
+                self.tools.stitch_panorama_client(calib=False, detect_weeds=True, update_map=False,
+                                                  mosaic=False, x=self.cur_x,
+                                                  y=self.cur_y, z=self.cur_z)
+            # Device commands
             case 'D_L_1' | 'D_L_0':
-                self.tools.led_strip(state = int(code[0][4]))
+                self.tools.led_strip(state=int(code[0][4]))
             case 'D_V_0' | 'D_V_1':
-                self.tools.vacuum_pump(state = int(code[0][4]))
+                self.tools.vacuum_pump(state=int(code[0][4]))
             case 'D_W_0' | 'D_W_1':
-                self.tools.water_pump(state = int(code[0][4]))
+                self.tools.water_pump(state=int(code[0][4]))
             case 'D_C':
                 self.devices.read_pin(63, False)
             case 'D_S_C':
                 self.devices.read_pin(59, True)
             case 'P4_0' | 'P4_1':
-                self.tools.peripheral_4(state = int(code[0][3]))
+                self.tools.peripheral_4(state=int(code[0][3]))
             case 'P5_0' | 'P5_1':
-                self.tools.peripheral_5(state = int(code[0][3]))
+                self.tools.peripheral_5(state=int(code[0][3]))
             case 'M_S':
                 self.get_logger().info(f'Trying to move servo {int(code[1])} to {int(code[2])}')
-                self.devices.move_servo(pin = int(code[1]), angle = float(code[2]))
+                self.devices.move_servo(pin=int(code[1]), angle=float(code[2]))
 
-    ## Farmbot Handling Callback
-    
+    # Farmbot Handling Callback
+
     def fb_feedback_callback(self, msg: String):
-        '''
-        Takes the feedback from the Serial Receiver and updates
-        information accordingly 
-        '''
+        """Take the feedback from the Serial Receiver and updates information accordingly."""
         msgSplit = (msg.data).split(' ')
         reportCode = msgSplit[0]
 
@@ -221,47 +242,49 @@ class FarmbotControl(Node):
             self.cur_x = float(msgSplit[1][1:])
             self.cur_y = float(msgSplit[2][1:])
             self.cur_z = float(msgSplit[3][1:])
-            
+
             # Update the position reference within the sequencing module
             self.tools.x = self.cur_x
             self.tools.y = self.cur_y
             self.tools.z = self.cur_z
         elif reportCode == 'R41':
             self.tools.uart_message(msg.data)
-    
-    ## Parameter Manager Clients and Future Callbacks
+
+    # Parameter Manager Clients and Future Callbacks
 
     def config_loader_client(self, ver: str):
-        '''
-        Client for the Parameter Loading Server
+        """
+        Client for the Parameter Loading Server.
+
         Requests the server to load the parameter configuration appropriate for
         the model of the farmbot used.
-        '''
+        """
         if ver == '':
-            self.get_logger().warn('IGNORED. Cannot set configuration if the version of the farmbot is not set!')
+            self.get_logger().warn('IGNORED. Cannot set configuration if the version of the farmbot\
+                                   is not set!')
             return
         if ver not in ['Genesis', 'genesis', 'Gen', 'gen',
                        'Express', 'express', 'Exp', 'exp',
                        'Custom', 'custom']:
             self.get_logger().warn('IGNORED. Config type unrecognized')
             return
-        
 
         client = self.create_client(StringRepReq, 'load_param_config')
         while not client.wait_for_service(1.0):
             self.get_logger().warn('Waiting for Parameter Loading Server...')
-        
+
         request = StringRepReq.Request()
         request.data = ver
 
-        future = client.call_async(request = request)
+        future = client.call_async(request=request)
         future.add_done_callback(self.config_loading_callback)
 
     def config_loading_callback(self, future):
-        '''
-        Future Callback from the parameter loading server
+        """
+        Future Callback from the parameter loading server.
+
         Checks if the parameter loading server executed correctly
-        '''
+        """
         try:
             response = future.result().data
             if response == 'FAILED':
@@ -270,10 +293,11 @@ class FarmbotControl(Node):
             self.get_logger().error('Service call failed %r' % (e, ))
 
     def param_config_client(self, cmd: String):
-        '''
-        Parameter Configuration Client
+        """
+        Parameter Configuration Client.
+
         Requests a response from the Parameter Manager Server
-        '''
+        """
         client = self.create_client(ParameterConfig, 'manage_param_config')
         while not client.wait_for_service(1.0):
             self.get_logger().warn('Waiting for Parameter Config Server...')
@@ -281,35 +305,37 @@ class FarmbotControl(Node):
         request = ParameterConfig.Request()
         request.data = cmd
 
-        future = client.call_async(request = request)
+        future = client.call_async(request=request)
         future.add_done_callback(self.param_config_callback)
 
     def param_config_callback(self, future):
-        '''
-        Parameter information request future callback
+        """
+        Parameter information request future callback.
+
         Gets the response from the request sent to the parameter config manager
-        '''
+        """
         try:
             response = future.result()
             if not response:
                 self.get_logger().warn('Failure in Parameter Config Handling!')
                 return
-            
+
             if future.result().cmd:
                 info = future.result().cmd.split(' ')
                 if info[0] == 'MAP':
-                    self.tools.stitch_panorama_client(calib = False, update_map = True, mosaic = False,
-                                                       x = float(info[2]), y = float(info[4]),
-                                                       z = float(info[6]))
+                    self.tools.stitch_panorama_client(calib=False, update_map=True, mosaic=False,
+                                                      x=float(info[2]), y=float(info[4]),
+                                                      z=float(info[6]))
         except Exception as e:
             self.get_logger().error('Service call failed %r' % (e, ))
-    
 
-def main(args = None):
-    rclpy.init(args = args)
+
+def main(args=None):
+    """Initialize ROS2 and run the FarmbotControl node until shutdown."""
+    rclpy.init(args=args)
 
     main_ctrl_node = FarmbotControl()
-    
+
     try:
         rclpy.spin(main_ctrl_node)
     except KeyboardInterrupt:
@@ -317,6 +343,7 @@ def main(args = None):
 
     main_ctrl_node.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
