@@ -29,7 +29,7 @@ def generate_launch_description():
         Node(
             package='farmbot_controllers',
             executable='farmbot_orchestrator',
-            name='farmbor_orchestrator',
+            name='farmbot_orchestrator',
             output='screen',
                     parameters=[
                         {'tx_freq': 10},

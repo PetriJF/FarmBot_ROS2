@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Farmbot serial controller module.
+Farmbot serial controller node.
 
 Handles ROS2 /farmbot_command input, forwards commands to the Farmduino over serial,
 and publishes feedback and busy state updates.
