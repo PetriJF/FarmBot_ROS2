@@ -416,10 +416,5 @@ class Sequencer:
         future.add_done_callback(self.cmd_sequence_callback)
 
     def status_callback(self, state: Bool):
-<<<<<<< HEAD
         """Transmit the busy statefrom the Uart controller to the sequencer timer."""
-        self.farmbot_busy = state.data
-=======
-        """Callback from the UART Handler that transmits the busy state of the farmbot."""
         self.farmbot_estop = state.data
->>>>>>> 707544a (Modification to the busy_state topic so that it is used only for estop. Related modification in the sequencer.)
