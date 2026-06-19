@@ -110,7 +110,6 @@ class FarmbotOrchestrator(Node):
 
         if self.goal_handle.accepted:
             self.busy_state = True
-            self.farmbot_state_pub.publish(self.farmbot_busy)
             self.get_logger().info('Goal accepted')
 
             self.goal_handle.get_result_async().add_done_callback(
@@ -130,7 +129,6 @@ class FarmbotOrchestrator(Node):
         """Handle the final result from the FarmbotControl action server."""
         # result = future.result().result
         self.busy_state = False
-
         self.get_logger().info('Farmbot is ready for the next command')
 
 
