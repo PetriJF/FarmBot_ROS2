@@ -141,8 +141,8 @@ class ConfigServer(Node):
             loaded_firmware_config = yaml.safe_load(yaml_file)
             for key, value in self.param_vals.items():
                 if (loaded_firmware_config[key] != value):
-                    self.param_cmd.data = 'parameter_command False True False False ' + str(key)
-                    + ' ' + str(value)
+                    self.param_cmd.data = ('parameter_command False True False False ' + str(key)
+                                           + ' ' + str(value))
                     self.param_cmd_pub.publish(self.param_cmd)
                     time.sleep(0.1)
 
