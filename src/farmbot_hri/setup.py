@@ -1,6 +1,13 @@
-from setuptools import find_packages, setup
+"""Setup configuration for farmbot_hri package.
+
+Defines package metadata, dependencies, and console entry points for the
+Farmbot human-robot interaction ROS2 package.
+"""
 import glob
 import os
+
+from setuptools import find_packages, setup
+
 package_name = 'farmbot_hri'
 
 setup(
@@ -26,8 +33,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            "keyboard_controller = farmbot_hri.keyboard_teleop:main",
-            "autonomous_controller = farmbot_hri.autonomous_controller:main"
+            'keyboard_controller = farmbot_hri.keyboard_teleop:main',
+            'autonomous_controller = farmbot_hri.autonomous_controller:main'
         ],
     },
 )

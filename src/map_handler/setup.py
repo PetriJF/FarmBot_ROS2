@@ -1,6 +1,13 @@
-from setuptools import find_packages, setup
-import os, glob
+"""
+Setup configuration for map_handler package.
 
+Defines package metadata, dependencies, and console entry points for the
+ROS2 map handler package that manages Farmbot map information and seed mapping.
+"""
+import glob
+import os
+
+from setuptools import find_packages, setup
 package_name = 'map_handler'
 
 setup(
@@ -17,12 +24,13 @@ setup(
     zip_safe=True,
     maintainer='James',
     maintainer_email='jamespetri28@gmail.com',
-    description='Package handling map information and seed mapping. Also handles sequencing for some tasks',
+    description='Package handling map information and seed mapping. Also handles sequencing'
+    'for some tasks',
     license='MIT',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "map_controller = map_handler.map_controller:main"
+            'map_controller = map_handler.map_controller:main'
         ],
     },
 )

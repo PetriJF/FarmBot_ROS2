@@ -1,9 +1,12 @@
-import launch
+"""Launch description for FarmBot nodes on Luxonis hardware."""
 from launch import LaunchDescription, LaunchService
-from launch_ros.actions import Node
 from launch.actions import TimerAction
 
+from launch_ros.actions import Node
+
+
 def generate_launch_description():
+    """Return the launch description for FarmBot nodes on Luxonis hardware."""
     return LaunchDescription([
         Node(
             package='farmbot_controllers',
@@ -41,7 +44,7 @@ def generate_launch_description():
             name='luxonis_camera',
             output='screen'
         ),
-        
+
         # Delay for 10 seconds
         TimerAction(
             period=10.0,
@@ -52,7 +55,7 @@ def generate_launch_description():
                     executable='uart_controller',
                     name='uart_controller',
                     output='screen',
-                    parameters = [
+                    parameters=[
                         {'serial_port': '/dev/ttyACM0'},
                         {'serial_speed': 115200},
                         {'check_uart_freq': 100},
@@ -62,6 +65,7 @@ def generate_launch_description():
             ]
         )
     ])
+
 
 if __name__ == '__main__':
     ls = LaunchService()

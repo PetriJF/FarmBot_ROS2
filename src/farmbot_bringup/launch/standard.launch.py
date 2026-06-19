@@ -1,17 +1,24 @@
-import launch
+"""Launch description for the FarmBot ROS2 stack.
+
+Defines the controller, parameter server, GPIO controller, and map
+controller nodes with an optional camera flag.
+"""
 from launch import LaunchDescription, LaunchService
-from launch_ros.actions import Node
+from launch.actions import DeclareLaunchArgument, TimerAction
 from launch.conditions import IfCondition
-from launch.substitutions import PythonExpression, LaunchConfiguration
-from launch.actions import TimerAction, DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration, PythonExpression
+
+from launch_ros.actions import Node
+
 
 def generate_launch_description():
+    """Return the launch description for the FarmBot ROS2 stack."""
     use_camera = LaunchConfiguration('use_camera')
 
     return LaunchDescription([
         DeclareLaunchArgument(
             'use_camera',
-            default_value = 'False'
+            default_value='False'
         ),
         Node(
             package='farmbot_controllers',
@@ -42,9 +49,9 @@ def generate_launch_description():
             executable='camera_controller',
             name='camera_controller',
             output='screen',
-            condition = IfCondition(
+            condition=IfCondition(
                 PythonExpression([
-                    use_camera, 
+                    use_camera,
                     '== True'
                 ])
             )
@@ -54,9 +61,9 @@ def generate_launch_description():
             executable='standard_camera',
             name='standard_camera',
             output='screen',
-            condition = IfCondition(
+            condition=IfCondition(
                 PythonExpression([
-                    use_camera, 
+                    use_camera,
                     '== True'
                 ])
             )
@@ -71,7 +78,7 @@ def generate_launch_description():
                     executable='uart_controller',
                     name='uart_controller',
                     output='screen',
-                    parameters = [
+                    parameters=[
                         {'serial_port': '/dev/ttyACM0'},
                         {'serial_speed': 115200},
                         {'check_uart_freq': 100},
@@ -81,6 +88,7 @@ def generate_launch_description():
             ]
         )
     ])
+
 
 if __name__ == '__main__':
     ls = LaunchService()
