@@ -1,19 +1,29 @@
+"""
+Standard camera Node.
+
+Provide a ROS2 node that captures frames from the standard FarmBot USB camera and publishes RGB
+images on the `rgb_img` topic.
+"""
+from time import sleep
+
+import cv2
+
+from cv_bridge import CvBridge
+
 import rclpy
 from rclpy.node import Node
+
 from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
-import os
-import cv2
-from time import sleep
+
 
 CAMERA = 'USB'  # Set your camera type here
 
+
 class StandardCameraNode(Node):
-    '''
-    Camera Node that reads packets from the standard farmbot camera 
-    and publishes the RGB frames on the topic
-    '''
+    """Camera Node reads packets from the standard farmbot camera and publishes the RGB frames."""
+
     def __init__(self):
+        """Initialize the standard camera node and start the image publisher."""
         super().__init__('StandardCamera')
         self.bridge_ = CvBridge()  # Bridge to convert between ROS and OpenCV images
 
@@ -30,10 +40,8 @@ class StandardCameraNode(Node):
         self.get_logger().info('Standard Camera Node initialized...')
 
     def init_camera(self):
-        '''
-        Initialize the camera
-        '''
-        self.WIDTH = 640  
+        """Initialize the camera."""
+        self.WIDTH = 640
         self.HEIGHT = 480
         self.camera_port = 0
         self.discard_frames = 20  # Reduced number of discarded frames
@@ -56,9 +64,7 @@ class StandardCameraNode(Node):
             self.camera.grab()
 
     def capture_image(self):
-        '''
-        Take a photo using the farmbot snake camera and publish it to /rgb_img
-        '''
+        """Take a photo using the farmbot snake camera and publish it to /rgb_img."""
         ret, image = self.camera.read()
 
         if not ret:
@@ -66,20 +72,20 @@ class StandardCameraNode(Node):
             return
 
         # Save image to file
-        image_msg = self.bridge_.cv2_to_imgmsg(image, "bgr8")
+        image_msg = self.bridge_.cv2_to_imgmsg(image, 'bgr8')
         self.rgb_publisher_.publish(image_msg)
 
     def destroy_node(self):
-        '''
-        Cleanup resources when shutting down the node
-        '''
+        """Cleanup resources when shutting down the node."""
         self.camera.release()
         self.get_logger().info('Camera released.')
         super().destroy_node()
 
+
 # Main Function called on the initialization of the ROS2 Node
-def main(args = None):
-    rclpy.init(args = args)
+def main(args=None):
+    """Initialize ROS2 and run the StandardCameraNode until shutdown."""
+    rclpy.init(args=args)
 
     cam = StandardCameraNode()
 
@@ -90,6 +96,7 @@ def main(args = None):
 
     cam.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
