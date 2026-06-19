@@ -40,10 +40,12 @@ class FarmbotOrchestrator(Node):
         self.uart_tx_sub = self.create_subscription(String, 'farmbot_command',
                                                     self.farmbot_command_callback, 10)
 
+        self.busy_state = False
+
         # Farmbot state publisher
-        self.farmbot_busy = Bool()
-        self.farmbot_busy.data = False
-        self.farmbot_state_pub = self.create_publisher(Bool, 'busy_state', 10)
+        self.estop_pressed = Bool()
+        self.estop_pressed.data = False
+        self.farmbot_estop_pub = self.create_publisher(Bool, 'estop', 10)
 
         self.action_status_timer = self.create_timer(1.0 / tx_freq, self.check_action_status)
 
@@ -68,6 +70,11 @@ class FarmbotOrchestrator(Node):
             self.queue['non_priority_cmd'].clear()
             self.queue['priority_cmd'].clear()
             self.queue['priority_cmd'].append(message.data)
+            if message.data == 'E':
+                self.estop_pressed.data = True
+            elif message.data == 'F09':
+                self.estop_pressed.data = False
+            self.farmbot_estop_pub.publish(self.estop_pressed)
         else:
             self.queue['non_priority_cmd'].append(message.data)
 
@@ -76,12 +83,12 @@ class FarmbotOrchestrator(Node):
         command = ''
 
         if self.queue['priority_cmd']:
-            if self.farmbot_busy.data:
+            if self.busy_state:
                 self.goal_handle.cancel_goal_async()
             command = self.queue['priority_cmd'].pop(0)
             self.send_goal(command)
 
-        elif self.queue['non_priority_cmd'] and not self.farmbot_busy.data:
+        elif self.queue['non_priority_cmd'] and not self.busy_state:
             command = self.queue['non_priority_cmd'].pop(0)
             self.send_goal(command)
         else:
@@ -102,7 +109,7 @@ class FarmbotOrchestrator(Node):
         self.goal_handle = future.result()
 
         if self.goal_handle.accepted:
-            self.farmbot_busy.data = True
+            self.busy_state = True
             self.farmbot_state_pub.publish(self.farmbot_busy)
             self.get_logger().info('Goal accepted')
 
@@ -122,8 +129,7 @@ class FarmbotOrchestrator(Node):
     def goal_result_callback(self, future):
         """Handle the final result from the FarmbotControl action server."""
         # result = future.result().result
-        self.farmbot_busy.data = False
-        self.farmbot_state_pub.publish(self.farmbot_busy)
+        self.busy_state = False
 
         self.get_logger().info('Farmbot is ready for the next command')
 
