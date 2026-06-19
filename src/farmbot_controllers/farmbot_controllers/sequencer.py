@@ -418,5 +418,3 @@ class Sequencer:
     def status_callback(self, state: Bool):
         """Transmit the busy statefrom the Uart controller to the sequencer timer."""
         self.farmbot_estop = state.data
-        if self.farmbot_estop:
-            self.clear_sequence()
