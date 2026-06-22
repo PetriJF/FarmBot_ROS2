@@ -2,6 +2,7 @@
 /build/
 /install/
 /log/
+/local_config/
 
 # Ignore compiled Python files
 *.pyc
