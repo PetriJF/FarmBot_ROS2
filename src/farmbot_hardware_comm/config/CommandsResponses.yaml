@@ -1,39 +1,40 @@
-# Contains all commands and their possible responses
+# Contains all commands and their possible end responses
 
-# Long-term commands
-G00: 
-  responses: ['R02', 'R03']
-G01: 
-  responses: ['R02', 'R03']
-G28: 
-  responses: ['R02', 'R03']
-F11:
-  responses: ['R02', 'R03']
-F12: 
-  responses: ['R02', 'R03']
-F13: 
-  responses: ['R02', 'R03']
-F14: 
-  responses: ['R02', 'R03']
-F15: 
-  responses: ['R02', 'R03']
-F16: 
-  responses: ['R02', 'R03']
-F20: 
-  responses: ['R02', 'R03']
-F44: 
-  responses: ['R02', 'R03']
+long_term:
+  G00: 
+    responses: ['R02', 'R03']
+  G01: 
+    responses: ['R02', 'R03']
+  G28: 
+    responses: ['R02', 'R03']
+  F11:
+    responses: ['R02', 'R03']
+  F12: 
+    responses: ['R02', 'R03']
+  F13: 
+    responses: ['R02', 'R03']
 
-# Commands that block until a response is reached
-F21: 
-  responses: ['R21']
-F42: 
-  responses: ['R41']
+calibration:
+  F14: 
+    responses: ['R02', 'R03']
+  F15: 
+    responses: ['R02', 'R03']
+  F16: 
+    responses: ['R02', 'R03']
+
+blocking:
+  F20: 
+    responses: ['R02', 'R03']
+  F44: 
+    responses: ['R02', 'R03']
+  F21: 
+    responses: ['R21']
+  F42: 
+    responses: ['R41']
 
 # Priority commands
-F09: 
-  responses: ['R02', 'R03']
-G01: 
-  responses: ['R02', 'R03']
+priority:
+  F09: 
+    responses: ['R02', 'R03']
 
 command_echo: 'R08'

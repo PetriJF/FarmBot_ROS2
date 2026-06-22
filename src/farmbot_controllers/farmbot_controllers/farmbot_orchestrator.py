@@ -5,7 +5,7 @@ Farmbot Orchestrator module.
 Provides the FarmbotOrchestrator ROS2 node for managing the transmission of commands to the UART
 controller through priority and non-priority queues.
 """
-from farmbot_interfaces.action import FarmbotControl
+from farmbot_interfaces.action import FarmbotComms
 
 import rclpy
 from rclpy.action import ActionClient
@@ -18,8 +18,8 @@ class FarmbotOrchestrator(Node):
     """
     Orchestrate FarmBot command routing.
 
-    This node receives commands from the `farmbot_command` topic and manages
-    priority and non-priority commands for FarmbotControl action.
+    This node receives commands from the farmbot_command topic and manages
+    priority and non-priority commands for FarmbotComms action.
     """
 
     # Node contructor
@@ -37,6 +37,7 @@ class FarmbotOrchestrator(Node):
         }
 
         # Node subscripters and publishers
+        self.fb_feedback_pub = self.create_publisher(String, 'farmbot_feedback', 10)
         self.uart_tx_sub = self.create_subscription(String, 'farmbot_command',
                                                     self.farmbot_command_callback, 10)
 
@@ -49,9 +50,9 @@ class FarmbotOrchestrator(Node):
 
         self.action_status_timer = self.create_timer(1.0 / tx_freq, self.check_action_status)
 
-        self.farmbot_control_client = ActionClient(self, FarmbotControl, 'farmbot_control')
+        self.farmbot_comm_client = ActionClient(self, FarmbotComms, 'farmbot_communication')
 
-        while not self.farmbot_control_client.wait_for_server(1.0):
+        while not self.farmbot_comm.wait_for_server(1.0):
             self.get_logger().warning('Waiting for Action Server...')
 
         # Log the initialization
@@ -96,10 +97,10 @@ class FarmbotOrchestrator(Node):
 
     def send_goal(self, cmd):
         """Send a command goal to the serial controller through the action server."""
-        goal = FarmbotControl.Goal()
+        goal = FarmbotComms.Goal()
         goal.command = cmd
 
-        self.farmbot_control_client.send_goal_async(
+        self.farmbot_comm_client.send_goal_async(
             goal,
             feedback_callback=self.goal_feedback_callback
             ).add_done_callback(self.goal_response_callback)
@@ -117,18 +118,39 @@ class FarmbotOrchestrator(Node):
             )
 
         else:
-            self.get_logger().warn('Goal rejected')
+            self.get_logger().warn('Goal rejected! This type of command is not accepted by Farmbot')
+
+    # def goal_cancel_callback(self, future):
+    #    """Handle the action server's goal cancel."""
+    #    self.goal_cancel = future.result()
+
+    #    if self.goal_cancel.accepted:
+
+    #        self.goal_handle.get_result_async().add_done_callback(
+    #           self.goal_result_callback
+    #        )
+
+    #    else:
+    #       self.get_logger().warn('Estop is already tunning')
 
     def goal_feedback_callback(self, feedback_msg):
-        """Handle feedback messages from the FarmbotControl action server."""
-        self.current_position = feedback_msg.feedback.current_position
+        """Handle feedback messages from the FarmbotComms action server."""
+        fb_feedback = feedback_msg.feedback.uart_feedback
+        percentage = feedback_msg.feedback.percentage
+        self.get_logger().info(f'Goal completion: {percentage}')
 
-        # self.get_logger().info(f'Current Position: {current_position}')
+        # Send the reporting message for further processing by other nodes
+        self.fb_feedback_pub.publish(fb_feedback)
 
     def goal_result_callback(self, future):
-        """Handle the final result from the FarmbotControl action server."""
-        # result = future.result().result
+        """Handle the final result from the FarmbotComms action server."""
+        #  result = future.result().success
         self.busy_state = False
+        #  if result == 'GOAL CANCELED':
+        #    self.get_logger().warn('The current command has been canceled by a estop request')
+        #  elif result == 'GOAL COMPLETED':
+        #    self.get_logger().info('The command was successful and has been completed')
+
         self.get_logger().info('Farmbot is ready for the next command')
 
 

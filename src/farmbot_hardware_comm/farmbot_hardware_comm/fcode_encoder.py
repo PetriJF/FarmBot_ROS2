@@ -189,7 +189,7 @@ class StateCmdHandler:
         if command[0] == 'True':        # List all parameters
             self.uart_cmd = 'F20'
         else:
-            if command[2] == 'True':  # Read a parameter
+            if command[2] == 'True':    # Read a parameter
                 self.uart_cmd = 'F21 P' + command[4]
             elif command[1] == 'True':  # Write to a parameter
                 self.uart_cmd = 'F22 P' + command[4] + ' V' + command[5]
@@ -215,17 +215,17 @@ class StateCmdHandler:
                 'Make sure to include only 1 state handler command!'
                 'Your input has ' + str(state_counter) + ' commands')
         else:
-            if command[0] == 'True':               # Electronic stop
+            if command[0] == 'True':         # Electronic stop
                 self.uart_cmd = 'E'
-            elif command[1] == 'True':    # Abort current movement command
+            elif command[1] == 'True':       # Abort current movement command
                 self.uart_cmd = '@'
             elif command[2] == 'True':       # Reset the Electronic stop
                 self.uart_cmd = 'F09'
-            elif command[3] == 'True':      # Report End Stop
+            elif command[3] == 'True':       # Report End Stop
                 self.uart_cmd = 'F81'
-            elif command[4] == 'True':      # Report Current Position
+            elif command[4] == 'True':       # Report Current Position
                 self.uart_cmd = 'F82'
-            elif command[5] == 'True':        # Report Software Version
+            elif command[5] == 'True':       # Report Software Version
                 self.uart_cmd = 'F83'
 
             self.node.get_logger().info(self.uart_cmd)

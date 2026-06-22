@@ -81,7 +81,7 @@ def generate_launch_description():
         TimerAction(
             period=10.0,
             actions=[
-                # Start uart_controller after the delay
+                # Start serial_controller after the delay
                 Node(
                     package='farmbot_hardware_comm',
                     executable='serial_controller',

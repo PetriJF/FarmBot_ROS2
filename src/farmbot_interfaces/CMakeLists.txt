@@ -26,7 +26,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/LedPanelHandler.srv"
   "srv/ParameterConfig.srv"
   "srv/StringRepReq.srv"
-  "action/FarmbotControl.action"
+  "action/FarmbotComms.action"
   DEPENDENCIES sensor_msgs
 )
 

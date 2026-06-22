@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Farmbot serial controller node.
+Farmbot serial communications node.
 
 Handles ROS2 /farmbot_command input, forwards commands to the Farmduino over serial,
 and publishes feedback and busy state updates.
@@ -11,7 +11,7 @@ from ament_index_python.packages import get_package_share_directory
 
 from farmbot_hardware_comm.fcode_encoder import DeviceCmdHandler, MotorCmdHandler, StateCmdHandler
 
-from farmbot_interfaces.action import FarmbotControl
+from farmbot_interfaces.action import FarmbotComms
 from farmbot_interfaces.msg import FBPanel
 from farmbot_interfaces.srv import LedPanelHandler
 
@@ -19,7 +19,6 @@ import rclpy
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.action.server import ServerGoalHandle
 from rclpy.callback_groups import ReentrantCallbackGroup
-from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 
 import serial
@@ -33,15 +32,11 @@ class SerialController(Node):
     """
     Farmbot ROS2 node that handles the Serial messages going to and from the Farmduino.
 
-    The Node receives commands through the FarmbotControl action and sends them to the
+    The Node receives commands through the FarmbotComms action and sends them to the
     Farmduino.
 
     When the node receives feedback from the Farmduino through Serial, the message is
     decoded and carried on to the relevant nodes.
-
-    Output Topics:
-        - /farmbot_feedback {String} -> The information that is received from serial and is carried
-            on through the system.
     """
 
     # Node contructor
@@ -49,7 +44,6 @@ class SerialController(Node):
         """Node Constructor."""
         super().__init__('SerialController')
 
-        self.uart_cmd = String()
         self.temp = String()
 
         self.declare_parameter('serial_port', rclpy.Parameter.Type.STRING)
@@ -66,14 +60,11 @@ class SerialController(Node):
         self.motor_cmd_handler = MotorCmdHandler(self)
         self.state_cmd_handler = StateCmdHandler(self)
 
-        # UART receive publisher
-        self.fb_feedback_pub = self.create_publisher(String, 'farmbot_feedback', 10)
-
         # Initialize the Action Server
-        self.farmbot_control_server = ActionServer(
+        self.farmbot_comm_server = ActionServer(
             self,
-            FarmbotControl,
-            'farmbot_control',
+            FarmbotComms,
+            'farmbot_communication',
             goal_callback=self.goal_callback,
             execute_callback=self.execute_callback,
             cancel_callback=self.cancel_callback,
@@ -91,6 +82,12 @@ class SerialController(Node):
         self.previous_cmd = ''
         self.command_is_finished = False
 
+        self.uart_cmd = ''
+        self.current_position = []
+        self.final_position = []
+        self.starting_position = []
+        self.percentage = 0.0
+
         # Initialize the LED states
         self.LED_client(FBPanel.ESTOP_LED, FBPanel.ON)
         self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
@@ -106,8 +103,20 @@ class SerialController(Node):
         self.get_logger().info('Serial Controller Initialized..')
 
     def goal_callback(self, goal_request):
-        """Accept the goal request."""
+        """
+        Check whether the goal is valid.
+
+        If the command type is not among those accepted by Farmbot, the goal is rejected.
+        Otherwise, it is accepted.
+        """
         self.get_logger().info('Received goal request')
+        command_id = (goal_request.command).split(' ')[0]
+
+        valid_commands = ['E', 'F09', 'i2c_command', 'pin_command', 'water_command', 'home_handler',
+                          'move_gantry', 'move_servo', 'parameter_command', 'state_command']
+
+        if command_id not in valid_commands or (self.previous_cmd == 'E' and command_id != 'F09'):
+            return GoalResponse.REJECT
         return GoalResponse.ACCEPT
 
     def cancel_callback(self, goal_handle):
@@ -115,14 +124,43 @@ class SerialController(Node):
         self.get_logger().info('Received cancel request')
         return CancelResponse.ACCEPT
 
-    def handle_callback(self, goal_handle):
+    def handle_callback(self, goal_handle: ServerGoalHandle):
         """Create a timer to track the command status."""
         self.goal_handle = goal_handle
         command = goal_handle.request.command
 
         self.farmbot_cmd_sender(command)
+
+        self.starting_position = self.current_position[:]
+        self.find_final_position()
+
         self.get_logger().info('Executing goal...')
         self.check_status_timer = self.create_timer(1.0 / self.check_uart_freq, self.check_status)
+
+    def find_final_position(self):
+        """Obtain the final position for motion command."""
+        goal = self.temp.data.split(' ')
+        match goal[0]:
+            case 'G00' | 'G01':
+                self.final_position = [float(goal[1][1:]), float(goal[2][1:]), float(goal[3][1:])]
+            case 'G28':
+                self.final_position = [0.0, 0.0, 0.0]
+            case 'F11':
+                self.final_position = [0.0] + self.start_position[1:]
+            case 'F12':
+                self.final_position = [self.start_position[0], 0.0, self.start_position[2]]
+            case 'F13':
+                self.final_position = self.start_position[:2] + [0.0]
+
+    def percentage_calculation(self):
+        """Calculate the percentage of progress made in the movement."""
+        x_axis_completion = ((self.current_position[0] - self.starting_position[0]) /
+                             (self.final_position[0] - self.starting_position[0]))
+        y_axis_completion = ((self.current_position[1] - self.starting_position[1]) /
+                             (self.final_position[1] - self.starting_position[1]))
+        z_axis_completion = ((self.current_position[2] - self.starting_position[2]) /
+                             (self.final_position[2] - self.starting_position[2]))
+        return (x_axis_completion + y_axis_completion + z_axis_completion) * 100 / 3
 
     def check_status(self):
         """
@@ -134,8 +172,12 @@ class SerialController(Node):
         goal_handle = self.goal_handle
 
         # Create Feedback object
-        # feedback = FarmbotControl.Feedback()
-        # goal_handle.publish_feedback(feedback)
+        feedback = FarmbotComms.Feedback()
+        feedback.uart_feedback = self.uart_cmd
+        if self.previous_cmd in self.non_immediate_cmds['long_term']:
+            self.percentage = self.percentage_calculation
+        feedback.percentage = self.percentage
+        goal_handle.publish_feedback(feedback)
 
         if self.command_is_finished and not self.check_status_timer.is_canceled():
             self.get_logger().info('Goal completed.')
@@ -143,7 +185,7 @@ class SerialController(Node):
 
     def execute_callback(self, goal_handle: ServerGoalHandle):
         """
-        Execute the FarmbotControl action goal.
+        Execute the FarmbotComms action goal.
 
         Checks if the command has finished executing. If so, cancels the
         status timer and returns the result. Otherwise, sends the command
@@ -153,13 +195,14 @@ class SerialController(Node):
         self.check_status_timer.cancel()
 
         # Create Result object
-        result = FarmbotControl.Result()
+        result = FarmbotComms.Result()
 
         if goal_handle.is_cancel_requested:
             goal_handle.canceled()
+            #  result.success = 'GOAL CANCELED'
             return result
 
-        self.get_logger().info('Command is sucessful')
+        #  result.success = 'GOAL COMPLETED'
         goal_handle.succeed()
         return result
 
@@ -214,6 +257,9 @@ class SerialController(Node):
             case 'state_command':
                 self.temp.data = self.state_cmd_handler.state_cmd(command[1:])
 
+            case _:
+                self.get_logger().warn('This type of command is not understand by Farmbot')
+
         # Ensure the endline char at the end of the command
         if self.temp.data[-1] != '\n':
             self.temp.data += '\n'
@@ -245,30 +291,30 @@ class SerialController(Node):
             message {str}: the command string
         """
         # Record the message
-        self.uart_cmd.data = message
+        self.uart_cmd = message
 
         # Extract the command code
         rep_code = (message).split(' ')[0]
 
+        if rep_code == 'R82':
+            self.current_position = [float(coord[1:]) for coord in message.split(' ')[1:4]]
+
+        if self.previous_cmd in ['F14', 'F15', 'F16'] and rep_code in ['R11', 'R12', 'R13']:
+            self.percentage += 33
+
         # If a running command has finished OR the response for a request was retrieved
         # OR the sent command was acknowledged by the farmbot
-        if (
-            (
-                self.previous_cmd in self.non_immediate_cmds
-                and rep_code in self.non_immediate_cmds[self.previous_cmd]['responses']
-            )
-            or (
-                self.previous_cmd not in self.non_immediate_cmds
-                and rep_code == self.non_immediate_cmds['command_echo']
-                )
-        ):
-            # Lower the blocking flag
-            self.command_is_finished = True
-
-        # Send the reporting message for further processing by other nodes
-        self.fb_feedback_pub.publish(self.uart_cmd)
+        for cmd_type in self.non_immediate_cmds:
+            if ((self.previous_cmd in self.non_immediate_cmds[cmd_type]
+                 and rep_code in self.non_immediate_cmds[cmd_type][self.previous_cmd]['responses'])
+                or (self.previous_cmd not in self.non_immediate_cmds[cmd_type]
+                    and rep_code == self.non_immediate_cmds['command_echo'])):
+                # Lower the blocking flag
+                self.command_is_finished = True
+                self.percentage = 0.0
 
     # Service Client
+
     def LED_client(self, led_pin, state):
         """Service client for switching an LED on or off."""
         client = self.create_client(LedPanelHandler, 'set_led')
@@ -301,11 +347,9 @@ def main(args=None):
     rclpy.init(args=args)
 
     serial_node = SerialController()
-    executor = MultiThreadedExecutor()
-    executor.add_node(serial_node)
 
     try:
-        executor.spin()
+        rclpy.spin(serial_node)
     except KeyboardInterrupt:
         serial_node.destroy_node()
 
