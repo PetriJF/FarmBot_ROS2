@@ -5,5 +5,5 @@ string command
 string success               
 ---
 # Feedback
-string uart_feedback
+float64[] current_position
 float64 percentage

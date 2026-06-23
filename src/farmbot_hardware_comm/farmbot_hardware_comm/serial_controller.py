@@ -44,6 +44,7 @@ class SerialController(Node):
         """Node Constructor."""
         super().__init__('SerialController')
 
+        self.uart_cmd = String()
         self.temp = String()
 
         self.declare_parameter('serial_port', rclpy.Parameter.Type.STRING)
@@ -60,6 +61,9 @@ class SerialController(Node):
         self.motor_cmd_handler = MotorCmdHandler(self)
         self.state_cmd_handler = StateCmdHandler(self)
 
+        # UART receive publisher
+        self.fb_feedback_pub = self.create_publisher(String, 'farmbot_feedback', 10)
+
         # Initialize the Action Server
         self.farmbot_comm_server = ActionServer(
             self,
@@ -69,6 +73,7 @@ class SerialController(Node):
             execute_callback=self.execute_callback,
             cancel_callback=self.cancel_callback,
             handle_accepted_callback=self.handle_callback,
+            # handle_canceled_callback=self.handle_cancel_callback,
             callback_group=ReentrantCallbackGroup()
         )
 
@@ -162,9 +167,11 @@ class SerialController(Node):
 
         # Create Feedback object
         feedback = FarmbotComms.Feedback()
-        feedback.uart_feedback = self.uart_cmd
+        feedback.uart_feedback = self.current_position
+
         if self.previous_cmd in self.non_immediate_cmds['long_term']:
             self.percentage = float(self.percentage_calculation())
+
         feedback.percentage = self.percentage
         goal_handle.publish_feedback(feedback)
 
@@ -300,7 +307,7 @@ class SerialController(Node):
             message {str}: the command string
         """
         # Record the message
-        self.uart_cmd = message
+        self.uart_cmd.data = message
 
         # Extract the command code
         rep_code = (message).split(' ')[0]
@@ -321,6 +328,9 @@ class SerialController(Node):
                 # Lower the blocking flag
                 self.command_is_finished = True
                 self.percentage = 0.0
+
+        # Send the reporting message for further processing by other nodes
+        self.fb_feedback_pub.publish(self.uart_cmd)
 
     # Service Client
 
