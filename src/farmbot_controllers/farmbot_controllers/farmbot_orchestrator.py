@@ -27,6 +27,7 @@ class FarmbotOrchestrator(Node):
         """Initialize the FarmbotOrchestrator node."""
         super().__init__('FarmbotOrchestrator')
 
+        self.fb_feedback = String()
         self.declare_parameter('tx_freq', rclpy.Parameter.Type.INTEGER)
         tx_freq = self.get_parameter('tx_freq').get_parameter_value().integer_value
 
@@ -52,7 +53,7 @@ class FarmbotOrchestrator(Node):
 
         self.farmbot_comm_client = ActionClient(self, FarmbotComms, 'farmbot_communication')
 
-        while not self.farmbot_comm.wait_for_server(1.0):
+        while not self.farmbot_comm_client.wait_for_server(1.0):
             self.get_logger().warning('Waiting for Action Server...')
 
         # Log the initialization
@@ -82,7 +83,6 @@ class FarmbotOrchestrator(Node):
     def check_action_status(self):
         """Check queued commands and busy state to determine if the next command can be sent."""
         command = ''
-
         if self.queue['priority_cmd']:
             if self.busy_state:
                 self.goal_handle.cancel_goal_async()
@@ -99,6 +99,7 @@ class FarmbotOrchestrator(Node):
         """Send a command goal to the serial controller through the action server."""
         goal = FarmbotComms.Goal()
         goal.command = cmd
+        self.get_logger().info(f'{cmd}')
 
         self.farmbot_comm_client.send_goal_async(
             goal,
@@ -135,12 +136,12 @@ class FarmbotOrchestrator(Node):
 
     def goal_feedback_callback(self, feedback_msg):
         """Handle feedback messages from the FarmbotComms action server."""
-        fb_feedback = feedback_msg.feedback.uart_feedback
+        self.fb_feedback.data = feedback_msg.feedback.uart_feedback
         percentage = feedback_msg.feedback.percentage
         self.get_logger().info(f'Goal completion: {percentage}')
 
         # Send the reporting message for further processing by other nodes
-        self.fb_feedback_pub.publish(fb_feedback)
+        self.fb_feedback_pub.publish(self.fb_feedback)
 
     def goal_result_callback(self, future):
         """Handle the final result from the FarmbotComms action server."""

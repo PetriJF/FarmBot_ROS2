@@ -77,6 +77,7 @@ class SerialController(Node):
         self.ser.reset_input_buffer()
         # Create a timer to periodically check for incoming serial messages
         self.rx_timer = self.create_timer(1.0 / self.check_uart_freq, self.uart_receive)
+        #  self.fb_feedback_sub = self.create_subscription(String, 'test', self.uart_receive, 10)
 
         # Used for setting the busy status on the ROS2 arch. while a command is running
         self.previous_cmd = ''
@@ -132,35 +133,23 @@ class SerialController(Node):
         self.farmbot_cmd_sender(command)
 
         self.starting_position = self.current_position[:]
-        self.find_final_position()
+        self.get_logger().info(f'{self.starting_position}')
+        self.get_logger().info(f'{self.final_position}')
 
         self.get_logger().info('Executing goal...')
         self.check_status_timer = self.create_timer(1.0 / self.check_uart_freq, self.check_status)
-
-    def find_final_position(self):
-        """Obtain the final position for motion command."""
-        goal = self.temp.data.split(' ')
-        match goal[0]:
-            case 'G00' | 'G01':
-                self.final_position = [float(goal[1][1:]), float(goal[2][1:]), float(goal[3][1:])]
-            case 'G28':
-                self.final_position = [0.0, 0.0, 0.0]
-            case 'F11':
-                self.final_position = [0.0] + self.start_position[1:]
-            case 'F12':
-                self.final_position = [self.start_position[0], 0.0, self.start_position[2]]
-            case 'F13':
-                self.final_position = self.start_position[:2] + [0.0]
+        # self.check_status_timer = self.create_timer(1.0 / 10, self.check_status)
 
     def percentage_calculation(self):
         """Calculate the percentage of progress made in the movement."""
-        x_axis_completion = ((self.current_position[0] - self.starting_position[0]) /
-                             (self.final_position[0] - self.starting_position[0]))
-        y_axis_completion = ((self.current_position[1] - self.starting_position[1]) /
-                             (self.final_position[1] - self.starting_position[1]))
-        z_axis_completion = ((self.current_position[2] - self.starting_position[2]) /
-                             (self.final_position[2] - self.starting_position[2]))
-        return (x_axis_completion + y_axis_completion + z_axis_completion) * 100 / 3
+        axis_completion = [0.0, 0.0, 0.0]
+        denominator = 0
+        for i in range(3):
+            if self.final_position[i] != self.starting_position[i]:
+                axis_completion[i] = ((self.current_position[i] - self.starting_position[i]) /
+                                      (self.final_position[i] - self.starting_position[i]))
+                denominator += 1
+        return sum(axis_completion) * 100 / denominator
 
     def check_status(self):
         """
@@ -175,7 +164,7 @@ class SerialController(Node):
         feedback = FarmbotComms.Feedback()
         feedback.uart_feedback = self.uart_cmd
         if self.previous_cmd in self.non_immediate_cmds['long_term']:
-            self.percentage = self.percentage_calculation
+            self.percentage = float(self.percentage_calculation())
         feedback.percentage = self.percentage
         goal_handle.publish_feedback(feedback)
 
@@ -260,6 +249,7 @@ class SerialController(Node):
             case _:
                 self.get_logger().warn('This type of command is not understand by Farmbot')
 
+        self.find_final_position(self.temp.data)
         # Ensure the endline char at the end of the command
         if self.temp.data[-1] != '\n':
             self.temp.data += '\n'
@@ -268,14 +258,33 @@ class SerialController(Node):
         self.previous_cmd = (
             self.temp.data.split(' ')[0]
             if ' ' in self.temp.data else self.temp.data.split('\n')[0])
+
         self.get_logger().info(f'Sent message: {self.temp.data}')
         # Send through UART the command
         self.ser.write(self.temp.data.encode('utf-8'))
+        # self.get_logger().info(self.temp.data.encode('utf-8'))
+
+    def find_final_position(self, cmd: str):
+        """Obtain the final position for motion command."""
+        self.final_position = []
+        goal = cmd.split(' ')
+        match goal[0]:
+            case 'G00' | 'G01':
+                self.final_position += [float(goal[1][1:]), float(goal[2][1:]), float(goal[3][1:])]
+            case 'G28':
+                self.final_position += [0.0, 0.0, 0.0]
+            case 'F11':
+                self.final_position += [0.0] + self.starting_position[1:]
+            case 'F12':
+                self.final_position += [self.starting_position[0], 0.0, self.starting_position[2]]
+            case 'F13':
+                self.final_position += self.starting_position[:2] + [0.0]
 
     def uart_receive(self):
         """Timer callback that reads from UART and handles the response codes and commands."""
         # Read from serial
         line = self.ser.readline().decode('utf-8').rstrip()
+        # line = response.data
         # If a command is read, handle it
         if line:
             self.get_logger().info(f'Received message: {line}')
@@ -300,7 +309,7 @@ class SerialController(Node):
             self.current_position = [float(coord[1:]) for coord in message.split(' ')[1:4]]
 
         if self.previous_cmd in ['F14', 'F15', 'F16'] and rep_code in ['R11', 'R12', 'R13']:
-            self.percentage += 33
+            self.percentage += 33.0
 
         # If a running command has finished OR the response for a request was retrieved
         # OR the sent command was acknowledged by the farmbot
@@ -308,7 +317,7 @@ class SerialController(Node):
             if ((self.previous_cmd in self.non_immediate_cmds[cmd_type]
                  and rep_code in self.non_immediate_cmds[cmd_type][self.previous_cmd]['responses'])
                 or (self.previous_cmd not in self.non_immediate_cmds[cmd_type]
-                    and rep_code == self.non_immediate_cmds['command_echo'])):
+                    and rep_code == self.non_immediate_cmds['command_echo']['echo'])):
                 # Lower the blocking flag
                 self.command_is_finished = True
                 self.percentage = 0.0
