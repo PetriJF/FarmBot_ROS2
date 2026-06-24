@@ -101,8 +101,8 @@ class FarmbotOrchestrator(Node):
         """Send a command goal to the serial controller through the action server."""
         goal = FarmbotComms.Goal()
         goal.command = cmd
-        self.get_logger().info(f'{cmd}')
 
+        self.busy_state = True
         self.farmbot_comm_client.send_goal_async(
             goal,
             feedback_callback=self.goal_feedback_callback
@@ -113,7 +113,6 @@ class FarmbotOrchestrator(Node):
         self.goal_handle: ClientGoalHandle = future.result()
 
         if self.goal_handle.accepted:
-            self.busy_state = True
             self.get_logger().info('Goal accepted')
 
             self.goal_handle.get_result_async().add_done_callback(
@@ -121,6 +120,7 @@ class FarmbotOrchestrator(Node):
             )
 
         else:
+            self.busy_state = False
             self.get_logger().warn('Goal rejected')
 
     def goal_feedback_callback(self, feedback_msg):
