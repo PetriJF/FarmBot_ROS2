@@ -46,6 +46,7 @@ class SerialController(Node):
 
         self.uart_cmd = String()
         self.temp = String()
+        self.goal_handle = None
 
         self.declare_parameter('serial_port', rclpy.Parameter.Type.STRING)
         self.declare_parameter('serial_speed', rclpy.Parameter.Type.INTEGER)
@@ -73,7 +74,6 @@ class SerialController(Node):
             execute_callback=self.execute_callback,
             cancel_callback=self.cancel_callback,
             handle_accepted_callback=self.handle_callback,
-            # handle_canceled_callback=self.handle_cancel_callback,
             callback_group=ReentrantCallbackGroup()
         )
 
@@ -85,8 +85,7 @@ class SerialController(Node):
 
         # Used for setting the busy status on the ROS2 arch. while a command is running
         self.previous_cmd = ''
-        self.command_is_finished = False
-        self.command_abort = False
+        self.status = ''
 
         self.mission = {
             'starting_position': [],
@@ -128,7 +127,7 @@ class SerialController(Node):
 
         if (command_id not in valid_commands
            or (self.previous_cmd == 'E' and command_id != 'F09')
-           or self.goal_handle.is_active()):
+           or (self.status == 'IS_RUNNING')):
             return GoalResponse.REJECT
 
         return GoalResponse.ACCEPT
@@ -140,6 +139,7 @@ class SerialController(Node):
     def cancel_callback(self, goal_handle):
         """Accept the cancel request."""
         self.get_logger().info('Received cancel request')
+
         return CancelResponse.ACCEPT
 
     # ==========================================
@@ -154,9 +154,11 @@ class SerialController(Node):
         self.mission['starting_position'] = self.mission['current_position'][:]
 
         self.farmbot_cmd_sender(command)
+        self.status = 'IS_RUNNING'
 
         self.get_logger().info('Executing goal...')
         self.check_status_timer = self.create_timer(1.0 / self.check_uart_freq, self.check_status)
+        self.feedback_timer = self.create_timer(1.0 / 2, self.send_feedback)
 
     def check_status(self):
         """
@@ -165,6 +167,22 @@ class SerialController(Node):
         Publishes feedback, handles goal cancellation requests, and triggers
         the next callback based on command completion state.
         """
+        if not self.check_status_timer.is_canceled():
+            if self.goal_handle.is_cancel_requested:
+                self.get_logger().info('Goal canceled.')
+                self.status = 'CANCELED'
+                self.goal_handle.execute()
+
+            elif self.status == 'ABORTED':
+                self.get_logger().warn('Goal aborted.')
+                self.goal_handle.execute()
+
+            elif self.status == 'SUCCEED':
+                self.get_logger().info('Goal completed.')
+                self.goal_handle.execute()
+
+    def send_feedback(self):
+        """Publish the feedback with the current position and the completion percentage."""
         # Create Feedback object
         feedback = FarmbotComms.Feedback()
 
@@ -175,19 +193,6 @@ class SerialController(Node):
         feedback.percentage = self.mission['completion']
 
         self.goal_handle.publish_feedback(feedback)
-
-        if not self.check_status_timer.is_canceled():
-            if self.goal_handle.is_cancel_requested():
-                self.get_logger().info('Goal canceled.')
-                self.goal_handle.execute('CANCELED')
-
-            elif self.command_abort:
-                self.get_logger().info('Goal completed.')
-                self.goal_handle.execute('ABORTED')
-
-            elif self.command_is_finished:
-                self.get_logger().info('Goal completed.')
-                self.goal_handle.execute('SUCCEED')
 
     def percentage_calculation(self):
         """Calculate the percentage of progress made in the movement."""
@@ -203,7 +208,7 @@ class SerialController(Node):
                 denominator += 1
         return sum(axis_completion) * 100 / denominator
 
-    def execute_callback(self, goal_handle: ServerGoalHandle, status: str):
+    def execute_callback(self, goal_handle: ServerGoalHandle):
         """
         Execute the FarmbotComms action goal.
 
@@ -211,29 +216,32 @@ class SerialController(Node):
         status timer and returns the result. Otherwise, sends the command
         to the Farmduino and logs execution status.
         """
-        self.command_is_finished = False
         self.mission['starting_position'] = []
         self.mission['final_position'] = []
         self.mission['completion'] = 0.0
         self.check_status_timer.cancel()
+        self.feedback_timer.cancel()
 
         # Create Result object
         result = FarmbotComms.Result()
 
-        if status == 'CANCELED':
+        if self.status == 'CANCELED':
             goal_handle.canceled()
-            result.status = status
+            result.status = self.status
+            self.status = ''
             return result
 
-        elif status == 'ABORTED':
+        elif self.status == 'ABORTED':
             self.command_abort = False
             goal_handle.abort()
-            result.status = status
+            result.status = self.status
+            self.status = ''
             return result
 
         else:
             goal_handle.succeed()
-            result.status = status
+            result.status = self.status
+            self.status = ''
             return result
 
     def farmbot_cmd_sender(self, cmd: str):
@@ -302,7 +310,7 @@ class SerialController(Node):
             if ' ' in self.temp.data else self.temp.data.split('\n')[0])
 
         self.get_logger().info(f'Sent message: {self.temp.data}')
-        # Send through UART the command
+        #  Send through UART the command
         self.ser.write(self.temp.data.encode('utf-8'))
 
     def find_final_position(self, cmd: str):
@@ -363,10 +371,10 @@ class SerialController(Node):
                 or (self.previous_cmd not in self.non_immediate_cmds[cmd_type]
                     and rep_code == self.non_immediate_cmds['command_echo']['echo'])):
                 # Lower the blocking flag
-                self.command_is_finished = True
+                self.status = 'SUCCEED'
 
                 if rep_code == 'R03':
-                    self.command_abort = True
+                    self.status = 'ABORTED'
 
         # Send the reporting message for further processing by other nodes
         self.fb_feedback_pub.publish(self.uart_cmd)

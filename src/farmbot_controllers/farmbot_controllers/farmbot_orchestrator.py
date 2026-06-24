@@ -68,8 +68,6 @@ class FarmbotOrchestrator(Node):
         self.get_logger().info(f'message to send: {message.data}')
 
         if message.data in ['E', 'F09', '@']:
-            self.queue['non_priority_cmd'].clear()
-            self.queue['priority_cmd'].clear()
             self.queue['priority_cmd'].append(message.data)
             if message.data == 'E':
                 self.estop_pressed.data = True
@@ -88,6 +86,8 @@ class FarmbotOrchestrator(Node):
                 self.goal_handle.cancel_goal_async()
             else:
                 command = self.queue['priority_cmd'].pop(0)
+                self.queue['non_priority_cmd'].clear()
+                self.queue['priority_cmd'].clear()
                 self.send_goal(command)
 
         elif self.queue['non_priority_cmd'] and not self.busy_state:
@@ -128,8 +128,8 @@ class FarmbotOrchestrator(Node):
         current_position = feedback_msg.feedback.current_position
         percentage = feedback_msg.feedback.percentage
         self.get_logger().info(f'Current postion : X{current_position[0]} \
-                               Y{current_position[1]} Z{current_position[2]}')
-        self.get_logger().info(f'Goal completion: {percentage}')
+                                Y{current_position[1]} Z{current_position[2]}')
+        self.get_logger().info(f'Goal completion: {percentage} %')
 
     def goal_result_callback(self, future):
         """Handle the final result from the FarmbotComms action server."""
