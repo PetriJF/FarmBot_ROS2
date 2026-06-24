@@ -9,6 +9,7 @@ from farmbot_interfaces.action import FarmbotComms
 
 import rclpy
 from rclpy.action import ActionClient
+from rclpy.action.client import ClientGoalHandle
 from rclpy.node import Node
 
 from std_msgs.msg import Bool, String
@@ -81,15 +82,18 @@ class FarmbotOrchestrator(Node):
     def check_action_status(self):
         """Check queued commands and busy state to determine if the next command can be sent."""
         command = ''
+
         if self.queue['priority_cmd']:
             if self.busy_state:
                 self.goal_handle.cancel_goal_async()
-            command = self.queue['priority_cmd'].pop(0)
-            self.send_goal(command)
+            else:
+                command = self.queue['priority_cmd'].pop(0)
+                self.send_goal(command)
 
         elif self.queue['non_priority_cmd'] and not self.busy_state:
             command = self.queue['non_priority_cmd'].pop(0)
             self.send_goal(command)
+
         else:
             return
 
@@ -106,7 +110,7 @@ class FarmbotOrchestrator(Node):
 
     def goal_response_callback(self, future):
         """Handle the action server's goal response."""
-        self.goal_handle = future.result()
+        self.goal_handle: ClientGoalHandle = future.result()
 
         if self.goal_handle.accepted:
             self.busy_state = True
@@ -117,20 +121,7 @@ class FarmbotOrchestrator(Node):
             )
 
         else:
-            self.get_logger().warn('Goal rejected! This type of command is not accepted by Farmbot')
-
-    # def goal_cancel_callback(self, future):
-    #    """Handle the action server's goal cancel."""
-    #    self.goal_cancel = future.result()
-
-    #    if self.goal_cancel.accepted:
-
-    #        self.goal_handle.get_result_async().add_done_callback(
-    #           self.goal_result_callback
-    #        )
-
-    #    else:
-    #       self.get_logger().warn('Estop is already tunning')
+            self.get_logger().warn('Goal rejected')
 
     def goal_feedback_callback(self, feedback_msg):
         """Handle feedback messages from the FarmbotComms action server."""
@@ -142,12 +133,15 @@ class FarmbotOrchestrator(Node):
 
     def goal_result_callback(self, future):
         """Handle the final result from the FarmbotComms action server."""
-        #  result = future.result().success
+        result = future.result().status
         self.busy_state = False
-        #  if result == 'GOAL CANCELED':
-        #    self.get_logger().warn('The current command has been canceled by a estop request')
-        #  elif result == 'GOAL COMPLETED':
-        #    self.get_logger().info('The command was successful and has been completed')
+
+        if result == 'CANCELED':
+            self.get_logger().info('The current command has been canceled by a estop request')
+        if result == 'ABORTED':
+            self.get_logger().info('Something happened the command has been aborted.')
+        elif result == 'SUCCEED':
+            self.get_logger().info('The command was successful and has been completed')
 
         self.get_logger().info('Farmbot is ready for the next command')
 

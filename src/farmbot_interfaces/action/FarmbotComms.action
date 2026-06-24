@@ -2,7 +2,7 @@
 string command
 ---
 # Result
-string success               
+string status               
 ---
 # Feedback
 float64[] current_position
