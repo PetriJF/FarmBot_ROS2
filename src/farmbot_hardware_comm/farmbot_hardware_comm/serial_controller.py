@@ -369,7 +369,7 @@ class SerialController(Node):
             if ((self.previous_cmd in self.non_immediate_cmds[cmd_type]
                  and rep_code in self.non_immediate_cmds[cmd_type][self.previous_cmd]['responses'])
                 or (self.previous_cmd not in self.non_immediate_cmds[cmd_type]
-                    and rep_code == self.non_immediate_cmds['command_echo']['echo'])):
+                    and rep_code == 'R08')):
                 # Lower the blocking flag
                 self.status = 'SUCCEED'
 

@@ -36,6 +36,3 @@ blocking:
 priority:
   F09: 
     responses: ['R02', 'R03']
-
-command_echo: 
-  echo: 'R08'

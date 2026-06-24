@@ -133,14 +133,17 @@ class FarmbotOrchestrator(Node):
 
     def goal_result_callback(self, future):
         """Handle the final result from the FarmbotComms action server."""
-        result = future.result().status
+        result = future.result().result
+        status = result.status
+
+        self.get_logger().info(f'Result reçu: "{status}"')
         self.busy_state = False
 
-        if result == 'CANCELED':
+        if status == 'CANCELED':
             self.get_logger().info('The current command has been canceled by a estop request')
-        if result == 'ABORTED':
+        elif status == 'ABORTED':
             self.get_logger().info('Something happened the command has been aborted.')
-        elif result == 'SUCCEED':
+        elif status == 'SUCCEED':
             self.get_logger().info('The command was successful and has been completed')
 
         self.get_logger().info('Farmbot is ready for the next command')
