@@ -233,7 +233,6 @@ class SerialController(Node):
             return result
 
         elif self.status == 'ERROR':
-            self.command_abort = False
             goal_handle.abort()
             result.status = self.status
             self.status = ''
@@ -364,8 +363,12 @@ class SerialController(Node):
             self.mission['current_position'] = [float(coord[1:]) for coord
                                                 in message.split(' ')[1:4]]
 
-        if self.previous_cmd in ['F14', 'F15', 'F16'] and rep_code in ['R11', 'R12', 'R13']:
-            self.mission['completion'] += 33.0
+        if self.previous_cmd == 'F16' and rep_code == 'R13':
+            self.mission['completion'] = 33.0
+        elif self.previous_cmd == 'F14' and rep_code == 'R11':
+            self.mission['completion'] = 66.0
+        elif self.previous_cmd == 'F15' and rep_code == 'R12':
+            self.mission['completion'] = 100.0
 
         # If a running command has finished OR the response for a request was retrieved
         # OR the sent command was acknowledged by the farmbot
