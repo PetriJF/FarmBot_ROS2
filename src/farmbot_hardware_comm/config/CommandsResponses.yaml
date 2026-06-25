@@ -38,6 +38,6 @@ priority:
     responses: ['R02', 'R03']
   E: 
     responses: ['R87']
-  @:
+  '@':
     responses: ['R86']
 

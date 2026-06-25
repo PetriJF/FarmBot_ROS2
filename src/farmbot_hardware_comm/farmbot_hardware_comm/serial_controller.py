@@ -122,12 +122,12 @@ class SerialController(Node):
         self.get_logger().info('Received goal request')
         command_id = (goal_request.command).split(' ')[0]
 
-        valid_commands = ['E', 'F09', 'i2c_command', 'pin_command', 'water_command', 'home_handler',
-                          'move_gantry', 'move_servo', 'parameter_command', 'state_command']
+        valid_commands = ['E', 'F09', '@', 'i2c_command', 'pin_command', 'water_command',
+                          'home_handler', 'move_gantry', 'move_servo', 'parameter_command',
+                          'state_command']
 
         if (command_id not in valid_commands
            or (self.previous_cmd == 'E' and command_id != 'F09')
-           or (self.previous_cmd == '@' and command_id not in ['@', 'E'])
            or (self.status == 'IS_RUNNING')):
             return GoalResponse.REJECT
 
@@ -362,13 +362,6 @@ class SerialController(Node):
         if rep_code == 'R82':
             self.mission['current_position'] = [float(coord[1:]) for coord
                                                 in message.split(' ')[1:4]]
-
-        if self.previous_cmd == 'F16' and rep_code == 'R13':
-            self.mission['completion'] = 33.0
-        elif self.previous_cmd == 'F14' and rep_code == 'R11':
-            self.mission['completion'] = 66.0
-        elif self.previous_cmd == 'F15' and rep_code == 'R12':
-            self.mission['completion'] = 100.0
 
         # If a running command has finished OR the response for a request was retrieved
         # OR the sent command was acknowledged by the farmbot
