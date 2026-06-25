@@ -46,6 +46,7 @@ class MapController(Node):
             get_package_share_directory('map_handler'),
             'config'
         )
+
         self.active_map_file_ = 'active_map.yaml'
         tool_ref_file = 'tool_reference.yaml'
         tray_ref_file = 'tray_reference.yaml'
@@ -54,8 +55,11 @@ class MapController(Node):
         reference_map_file_ = 'map_references.yaml'
         watering_guide_file_ = 'watering_guide.yaml'
 
+        os.makedirs('local_config', exist_ok=True)
+        self.config_path = 'local_config'
+
         # Loading the map instance from memory
-        self.map_instance_ = self.retrieve_map(directory=self.directory_,
+        self.map_instance_ = self.retrieve_map(directory=self.config_path,
                                                file_name1=self.active_map_file_,
                                                file_name2=reference_map_file_)
 
@@ -133,7 +137,7 @@ class MapController(Node):
                 map_max_z=-self.map_instance_['map_reference']['z_len']
             )
             # Save the new active map
-            self.save_to_yaml(self.map_instance_, self.directory_,
+            self.save_to_yaml(self.map_instance_, self.config_path,
                               self.active_map_file_, create_if_empty=True)
         if cmd.back_up:
             pass
@@ -190,7 +194,7 @@ class MapController(Node):
         self.map_instance_['plant_details']['plants'][copy.deepcopy(index)] = copy.deepcopy(
                                                                                     self.plant_ref_)
 
-        self.save_to_yaml(self.map_instance_, self.directory_, self.active_map_file_,
+        self.save_to_yaml(self.map_instance_, self.config_path, self.active_map_file_,
                           create_if_empty=True)
 
     def remove_plant(self, index: int):
@@ -199,7 +203,7 @@ class MapController(Node):
         if index in plants:
             del plants[index]
             self.reindex_plants()
-            self.save_to_yaml(self.map_instance_, self.directory_, self.active_map_file_)
+            self.save_to_yaml(self.map_instance_, self.config_path, self.active_map_file_)
 
             self.get_logger().info(f'Removed plant with index {index}')
         else:
@@ -253,7 +257,7 @@ class MapController(Node):
         if cmd_sequence[-1] == '\n':
             cmd_sequence = cmd_sequence[:-1]
 
-        self.save_to_yaml(self.map_instance_, self.directory_,
+        self.save_to_yaml(self.map_instance_, self.config_path,
                           self.active_map_file_, create_if_empty=True)
         return cmd_sequence
 
@@ -531,7 +535,7 @@ class MapController(Node):
 
             self.map_instance_['map_reference']['trays'][index] = tray_ref
             self.get_logger().info(str(self.map_instance_))
-            self.save_to_yaml(self.map_instance_, self.directory_,
+            self.save_to_yaml(self.map_instance_, self.config_path,
                               self.active_map_file_, create_if_empty=True)
         if cmd == 1:
             trays = self.map_instance_['map_reference']['trays']
@@ -590,7 +594,7 @@ class MapController(Node):
 
         self.map_instance_['map_reference']['tools']['T' + index] = tool_ref
         self.get_logger().info(str(self.map_instance_))
-        self.save_to_yaml(self.map_instance_, self.directory_,
+        self.save_to_yaml(self.map_instance_, self.config_path,
                           self.active_map_file_, create_if_empty=True)
 
     def set_soil_moisture(self, index: int, reading: int) -> str:
@@ -610,7 +614,7 @@ class MapController(Node):
                                     moisture reading: '{reading}'")
             plants[index]['plant_details']['soil_moisture'] = copy.deepcopy(reading)
 
-            self.save_to_yaml(self.map_instance_, self.directory_,
+            self.save_to_yaml(self.map_instance_, self.config_path,
                               self.active_map_file_, create_if_empty=False)
         else:
             self.get_logger().warn(f"Couldn't find plant with index '{index}' to add moisture\
@@ -696,7 +700,7 @@ class MapController(Node):
                 'Previous map info could not be found! Unless you have '
                 'a back-up, previous items need to be re-added'
             )
-            return self.load_from_yaml(directory, file_name2)
+            return self.load_from_yaml(self.directory_, file_name2)
 
 
 def main(args=None):
