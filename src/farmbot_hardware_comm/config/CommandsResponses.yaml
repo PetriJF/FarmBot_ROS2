@@ -36,3 +36,6 @@ blocking:
 priority:
   F09: 
     responses: ['R02', 'R03']
+  E: 
+    responses: ['R87']
+

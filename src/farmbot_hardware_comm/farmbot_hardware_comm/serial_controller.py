@@ -361,20 +361,22 @@ class SerialController(Node):
                                                 in message.split(' ')[1:4]]
 
         if self.previous_cmd in ['F14', 'F15', 'F16'] and rep_code in ['R11', 'R12', 'R13']:
-            self.percentage += 33.0
+            self.mission['completion'] += 33.0
 
         # If a running command has finished OR the response for a request was retrieved
         # OR the sent command was acknowledged by the farmbot
+        command_type = ''
         for cmd_type in self.non_immediate_cmds:
-            if ((self.previous_cmd in self.non_immediate_cmds[cmd_type]
-                 and rep_code in self.non_immediate_cmds[cmd_type][self.previous_cmd]['responses'])
-                or (self.previous_cmd not in self.non_immediate_cmds[cmd_type]
-                    and rep_code == 'R08')):
-                # Lower the blocking flag
-                self.status = 'SUCCEED'
+            if self.previous_cmd in self.non_immediate_cmds[cmd_type]:
+                command_type = cmd_type
 
-                if rep_code == 'R03':
-                    self.status = 'ABORTED'
+        if ((command_type and rep_code in self.non_immediate_cmds[command_type][self.previous_cmd]['responses'])
+            or (not command_type and rep_code == 'R08')):
+            # Lower the blocking flag
+            self.status = 'SUCCEED'
+
+            if rep_code == 'R03':
+                self.status = 'ABORTED'
 
         # Send the reporting message for further processing by other nodes
         self.fb_feedback_pub.publish(self.uart_cmd)

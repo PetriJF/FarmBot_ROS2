@@ -127,8 +127,8 @@ class FarmbotOrchestrator(Node):
         """Handle feedback messages from the FarmbotComms action server."""
         current_position = feedback_msg.feedback.current_position
         percentage = feedback_msg.feedback.percentage
-        self.get_logger().info(f'Current postion : X{current_position[0]} \
-                                Y{current_position[1]} Z{current_position[2]}')
+        self.get_logger().info(f'Current postion : X{current_position[0]}'\
+                                'Y{current_position[1]} Z{current_position[2]}')
         self.get_logger().info(f'Goal completion: {percentage} %')
 
     def goal_result_callback(self, future):
