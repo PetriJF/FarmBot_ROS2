@@ -127,6 +127,7 @@ class SerialController(Node):
 
         if (command_id not in valid_commands
            or (self.previous_cmd == 'E' and command_id != 'F09')
+           or (self.previous_cmd == '@' and command_id not in ['@', 'E'])
            or (self.status == 'IS_RUNNING')):
             return GoalResponse.REJECT
 
@@ -173,8 +174,8 @@ class SerialController(Node):
                 self.status = 'CANCELED'
                 self.goal_handle.execute()
 
-            elif self.status == 'ABORTED':
-                self.get_logger().warn('Goal aborted.')
+            elif self.status == 'ERROR':
+                self.get_logger().warn('Goal finished with error.')
                 self.goal_handle.execute()
 
             elif self.status == 'SUCCEED':
@@ -231,7 +232,7 @@ class SerialController(Node):
             self.status = ''
             return result
 
-        elif self.status == 'ABORTED':
+        elif self.status == 'ERROR':
             self.command_abort = False
             goal_handle.abort()
             result.status = self.status
@@ -268,6 +269,9 @@ class SerialController(Node):
                 self.temp.data = 'F09'
                 self.LED_client(FBPanel.ESTOP_LED, FBPanel.ON)
                 self.LED_client(FBPanel.UNLOCK_LED, FBPanel.ON)
+
+            case '@':
+                self.temp.data = '@'
 
             case 'i2c_command':
                 self.temp.data = self.device_cmd_handler.i2c_cmd(command[1:])
@@ -370,13 +374,14 @@ class SerialController(Node):
             if self.previous_cmd in self.non_immediate_cmds[cmd_type]:
                 command_type = cmd_type
 
-        if ((command_type and rep_code in self.non_immediate_cmds[command_type][self.previous_cmd]['responses'])
-            or (not command_type and rep_code == 'R08')):
+        if ((command_type
+             and rep_code in self.non_immediate_cmds[command_type][self.previous_cmd]['responses'])
+           or (not command_type and rep_code == 'R08')):
             # Lower the blocking flag
             self.status = 'SUCCEED'
 
             if rep_code == 'R03':
-                self.status = 'ABORTED'
+                self.status = 'ERROR'
 
         # Send the reporting message for further processing by other nodes
         self.fb_feedback_pub.publish(self.uart_cmd)

@@ -73,6 +73,8 @@ class FarmbotOrchestrator(Node):
                 self.estop_pressed.data = True
             elif message.data == 'F09':
                 self.estop_pressed.data = False
+            elif message.data == '@':
+                self.get_logger().info('Movement abortion asked')
             self.farmbot_estop_pub.publish(self.estop_pressed)
         else:
             self.queue['non_priority_cmd'].append(message.data)
@@ -86,12 +88,13 @@ class FarmbotOrchestrator(Node):
                 self.goal_handle.cancel_goal_async()
             else:
                 command = self.queue['priority_cmd'].pop(0)
-                self.queue['non_priority_cmd'].clear()
+                if command in ['E', 'F09']:
+                    self.queue['non_priority_cmd'].clear()
                 self.queue['priority_cmd'].clear()
                 self.send_goal(command)
 
         elif self.queue['non_priority_cmd'] and not self.busy_state:
-            command = self.queue['non_priority_cmd'].pop(0)
+            command = self.queue['non_priority_cmd'][0]
             self.send_goal(command)
 
         else:
@@ -127,25 +130,25 @@ class FarmbotOrchestrator(Node):
         """Handle feedback messages from the FarmbotComms action server."""
         current_position = feedback_msg.feedback.current_position
         percentage = feedback_msg.feedback.percentage
-        self.get_logger().info(f'Current postion : X{current_position[0]}'\
-                                'Y{current_position[1]} Z{current_position[2]}')
-        self.get_logger().info(f'Goal completion: {percentage} %')
+        self.get_logger().info(f'Current postion : X{current_position[0]} '
+                               f'Y{current_position[1]} Z{current_position[2]}')
+        if percentage != 0.0:
+            self.get_logger().info(f'Goal completion: {percentage:.2f} %')
 
     def goal_result_callback(self, future):
         """Handle the final result from the FarmbotComms action server."""
         result = future.result().result
         status = result.status
 
-        self.get_logger().info(f'Result reçu: "{status}"')
-        self.busy_state = False
-
         if status == 'CANCELED':
             self.get_logger().info('The current command has been canceled by a estop request')
-        elif status == 'ABORTED':
-            self.get_logger().info('Something happened the command has been aborted.')
+        elif status == 'ERROR':
+            self.get_logger().info('Something happened the command has finished with error.')
         elif status == 'SUCCEED':
+            self.queue['non_priority_cmd'].pop(0)
             self.get_logger().info('The command was successful and has been completed')
 
+        self.busy_state = False
         self.get_logger().info('Farmbot is ready for the next command')
 
 
