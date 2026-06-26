@@ -68,7 +68,7 @@ class FarmbotControl(Node):
         code = cmd.data.split(' ')
         match code[0]:
             # Electronic Stop
-            case 'e' | '@':
+            case 'e':
                 self.get_logger().info('CLEARING SEQUENCE')
                 self.tools.clear_sequence()
             # Movement Commands

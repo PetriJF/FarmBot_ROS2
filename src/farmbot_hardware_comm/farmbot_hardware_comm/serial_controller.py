@@ -128,6 +128,7 @@ class SerialController(Node):
 
         if (command_id not in valid_commands
            or (self.previous_cmd == 'E' and command_id != 'F09')
+           or (self.previous_cmd == '@' and command_id not in ['E', '@'])
            or (self.status == 'IS_RUNNING')):
             return GoalResponse.REJECT
 
@@ -151,6 +152,11 @@ class SerialController(Node):
         """Create a timer to track the command status."""
         self.goal_handle = goal_handle
         command = goal_handle.request.command
+
+        if self.previous_cmd == '@' and command == '@':
+            self.status = 'ABORT_ENDED'
+            self.previous_cmd = ''
+            goal_handle.execute()
 
         self.mission['starting_position'] = self.mission['current_position'][:]
 

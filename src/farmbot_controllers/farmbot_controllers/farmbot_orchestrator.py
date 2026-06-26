@@ -88,12 +88,14 @@ class FarmbotOrchestrator(Node):
                 self.goal_handle.cancel_goal_async()
             else:
                 command = self.queue['priority_cmd'].pop(0)
-                self.queue['non_priority_cmd'].clear()
+                if command in ['E', 'F09']:
+                    self.queue['non_priority_cmd'].clear()
+
                 self.queue['priority_cmd'].clear()
                 self.send_goal(command)
 
         elif self.queue['non_priority_cmd'] and not self.busy_state:
-            command = self.queue['non_priority_cmd'].pop(0)
+            command = self.queue['non_priority_cmd'][0]
             self.send_goal(command)
 
         else:
@@ -144,6 +146,7 @@ class FarmbotOrchestrator(Node):
         elif status == 'ERROR':
             self.get_logger().info('Something happened the command has finished with error.')
         elif status == 'SUCCEED':
+            self.queueself.queue['non_priority_cmd'].pop(0)
             self.get_logger().info('The command was successful and has been completed')
 
         self.busy_state = False
