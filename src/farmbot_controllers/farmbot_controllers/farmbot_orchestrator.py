@@ -42,6 +42,7 @@ class FarmbotOrchestrator(Node):
                                                     self.farmbot_command_callback, 10)
 
         self.busy_state = False
+        self.previous_cmd = ''
 
         # Farmbot state publisher
         self.estop_pressed = Bool()
@@ -88,15 +89,19 @@ class FarmbotOrchestrator(Node):
                 self.goal_handle.cancel_goal_async()
             else:
                 command = self.queue['priority_cmd'].pop(0)
+
                 if command in ['E', 'F09']:
                     self.queue['non_priority_cmd'].clear()
+                elif self.previous_cmd:
+                    self.queue['non_priority_cmd'] = ([self.previous_cmd]
+                                                      + self.queue['non_priority_cmd'])
 
                 self.queue['priority_cmd'].clear()
                 self.send_goal(command)
 
         elif self.queue['non_priority_cmd'] and not self.busy_state:
-            command = self.queue['non_priority_cmd'][0]
-            self.send_goal(command)
+            self.previous_cmd = self.queue['non_priority_cmd'].pop(0)
+            self.send_goal(self.previous_cmd)
 
         else:
             return
@@ -143,10 +148,15 @@ class FarmbotOrchestrator(Node):
 
         if status == 'CANCELED':
             self.get_logger().info('The current command has been canceled by a estop request')
+
+        if status == 'ABORTED':
+            self.get_logger().info('The current command has been aborted.')
+
         elif status == 'ERROR':
             self.get_logger().info('Something happened the command has finished with error.')
+
         elif status == 'SUCCEED':
-            self.queueself.queue['non_priority_cmd'].pop(0)
+            self.previous_cmd = ''
             self.get_logger().info('The command was successful and has been completed')
 
         self.busy_state = False

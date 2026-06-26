@@ -180,6 +180,10 @@ class SerialController(Node):
                 self.status = 'CANCELED'
                 self.goal_handle.execute()
 
+            elif self.status == 'ABORTED':
+                self.get_logger().warn('Goal aborted.')
+                self.goal_handle.execute()
+
             elif self.status == 'ERROR':
                 self.get_logger().warn('Goal finished with error.')
                 self.goal_handle.execute()
@@ -238,7 +242,7 @@ class SerialController(Node):
             self.status = ''
             return result
 
-        elif self.status == 'ERROR':
+        elif self.status == 'ABORTED':
             goal_handle.abort()
             result.status = self.status
             self.status = ''
@@ -379,11 +383,13 @@ class SerialController(Node):
         if ((command_type
              and rep_code in self.non_immediate_cmds[command_type][self.previous_cmd]['responses'])
            or (not command_type and rep_code == 'R08')):
-            # Lower the blocking flag
-            self.status = 'SUCCEED'
 
             if rep_code == 'R03':
                 self.status = 'ERROR'
+            elif rep_code == 'R86':
+                self.status = 'ABORTED'
+            else:
+                self.status = 'SUCCEED'
 
         # Send the reporting message for further processing by other nodes
         self.fb_feedback_pub.publish(self.uart_cmd)
