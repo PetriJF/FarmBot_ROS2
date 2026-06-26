@@ -157,6 +157,7 @@ class SerialController(Node):
             self.status = 'ABORT_ENDED'
             self.previous_cmd = ''
             goal_handle.execute()
+            return
 
         self.mission['starting_position'] = self.mission['current_position'][:]
 
@@ -217,7 +218,8 @@ class SerialController(Node):
                                       (self.mission['final_position'][i] -
                                        self.mission['starting_position'][i]))
                 denominator += 1
-        return sum(axis_completion) * 100 / denominator
+        if denominator != 0:
+            return sum(axis_completion) * 100 / denominator
 
     def execute_callback(self, goal_handle: ServerGoalHandle):
         """

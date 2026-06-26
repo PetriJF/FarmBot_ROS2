@@ -92,7 +92,7 @@ class FarmbotOrchestrator(Node):
 
                 if command in ['E', 'F09']:
                     self.queue['non_priority_cmd'].clear()
-                elif self.current_cmd_cmd:
+                elif self.current_cmd:
                     self.queue['non_priority_cmd'] = ([self.current_cmd]
                                                       + self.queue['non_priority_cmd'])
 
