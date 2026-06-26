@@ -26,6 +26,7 @@ These represent high priority commands and configuration commands for the farmbo
 | ---- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | e    |          | ESTOP command (Electronic Stop). Halts any ongoing operation on the farmbot, and clears all sequences and queues. The robot axis are un actuated in this case and the robot cannot perform any physical action until the ESTOP RESET command is set |
 | E    |          | ESTOP RESET. Resets the farmbot from the EStop state back to the working state                                                                                      |                   
+| @    |          | ABORT command. Aborts the current command to pause the Farmbot. To exit this paused state, send @, and the command will start again.                                                                      |                   
 | C_0  |          | Calibrate all the axis length and home position                                                                                                                     |
 |      | X        | Calibrate X axis length and home position                                                                                                                           |
 |      | Y        | Calibrate Y axis length and home position                                                                                                                           |
