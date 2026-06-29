@@ -18,7 +18,6 @@ from farmbot_interfaces.srv import LedPanelHandler
 import rclpy
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.action.server import ServerGoalHandle
-from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
 
 import serial
@@ -74,7 +73,6 @@ class SerialController(Node):
             execute_callback=self.execute_callback,
             cancel_callback=self.cancel_callback,
             handle_accepted_callback=self.handle_callback,
-            callback_group=ReentrantCallbackGroup()
         )
 
         # Initialize Serial Communication
@@ -108,10 +106,7 @@ class SerialController(Node):
         # Log the initialization
         self.get_logger().info('Serial Controller Initialized..')
 
-    # ==========================================
-    # GOAL CALLBACK
-    # ==========================================
-
+    # Goal Callback
     def goal_callback(self, goal_request):
         """
         Check whether the goal is valid.
@@ -134,20 +129,14 @@ class SerialController(Node):
 
         return GoalResponse.ACCEPT
 
-    # ==========================================
-    # CANCEL CALLBACK
-    # ==========================================
-
+    # Cancel callback
     def cancel_callback(self, goal_handle):
         """Accept the cancel request."""
         self.get_logger().info('Received cancel request')
 
         return CancelResponse.ACCEPT
 
-    # ==========================================
-    # HANDLE EXECUTE CALLBACK
-    # ==========================================
-
+    # Handle execute callback
     def handle_callback(self, goal_handle: ServerGoalHandle):
         """Create a timer to track the command status."""
         self.goal_handle = goal_handle
@@ -220,7 +209,9 @@ class SerialController(Node):
                 denominator += 1
         if denominator != 0:
             return sum(axis_completion) * 100 / denominator
+        return 100
 
+    # Execute callback
     def execute_callback(self, goal_handle: ServerGoalHandle):
         """
         Execute the FarmbotComms action goal.
@@ -311,7 +302,9 @@ class SerialController(Node):
                 self.temp.data = self.state_cmd_handler.state_cmd(command[1:])
 
             case _:
-                self.get_logger().warn('This type of command is not understand by Farmbot')
+                self.get_logger().warn(f'This command type is not recognized {cmd}'
+                                       "Ensure you don't have a typo!")
+                return
 
         self.find_final_position(self.temp.data)
 
@@ -347,6 +340,7 @@ class SerialController(Node):
             case 'F13':
                 self.mission['final_position'] = self.mission['starting_position'][:2] + [0.0]
 
+    # Receiving messages from Farmbot
     def uart_receive(self):
         """Timer callback that reads from UART and handles the response codes and commands."""
         # Read from serial
@@ -401,8 +395,14 @@ class SerialController(Node):
     def LED_client(self, led_pin, state):
         """Service client for switching an LED on or off."""
         client = self.create_client(LedPanelHandler, 'set_led')
+        delay = 0
+
         while not client.wait_for_service(1.0):
+            delay += 1
             self.get_logger().warn('Waiting for LED Handling Server...')
+            if delay >= 5:
+                self.get_logger().error('LED Handling Server not available!')
+                return
 
         request = LedPanelHandler.Request()
         request.led_pin = led_pin

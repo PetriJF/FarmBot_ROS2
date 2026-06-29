@@ -2,7 +2,7 @@
 """
 Farmbot Orchestrator module.
 
-Provides the FarmbotOrchestrator ROS2 node for managing the transmission of commands to the UART
+Provides the FarmbotOrchestrator ROS2 node for managing the transmission of commands to the Serial
 controller through priority and non-priority queues.
 """
 from farmbot_interfaces.action import FarmbotComms
@@ -63,7 +63,7 @@ class FarmbotOrchestrator(Node):
         """
         Handle the queue.
 
-        Analyze messages from the /farmbot_command topic and enqueue them according to their
+        Analyse messages from the /farmbot_command topic and enqueue them according to their
         priority.
         """
         self.get_logger().info(f'message to send: {message.data}')
