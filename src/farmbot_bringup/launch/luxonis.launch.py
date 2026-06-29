@@ -1,4 +1,6 @@
 """Launch description for FarmBot nodes on Luxonis hardware."""
+import os
+
 from launch import LaunchDescription, LaunchService
 from launch.actions import DeclareLaunchArgument, TimerAction
 from launch.substitutions import LaunchConfiguration
@@ -13,7 +15,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             'ws_path',
-            default_value='~/FarmBot_ROS2/farmbot_data'
+            default_value=os.path.expanduser('~/FarmBot_ROS2/farmbot_data')
         ),
         Node(
             package='farmbot_controllers',
