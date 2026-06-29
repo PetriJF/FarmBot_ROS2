@@ -3,6 +3,8 @@
 Defines the controller, parameter server, GPIO controller, and map
 controller nodes with an optional camera flag.
 """
+import os
+
 from launch import LaunchDescription, LaunchService
 from launch.actions import DeclareLaunchArgument, TimerAction
 from launch.conditions import IfCondition
@@ -23,7 +25,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'ws_path',
-            default_value='~/FarmBot_ROS2/farmbot_data'
+            default_value=os.path.expanduser('~/FarmBot_ROS2/farmbot_data')
         ),
         Node(
             package='farmbot_controllers',
