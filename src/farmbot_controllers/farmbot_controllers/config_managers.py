@@ -45,12 +45,14 @@ class ConfigServer(Node):
         }
 
         # The share directory path and the file names for all the files
-        os.makedirs('local_config', exist_ok=True)
-        self.config_path = 'local_config'
         self.default_path = os.path.join(
             get_package_share_directory('farmbot_controllers'),
             'config'
         )
+
+        ws_path = os.path.abspath(os.path.join(self.default_path, '..', '..', '..', '..', '..'))
+        self.config_path = os.path.join(ws_path, 'farmbot_data', 'local_config')
+        os.makedirs(self.config_path, exist_ok=True)
 
         self.base_config = 'firmwareDefault.yaml'  # default config loaded by the firmware
         self.custom1_config = 'Custom1.yaml'       # custom configuration,modify in source and build
