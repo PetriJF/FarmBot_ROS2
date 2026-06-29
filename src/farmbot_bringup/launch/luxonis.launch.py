@@ -1,18 +1,29 @@
 """Launch description for FarmBot nodes on Luxonis hardware."""
 from launch import LaunchDescription, LaunchService
-from launch.actions import TimerAction
+from launch.actions import DeclareLaunchArgument, TimerAction
+from launch.substitutions import LaunchConfiguration
 
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
     """Return the launch description for FarmBot nodes on Luxonis hardware."""
+    ws_path = LaunchConfiguration('ws_path')
+
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'ws_path',
+            default_value='~/FarmBot_ROS2/farmbot_data'
+        ),
         Node(
             package='farmbot_controllers',
             executable='param_conf_server',
             name='param_conf_server',
-            output='screen'
+            output='screen',
+            parameters=[
+                {'ws_path': ws_path},
+                {'folder_config_name': 'local_config'},
+            ]
         ),
         Node(
             package='farmbot_hardware_comm',
@@ -39,7 +50,11 @@ def generate_launch_description():
             package='map_handler',
             executable='map_controller',
             name='map_controller',
-            output='screen'
+            output='screen',
+            parameters=[
+                {'ws_path': ws_path},
+                {'folder_config_name': 'local_config'},
+            ]
         ),
         Node(
             package='camera_handler',
