@@ -43,6 +43,7 @@ class FarmbotOrchestrator(Node):
 
         self.busy_state = False
         self.current_cmd = ''
+        self.status = ''
 
         # Farmbot state publisher
         self.estop_pressed = Bool()
@@ -92,14 +93,11 @@ class FarmbotOrchestrator(Node):
 
                 if command in ['E', 'F09']:
                     self.queue['non_priority_cmd'].clear()
-                elif self.current_cmd:
-                    self.queue['non_priority_cmd'] = ([self.current_cmd]
-                                                      + self.queue['non_priority_cmd'])
 
                 self.queue['priority_cmd'].clear()
                 self.send_goal(command)
 
-        elif self.queue['non_priority_cmd'] and not self.busy_state:
+        elif self.queue['non_priority_cmd'] and not self.busy_state and self.status != 'ABORTED':
             self.current_cmd = self.queue['non_priority_cmd'].pop(0)
             self.send_goal(self.current_cmd)
 
@@ -144,23 +142,30 @@ class FarmbotOrchestrator(Node):
     def goal_result_callback(self, future):
         """Handle the final result from the FarmbotComms action server."""
         result = future.result().result
-        status = result.status
+        self.status = result.status
 
-        if status == 'CANCELED':
+        if self.status == 'CANCELED':
             self.get_logger().info('The current command has been canceled by a estop request')
 
-        if status == 'ABORTED':
+        elif self.status == 'ABORTED':
             self.get_logger().info('The Farmbot has been paused.')
+            if self.current_cmd:
+                self.queue['non_priority_cmd'] = ([self.current_cmd]
+                                                  + self.queue['non_priority_cmd'])
 
-        elif status == 'ERROR':
+        elif self.status == 'ERROR':
             self.get_logger().info('Something happened the command has finished with error.')
 
-        elif status == 'SUCCEED':
+        elif self.status == 'ABORT_ENDED':
+            self.current_cmd = ''
+            self.get_logger().info('End of the command interruption!'
+                                   'The aborted command will resume.')
+
+        elif self.status == 'SUCCEED':
             self.current_cmd = ''
             self.get_logger().info('The command was successful and has been completed')
 
         self.busy_state = False
-        self.get_logger().info('Farmbot is ready for the next command')
 
 
 def main(args=None):
