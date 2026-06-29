@@ -2,7 +2,7 @@
 /build/
 /install/
 /log/
-/local_config/
+/farmbot_data/
 
 # Ignore compiled Python files
 *.pyc

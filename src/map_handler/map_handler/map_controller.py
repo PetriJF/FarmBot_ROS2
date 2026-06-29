@@ -55,8 +55,9 @@ class MapController(Node):
         reference_map_file_ = 'map_references.yaml'
         watering_guide_file_ = 'watering_guide.yaml'
 
-        os.makedirs('local_config', exist_ok=True)
-        self.config_path = 'local_config'
+        ws_path = os.path.abspath(os.path.join(self.directory_, '..', '..', '..', '..', '..'))
+        self.config_path = os.path.join(ws_path, 'farmbot_data', 'local_config')
+        os.makedirs(self.config_path, exist_ok=True)
 
         # Loading the map instance from memory
         self.map_instance_ = self.retrieve_map(directory=self.config_path,
