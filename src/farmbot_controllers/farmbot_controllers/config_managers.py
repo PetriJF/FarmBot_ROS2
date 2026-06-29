@@ -50,8 +50,14 @@ class ConfigServer(Node):
             'config'
         )
 
-        ws_path = os.path.abspath(os.path.join(self.default_path, '..', '..', '..', '..', '..'))
-        self.config_path = os.path.join(ws_path, 'farmbot_data', 'local_config')
+        self.declare_parameter('ws_path', rclpy.Parameter.Type.STRING)
+        self.declare_parameter('folder_config_name', rclpy.Parameter.Type.STRING)
+
+        ws_path = self.get_parameter('ws_path').get_parameter_value().string_value
+        folder_config_name = self.get_parameter(
+            'folder_config_name').get_parameter_value().string_value
+
+        self.config_path = os.path.join(ws_path, folder_config_name)
         os.makedirs(self.config_path, exist_ok=True)
 
         self.base_config = 'firmwareDefault.yaml'  # default config loaded by the firmware
