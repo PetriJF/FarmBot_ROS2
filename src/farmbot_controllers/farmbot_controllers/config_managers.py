@@ -49,6 +49,17 @@ class ConfigServer(Node):
             get_package_share_directory('farmbot_controllers'),
             'config'
         )
+
+        self.declare_parameter('ws_path', rclpy.Parameter.Type.STRING)
+        self.declare_parameter('folder_config_name', rclpy.Parameter.Type.STRING)
+
+        ws_path = self.get_parameter('ws_path').get_parameter_value().string_value
+        folder_config_name = self.get_parameter(
+            'folder_config_name').get_parameter_value().string_value
+
+        self.config_path = os.path.join(ws_path, folder_config_name)
+        os.makedirs(self.config_path, exist_ok=True)
+
         self.base_config = 'firmwareDefault.yaml'  # default config loaded by the firmware
         self.custom1_config = 'Custom1.yaml'       # custom configuration,modify in source and build
         self.genesis_config = 'Genesis.yaml'       # farmbot genesis config
@@ -93,9 +104,9 @@ class ConfigServer(Node):
 
     def retrieve_config(self):
         """Load the active configuration file, if it exists, and write it to the Farmduino."""
-        active_config_path = os.path.join(self.default_path, self.active_config)
+        active_config_path = os.path.join(self.config_path, self.active_config)
         if os.path.exists(active_config_path):
-            self.load_from_yaml(self.default_path, self.active_config)
+            self.load_from_yaml(self.config_path, self.active_config)
             self.load_params()
             self.get_logger().info('Initialized with active config from previous run')
         else:
@@ -201,9 +212,9 @@ class ConfigServer(Node):
             return response
         if code == 'SAVE':
             response.value = 0
-            os.makedirs(os.path.dirname(os.path.join(self.default_path, self.active_config)),
+            os.makedirs(os.path.dirname(os.path.join(self.config_path, self.active_config)),
                         exist_ok=True)
-            self.save_to_yaml(self.default_path, self.active_config)
+            self.save_to_yaml(self.config_path, self.active_config)
             return response
 
         # If the service gets here, the request could not be processed

@@ -38,44 +38,55 @@ class MapController(Node):
         """
         super().__init__('MapController')
 
+        self.declare_parameter('ws_path', rclpy.Parameter.Type.STRING)
+        self.declare_parameter('folder_config_name', rclpy.Parameter.Type.STRING)
+
+        ws_path = self.get_parameter('ws_path').get_parameter_value().string_value
+        folder_config_name = self.get_parameter(
+            'folder_config_name').get_parameter_value().string_value
+
+        self.config_path = os.path.join(ws_path, folder_config_name)
+        os.makedirs(self.config_path, exist_ok=True)
+
         # The safe Z increment for the sequences
         self.safe_z_increment_ = 80.0
 
         # Relevant directory and file names
-        self.directory_ = os.path.join(
+        self.directory = os.path.join(
             get_package_share_directory('map_handler'),
             'config'
         )
-        self.active_map_file_ = 'active_map.yaml'
+
+        self.active_map_file = 'active_map.yaml'
         tool_ref_file = 'tool_reference.yaml'
         tray_ref_file = 'tray_reference.yaml'
         tray_16_ref_file = '16_seed_tray.yaml'
-        reference_plant_file_ = 'plant_reference.yaml'
-        reference_map_file_ = 'map_references.yaml'
-        watering_guide_file_ = 'watering_guide.yaml'
+        reference_plant_file = 'plant_reference.yaml'
+        reference_map_file = 'map_references.yaml'
+        watering_guide_file = 'watering_guide.yaml'
 
         # Loading the map instance from memory
-        self.map_instance_ = self.retrieve_map(directory=self.directory_,
-                                               file_name1=self.active_map_file_,
-                                               file_name2=reference_map_file_)
+        self.map_instance = self.retrieve_map(directory=self.config_path,
+                                              file_name1=self.active_map_file,
+                                              file_name2=reference_map_file)
 
-        self.water_guide_instance_ = self.load_from_yaml(self.directory_, watering_guide_file_)
+        self.water_guide_instance_ = self.load_from_yaml(self.directory, watering_guide_file)
 
         # Loading the tool exhanging module and the tool command object
         self.tool_exchanger_ = ToolExchanger(node=self,
-                                             map_max_x=self.map_instance_['map_reference']['x_len'],
-                                             map_max_y=self.map_instance_['map_reference']['y_len'],
-                                             map_max_z=-self.map_instance_['map_reference']['z_len']
+                                             map_max_x=self.map_instance['map_reference']['x_len'],
+                                             map_max_y=self.map_instance['map_reference']['y_len'],
+                                             map_max_z=-self.map_instance['map_reference']['z_len']
                                              )
         self.tool_details_ = ToolDetails()
 
         # Loading the plant referencing method
-        self.plant_ref_ = self.load_from_yaml(self.directory_, reference_plant_file_)
+        self.plant_ref_ = self.load_from_yaml(self.directory, reference_plant_file)
         # Loading the tool referencing method
-        self.tool_ref_ = self.load_from_yaml(self.directory_, tool_ref_file)
+        self.tool_ref_ = self.load_from_yaml(self.directory, tool_ref_file)
         # Loading the tray reference and 16 seed tray addon reference
-        self.tray_ref_ = self.load_from_yaml(self.directory_, tray_ref_file)
-        self.tray_16_ref_ = self.load_from_yaml(self.directory_, tray_16_ref_file)
+        self.tray_ref_ = self.load_from_yaml(self.directory, tray_ref_file)
+        self.tray_16_ref_ = self.load_from_yaml(self.directory, tray_16_ref_file)
 
         # MapCommand subscriber
         self.map_cmd_sub_ = self.create_subscription(MapCommand,
@@ -114,13 +125,13 @@ class MapController(Node):
                 # Updating the map dimensions
                 match cmd_split[0]:
                     case 'X':
-                        self.map_instance_['map_reference']['x_len'] = float(cmd_split[1])
+                        self.map_instance['map_reference']['x_len'] = float(cmd_split[1])
                         self.tool_exchanger_.map_max_x = float(cmd_split[1])
                     case 'Y':
-                        self.map_instance_['map_reference']['y_len'] = float(cmd_split[1])
+                        self.map_instance['map_reference']['y_len'] = float(cmd_split[1])
                         self.tool_exchanger_.map_max_y = float(cmd_split[1])
                     case 'Z':
-                        self.map_instance_['map_reference']['z_len'] = float(cmd_split[1])
+                        self.map_instance['map_reference']['z_len'] = float(cmd_split[1])
                         self.tool_exchanger_.map_max_z = float(cmd_split[1])
                     case _:
                         self.get_logger().warn(f'Command ({update}) not recognized and ignored!')
@@ -128,13 +139,13 @@ class MapController(Node):
             # Reset the tool object with the map reference dimensions
             self.tool_exchanger_ = ToolExchanger(
                 node=self,
-                map_max_x=self.map_instance_['map_reference']['x_len'],
-                map_max_y=self.map_instance_['map_reference']['y_len'],
-                map_max_z=-self.map_instance_['map_reference']['z_len']
+                map_max_x=self.map_instance['map_reference']['x_len'],
+                map_max_y=self.map_instance['map_reference']['y_len'],
+                map_max_z=-self.map_instance['map_reference']['z_len']
             )
             # Save the new active map
-            self.save_to_yaml(self.map_instance_, self.directory_,
-                              self.active_map_file_, create_if_empty=True)
+            self.save_to_yaml(self.map_instance, self.config_path,
+                              self.active_map_file, create_if_empty=True)
         if cmd.back_up:
             pass
 
@@ -179,27 +190,27 @@ class MapController(Node):
         self.plant_ref_['plant_details']['soil_moisture'] = 0.0
         self.plant_ref_['status']['growth_stage'] = growth_stage
 
-        index = self.map_instance_['plant_details']['plant_count'] + 1
+        index = self.map_instance['plant_details']['plant_count'] + 1
         self.plant_ref_['identifiers']['index'] = copy.deepcopy(index)
 
-        self.map_instance_['plant_details']['plant_count'] += 1
+        self.map_instance['plant_details']['plant_count'] += 1
         # Case for the first plant being added
         if index == 1:
-            self.map_instance_['plant_details']['plants'] = {}
+            self.map_instance['plant_details']['plants'] = {}
 
-        self.map_instance_['plant_details']['plants'][copy.deepcopy(index)] = copy.deepcopy(
+        self.map_instance['plant_details']['plants'][copy.deepcopy(index)] = copy.deepcopy(
                                                                                     self.plant_ref_)
 
-        self.save_to_yaml(self.map_instance_, self.directory_, self.active_map_file_,
+        self.save_to_yaml(self.map_instance, self.config_path, self.active_map_file,
                           create_if_empty=True)
 
     def remove_plant(self, index: int):
         """Remove the plant of the represented index."""
-        plants = self.map_instance_['plant_details']['plants']
+        plants = self.map_instance['plant_details']['plants']
         if index in plants:
             del plants[index]
             self.reindex_plants()
-            self.save_to_yaml(self.map_instance_, self.directory_, self.active_map_file_)
+            self.save_to_yaml(self.map_instance, self.config_path, self.active_map_file)
 
             self.get_logger().info(f'Removed plant with index {index}')
         else:
@@ -208,7 +219,7 @@ class MapController(Node):
     def reindex_plants(self):
         """Reindex all the plants after the removal of one in the list."""
         index = 1
-        plants = self.map_instance_['plant_details']['plants']
+        plants = self.map_instance['plant_details']['plants']
         for plant_index in plants:
             if int(plant_index) != index:
                 plants[index] = plants.pop(plant_index)
@@ -226,7 +237,7 @@ class MapController(Node):
         EXECUTION OF THE SEQUENCE DOES NOT HAPPEN HERE
         """
         cmd_sequence = ''
-        plants = self.map_instance_['plant_details']['plants']
+        plants = self.map_instance['plant_details']['plants']
         for plant_index in plants:
             plant = plants[plant_index]
             if plant['status']['growth_stage'] == 'Planning':
@@ -242,7 +253,7 @@ class MapController(Node):
 
                 cmd_sequence += self.seed_plant(
                     plant,
-                    self.map_instance_['map_reference']['trays'][tray_index]
+                    self.map_instance['map_reference']['trays'][tray_index]
                 )
                 plant['status']['growth_stage'] = 'Seedling'
 
@@ -253,13 +264,13 @@ class MapController(Node):
         if cmd_sequence[-1] == '\n':
             cmd_sequence = cmd_sequence[:-1]
 
-        self.save_to_yaml(self.map_instance_, self.directory_,
-                          self.active_map_file_, create_if_empty=True)
+        self.save_to_yaml(self.map_instance, self.config_path,
+                          self.active_map_file, create_if_empty=True)
         return cmd_sequence
 
     def __check_loaded_seeds(self, seed_type: str):
         """Check if there is a tray with the seed type loaded in it."""
-        trays = self.map_instance_['map_reference']['trays']
+        trays = self.map_instance['map_reference']['trays']
         # self.get_logger().info(str(trays))
         for tray_index in trays:
             tray = trays[tray_index]
@@ -281,7 +292,7 @@ class MapController(Node):
 
         plant_x = plant['position']['x']
         plant_y = plant['position']['y']
-        plant_z = (-1.0) * self.map_instance_['map_reference']['z_len']
+        plant_z = (-1.0) * self.map_instance['map_reference']['z_len']
 
         tray_x = tray['position']['x']
         tray_y = tray['position']['y']
@@ -360,12 +371,12 @@ class MapController(Node):
         sequence = ''
 
         # Get the constraints of the map
-        max_x = self.map_instance_['map_reference']['x_len']
-        max_y = self.map_instance_['map_reference']['y_len']
-        max_z = (-1.0) * self.map_instance_['map_reference']['z_len']
+        max_x = self.map_instance['map_reference']['x_len']
+        max_y = self.map_instance['map_reference']['y_len']
+        max_z = (-1.0) * self.map_instance['map_reference']['z_len']
 
         # Get the details of all the plants and iterate through them
-        plants = self.map_instance_['plant_details']['plants']
+        plants = self.map_instance['plant_details']['plants']
         for plant_index in plants:
             plant = plants[plant_index]
 
@@ -469,7 +480,7 @@ class MapController(Node):
             return 0
 
         cmd_sequence = ''
-        plants = self.map_instance_['plant_details']['plants']
+        plants = self.map_instance['plant_details']['plants']
         for plant_index in plants:
             plant = plants[plant_index]
             water_pulses = (
@@ -529,12 +540,12 @@ class MapController(Node):
             tray_ref['position']['z'] = float(pos[2])
             tray_ref['tray_type'] = tray_type
 
-            self.map_instance_['map_reference']['trays'][index] = tray_ref
-            self.get_logger().info(str(self.map_instance_))
-            self.save_to_yaml(self.map_instance_, self.directory_,
-                              self.active_map_file_, create_if_empty=True)
+            self.map_instance['map_reference']['trays'][index] = tray_ref
+            self.get_logger().info(str(self.map_instance))
+            self.save_to_yaml(self.map_instance, self.config_path,
+                              self.active_map_file, create_if_empty=True)
         if cmd == 1:
-            trays = self.map_instance_['map_reference']['trays']
+            trays = self.map_instance['map_reference']['trays']
             if index in trays:
                 del trays[index]
         if cmd == 2:
@@ -552,7 +563,7 @@ class MapController(Node):
             self.add_tool(msg, index)
             return 'SUCCESS'
         elif cmd == 1 or cmd == 2:
-            tool_ref = self.map_instance_['map_reference']['tools']
+            tool_ref = self.map_instance['map_reference']['tools']
             self.tool_details_.x_pos = tool_ref['T' + index]['position']['x']
             self.tool_details_.y_pos = tool_ref['T' + index]['position']['y']
             self.tool_details_.z_pos = tool_ref['T' + index]['position']['z']
@@ -566,7 +577,7 @@ class MapController(Node):
             else:
                 return self.tool_exchanger_.unmount_tool(self.tool_details_)
         elif cmd == 9:
-            tools = self.map_instance_['map_reference']['tools']
+            tools = self.map_instance['map_reference']['tools']
             if ('T' + index) in tools:
                 del tools['T' + index]
                 return 'SUCCESS'
@@ -588,10 +599,10 @@ class MapController(Node):
         tool_ref['position']['z'] = float(pos[2])
         tool_ref['release_dir'] = int(pos[3])
 
-        self.map_instance_['map_reference']['tools']['T' + index] = tool_ref
-        self.get_logger().info(str(self.map_instance_))
-        self.save_to_yaml(self.map_instance_, self.directory_,
-                          self.active_map_file_, create_if_empty=True)
+        self.map_instance['map_reference']['tools']['T' + index] = tool_ref
+        self.get_logger().info(str(self.map_instance))
+        self.save_to_yaml(self.map_instance, self.config_path,
+                          self.active_map_file, create_if_empty=True)
 
     def set_soil_moisture(self, index: int, reading: int) -> str:
         """
@@ -604,14 +615,14 @@ class MapController(Node):
         Returns:
             'SUCCESS' if plant found and updated, 'FAILED' otherwise.
         """
-        plants = self.map_instance_['plant_details']['plants']
+        plants = self.map_instance['plant_details']['plants']
         if index in plants:
             self.get_logger().info(f"Plant of Index '{index}' has soil\
                                     moisture reading: '{reading}'")
             plants[index]['plant_details']['soil_moisture'] = copy.deepcopy(reading)
 
-            self.save_to_yaml(self.map_instance_, self.directory_,
-                              self.active_map_file_, create_if_empty=False)
+            self.save_to_yaml(self.map_instance, self.config_path,
+                              self.active_map_file, create_if_empty=False)
         else:
             self.get_logger().warn(f"Couldn't find plant with index '{index}' to add moisture\
                                    reading to")
@@ -696,7 +707,7 @@ class MapController(Node):
                 'Previous map info could not be found! Unless you have '
                 'a back-up, previous items need to be re-added'
             )
-            return self.load_from_yaml(directory, file_name2)
+            return self.load_from_yaml(self.directory, file_name2)
 
 
 def main(args=None):
