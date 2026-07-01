@@ -1,0 +1,28 @@
+# File used as an enum to store all the constants
+# related to the farmbot panel, including button pins,
+# LED pins and LED states
+
+# Button Pins
+BUTTON_ESTOP: 16
+BUTTON_UNLOCK: 22
+BUTTON_A: 26
+BUTTON_B: 5
+BUTTON_C: 20
+
+# Button LEDs
+ESTOP_LED: 17
+UNLOCK_LED: 23
+BUTTON_LED_A: 27
+BUTTON_LED_B: 6
+BUTTON_LED_C: 21
+
+# Standard LEDs
+LED1: 24
+LED2: 25
+LED3: 12
+LED4: 13
+
+# LED states
+ON: 1
+OFF: 0
+FLASHING: 2

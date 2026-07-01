@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>farmbot_hardware_comm</name>
-  <version>0.1.0</version>
+  <version>0.1.1</version>
   <description>Package containing the hardware communication for the ROS2 Farmbot</description>
   <maintainer email="salome.deoliveira.2026@mumail.ie">Salome</maintainer>
   <license>MIT</license>

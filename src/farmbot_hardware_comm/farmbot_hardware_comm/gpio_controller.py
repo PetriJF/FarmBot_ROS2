@@ -11,7 +11,6 @@ import RPi.GPIO as GPIO
 
 from ament_index_python.packages import get_package_share_directory
 
-from farmbot_interfaces.msg import FBPanel
 from farmbot_interfaces.srv import LedPanelHandler
 
 import rclpy
@@ -38,23 +37,23 @@ class GPIOController(Node):
 
         GPIO.setmode(GPIO.BCM)
 
-        # LED Initializing
-        GPIO.setup(FBPanel.ESTOP_LED, GPIO.OUT)
-        GPIO.setup(FBPanel.UNLOCK_LED, GPIO.OUT)
-        GPIO.setup(FBPanel.BUTTON_LED_A, GPIO.OUT)
-        GPIO.setup(FBPanel.BUTTON_LED_B, GPIO.OUT)
-        GPIO.setup(FBPanel.BUTTON_LED_C, GPIO.OUT)
-        GPIO.setup(FBPanel.LED1, GPIO.OUT)
-        GPIO.setup(FBPanel.LED2, GPIO.OUT)
-        GPIO.setup(FBPanel.LED3, GPIO.OUT)
-        GPIO.setup(FBPanel.LED4, GPIO.OUT)
+        self.directory = os.path.join(
+            get_package_share_directory('farmbot_hardware_comm'),
+            'config'
+        )
+        self.button = yaml.safe_load(open(os.path.join(self.directory, 'ButtonCommand.yaml'), 'r'))
+        self.fb_panel = yaml.safe_load(open(os.path.join(self.directory, 'FarmbotPanel.yaml'), 'r'))
 
-        # Button Initialization
-        GPIO.setup(FBPanel.BUTTON_ESTOP, GPIO.IN)
-        GPIO.setup(FBPanel.BUTTON_UNLOCK, GPIO.IN)
-        GPIO.setup(FBPanel.BUTTON_A, GPIO.IN)
-        GPIO.setup(FBPanel.BUTTON_B, GPIO.IN)
-        GPIO.setup(FBPanel.BUTTON_C, GPIO.IN)
+        # LED Initializing
+        GPIO.setup(self.fb_panel['ESTOP_LED'], GPIO.OUT)
+        GPIO.setup(self.fb_panel['UNLOCK_LED'], GPIO.OUT)
+        GPIO.setup(self.fb_panel['BUTTON_LED_A'], GPIO.OUT)
+        GPIO.setup(self.fb_panel['BUTTON_LED_B'], GPIO.OUT)
+        GPIO.setup(self.fb_panel['BUTTON_LED_C'], GPIO.OUT)
+        GPIO.setup(self.fb_panel['LED1'], GPIO.OUT)
+        GPIO.setup(self.fb_panel['LED2'], GPIO.OUT)
+        GPIO.setup(self.fb_panel['LED3'], GPIO.OUT)
+        GPIO.setup(self.fb_panel['LED4'], GPIO.OUT)
 
         self.cmd = String()
         self.lowlevel_command_pub = self.create_publisher(String, 'farmbot_command', 10)
@@ -69,24 +68,18 @@ class GPIOController(Node):
         self.led_flasher_timer = self.create_timer(1.0 / flashing_frequency, self.LED_flasher)
 
         self.led_pin_list = [
-            FBPanel.LED1,
-            FBPanel.LED2,
-            FBPanel.LED3,
-            FBPanel.LED4,
-            FBPanel.ESTOP_LED,
-            FBPanel.UNLOCK_LED,
-            FBPanel.BUTTON_LED_A,
-            FBPanel.BUTTON_LED_B,
-            FBPanel.BUTTON_LED_C
+            self.fb_panel['LED1'],
+            self.fb_panel['LED2'],
+            self.fb_panel['LED3'],
+            self.fb_panel['LED4'],
+            self.fb_panel['ESTOP_LED'],
+            self.fb_panel['UNLOCK_LED'],
+            self.fb_panel['BUTTON_LED_A'],
+            self.fb_panel['BUTTON_LED_B'],
+            self.fb_panel['BUTTON_LED_C']
         ]
 
         self.led_panel_server = self.create_service(LedPanelHandler, 'set_led', self.LED_server)
-
-        self.directory = os.path.join(
-            get_package_share_directory('farmbot_hardware_comm'),
-            'config'
-        )
-        self.button = yaml.safe_load(open(os.path.join(self.directory, 'ButtonCommand.yaml'), 'r'))
 
         # Log the initialization
         self.get_logger().info('GPIO Controller Initialized..')
@@ -105,18 +98,19 @@ class GPIOController(Node):
             response.success = False
             return response
         # Check if an existing state was selected
-        if request.state not in [FBPanel.ON, FBPanel.OFF, FBPanel.FLASHING]:
+        if request.state not in [self.fb_panel['ON'], self.fb_panel['OFF'],
+                                 self.fb_panel['FLASHING']]:
             self.get_logger().warn('Selected LED status is not recognized')
             response.success = False
             return response
 
-        if request.state == FBPanel.ON:
+        if request.state == self.fb_panel['ON']:
             GPIO.output(request.led_pin, GPIO.HIGH)
             self.remove_flashing_led(request.led_pin)
-        elif request.state == FBPanel.OFF:
+        elif request.state == self.fb_panel['OFF']:
             GPIO.output(request.led_pin, GPIO.LOW)
             self.remove_flashing_led(request.led_pin)
-        elif request.state == FBPanel.FLASHING:
+        elif request.state == self.fb_panel['FLASHING']:
             self.add_flashing_led(request.led_pin)
 
         response.success = True
@@ -166,7 +160,7 @@ class GPIOController(Node):
 
     def estop_button_handler(self, channel):
         """Estop Button Event Handler for the panel controller."""
-        current_state = GPIO.input(FBPanel.BUTTON_ESTOP)
+        current_state = GPIO.input(self.fb_panel['BUTTON_ESTOP'])
         if current_state == GPIO.LOW:
             self.cmd.data = 'E'
             self.lowlevel_command_pub.publish(self.cmd)
@@ -176,7 +170,7 @@ class GPIOController(Node):
 
     def reset_button_handler(self, channel):
         """Reset Button Event Handler for the panel controller."""
-        current_state = GPIO.input(FBPanel.BUTTON_UNLOCK)
+        current_state = GPIO.input(self.fb_panel['BUTTON_UNLOCK'])
         if current_state == GPIO.LOW:
             self.cmd.data = 'F09'
             self.lowlevel_command_pub.publish(self.cmd)
@@ -193,17 +187,17 @@ class GPIOController(Node):
         """
         current_state = GPIO.input(channel)
         if current_state == GPIO.LOW:
-            if channel == FBPanel.BUTTON_A:
+            if channel == self.fb_panel['BUTTON_A']:
                 self.get_logger().info('BUTTON A pressed : ' +
                                        self.button['button_A']['command_name'] + ' is triggered')
                 self.process_button_command(self.button['button_A']['command_type'],
                                             self.button['button_A']['command'])
-            elif channel == FBPanel.BUTTON_B:
+            elif channel == self.fb_panel['BUTTON_B']:
                 self.get_logger().info('BUTTON B pressed : ' +
                                        self.button['button_B']['command_name'] + ' is triggered')
                 self.process_button_command(self.button['button_B']['command_type'],
                                             self.button['button_B']['command'])
-            elif channel == FBPanel.BUTTON_C:
+            elif channel == self.fb_panel['BUTTON_C']:
                 self.get_logger().info('BUTTON C pressed : ' +
                                        self.button['button_C']['command_name'] + ' is triggered')
                 self.process_button_command(self.button['button_C']['command_type'],
@@ -230,15 +224,15 @@ def main(args=None):
     gpio_node = GPIOController()
 
     # GPIO Button
-    GPIO.add_event_detect(FBPanel.BUTTON_ESTOP, GPIO.FALLING,
+    GPIO.add_event_detect(gpio_node.fb_panel['BUTTON_ESTOP'], GPIO.FALLING,
                           callback=gpio_node.estop_button_handler, bouncetime=200)
-    GPIO.add_event_detect(FBPanel.BUTTON_UNLOCK, GPIO.FALLING,
+    GPIO.add_event_detect(gpio_node.fb_panel['BUTTON_UNLOCK'], GPIO.FALLING,
                           callback=gpio_node.reset_button_handler, bouncetime=200)
-    GPIO.add_event_detect(FBPanel.BUTTON_A, GPIO.FALLING,
+    GPIO.add_event_detect(gpio_node.fb_panel['BUTTON_A'], GPIO.FALLING,
                           callback=gpio_node.buttonHandler, bouncetime=1000)
-    GPIO.add_event_detect(FBPanel.BUTTON_B, GPIO.FALLING,
+    GPIO.add_event_detect(gpio_node.fb_panel['BUTTON_B'], GPIO.FALLING,
                           callback=gpio_node.buttonHandler, bouncetime=1000)
-    GPIO.add_event_detect(FBPanel.BUTTON_C, GPIO.FALLING,
+    GPIO.add_event_detect(gpio_node.fb_panel['BUTTON_C'], GPIO.FALLING,
                           callback=gpio_node.buttonHandler, bouncetime=1000)
 
     try:
@@ -246,11 +240,11 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
-        GPIO.remove_event_detect(FBPanel.BUTTON_ESTOP)
-        GPIO.remove_event_detect(FBPanel.BUTTON_UNLOCK)
-        GPIO.remove_event_detect(FBPanel.BUTTON_A)
-        GPIO.remove_event_detect(FBPanel.BUTTON_B)
-        GPIO.remove_event_detect(FBPanel.BUTTON_C)
+        GPIO.remove_event_detect(gpio_node.fb_panel['BUTTON_ESTOP'])
+        GPIO.remove_event_detect(gpio_node.fb_panel['BUTTON_UNLOCK'])
+        GPIO.remove_event_detect(gpio_node.fb_panel['BUTTON_A'])
+        GPIO.remove_event_detect(gpio_node.fb_panel['BUTTON_B'])
+        GPIO.remove_event_detect(gpio_node.fb_panel['BUTTON_C'])
         gpio_node.destroy_node()
         rclpy.shutdown()
 
