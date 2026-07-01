@@ -151,7 +151,6 @@ class SerialController(Node):
         self.mission['starting_position'] = self.mission['current_position'][:]
 
         self.farmbot_cmd_sender(command)
-        self.status = 'IS_RUNNING'
 
         self.get_logger().info('Executing goal...')
         self.check_status_timer = self.create_timer(1.0 / self.check_uart_freq, self.check_status)
@@ -304,8 +303,14 @@ class SerialController(Node):
             case _:
                 self.get_logger().warn(f'This command type is not recognized {cmd}'
                                        "Ensure you don't have a typo!")
+                self.status = 'ERROR'
                 return
 
+        if not self.temp.data:
+            self.status = 'ERROR'
+            return
+
+        self.status = 'IS_RUNNING'
         self.find_final_position(self.temp.data)
 
         # Ensure the endline char at the end of the command
