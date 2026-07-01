@@ -55,6 +55,13 @@ class GPIOController(Node):
         GPIO.setup(self.fb_panel['LED3'], GPIO.OUT)
         GPIO.setup(self.fb_panel['LED4'], GPIO.OUT)
 
+        # Button Initialization
+        GPIO.setup(self.fb_panel['BUTTON_ESTOP'], GPIO.IN)
+        GPIO.setup(self.fb_panel['BUTTON_UNLOCK'], GPIO.IN)
+        GPIO.setup(self.fb_panel['BUTTON_A'], GPIO.IN)
+        GPIO.setup(self.fb_panel['BUTTON_B'], GPIO.IN)
+        GPIO.setup(self.fb_panel['BUTTON_C'], GPIO.IN)
+
         self.cmd = String()
         self.lowlevel_command_pub = self.create_publisher(String, 'farmbot_command', 10)
 
