@@ -8,12 +8,11 @@ import os
 
 from setuptools import find_packages, setup
 
-
 package_name = 'farmbot_hardware_comm'
 
 setup(
     name=package_name,
-    version='0.0.1',
+    version='0.1.0',
     packages=find_packages(exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages',
@@ -34,7 +33,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'uart_controller = farmbot_hardware_comm.uart_controller:main',
+            'serial_controller = farmbot_hardware_comm.serial_controller:main',
             'gpio_controller = farmbot_hardware_comm.gpio_controller:main'
         ],
     },

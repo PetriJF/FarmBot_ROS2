@@ -52,13 +52,13 @@ class Sequencer:
         self.command_type = ''
 
         self.wait_for_request = WaitForRequest()
-        self.farmbot_busy = False
+        self.farmbot_estop = False
         self.wait_for_camera = False
         self.general_wait_flag = False
         self.ticks = 0
 
-        self.busy_state_sub = self.node.create_subscription(Bool, 'busy_state',
-                                                            self.status_callback, 10)
+        self.estop_sub = self.node.create_subscription(Bool, 'estop',
+                                                       self.status_callback, 10)
         self.sequencer_sub = self.node.create_subscription(String, 'sequencer',
                                                            self.extend_sequence, 10)
         self.sequencing_timer_ = self.node.create_timer(1.0, self.sequencing_timer)
@@ -181,7 +181,7 @@ class Sequencer:
             return
 
         # If the farmbot is not busy and a request's response is not processed
-        if not self.farmbot_busy and not self.wait_for_request.wait_flag:
+        if not self.farmbot_estop and not self.wait_for_request.wait_flag:
             # If the command type was not set, ignore
             if self.command_type == '':
                 self.node.get_logger().warn(f"Command type not set! Not enough context! \
@@ -417,4 +417,4 @@ class Sequencer:
 
     def status_callback(self, state: Bool):
         """Transmit the busy statefrom the Uart controller to the sequencer timer."""
-        self.farmbot_busy = state.data
+        self.farmbot_estop = state.data

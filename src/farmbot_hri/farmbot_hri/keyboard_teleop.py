@@ -48,7 +48,7 @@ class KeyboardTeleOp(Node):
         key is followed by more information that is to be used by the farmbot
         """
         # Valid Keys and Commands
-        valid_keys = ('e', 'E', 'w', 'a', 's', 'd', '1', '2', '3', 'h', 'j', 'k', 'l', 'fh',
+        valid_keys = ('e', 'E', '@', 'w', 'a', 's', 'd', '1', '2', '3', 'h', 'j', 'k', 'l', 'fh',
                       'o', 'p',
                       'T_1_1', 'T_1_2', 'T_2_1', 'T_2_2', 'T_3_1', 'T_3_2',
                       'T_4_1', 'T_4_2', 'T_5_1', 'T_5_2', 'T_6_1', 'T_6_2',
@@ -67,15 +67,15 @@ class KeyboardTeleOp(Node):
             if user_input == 'e':
                 self.cmd.data = 'E'
                 self.priority_pub.publish(self.cmd)
-                self.cmd.data = 'e'
-                self.input_pub.publish(self.cmd)
                 self.get_logger().info('ESTOP button pressed')
             elif user_input == 'E':
                 self.cmd.data = 'F09'
                 self.priority_pub.publish(self.cmd)
-                self.cmd.data = 'E'
-                self.input_pub.publish(self.cmd)
                 self.get_logger().info('RESET button pressed')
+            elif user_input == '@':
+                self.cmd.data = '@'
+                self.priority_pub.publish(self.cmd)
+                self.get_logger().info('Abort movement')
 
             self.cmd.data = user_input
             self.input_pub.publish(self.cmd)

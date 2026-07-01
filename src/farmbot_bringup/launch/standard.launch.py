@@ -50,6 +50,15 @@ def generate_launch_description():
             output='screen'
         ),
         Node(
+            package='farmbot_controllers',
+            executable='farmbot_orchestrator',
+            name='farmbot_orchestrator',
+            output='screen',
+                    parameters=[
+                        {'tx_freq': 10},
+                    ]
+        ),
+        Node(
             package='map_handler',
             executable='map_controller',
             name='map_controller',
@@ -87,17 +96,16 @@ def generate_launch_description():
         TimerAction(
             period=10.0,
             actions=[
-                # Start uart_controller after the delay
+                # Start serial_controller after the delay
                 Node(
                     package='farmbot_hardware_comm',
-                    executable='uart_controller',
-                    name='uart_controller',
+                    executable='serial_controller',
+                    name='serial_controller',
                     output='screen',
                     parameters=[
                         {'serial_port': '/dev/ttyACM0'},
                         {'serial_speed': 115200},
                         {'check_uart_freq': 100},
-                        {'tx_freq': 10},
                     ]
                 )
             ]
