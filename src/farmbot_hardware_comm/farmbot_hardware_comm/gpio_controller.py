@@ -105,19 +105,19 @@ class GPIOController(Node):
             response.success = False
             return response
         # Check if an existing state was selected
-        if request.state not in [self.fb_panel['ON'], self.fb_panel['OFF'],
-                                 self.fb_panel['FLASHING']]:
+        if request.state not in [self.fb_panel['LED_ON'], self.fb_panel['LED_OFF'],
+                                 self.fb_panel['LED_FLASHING']]:
             self.get_logger().warn('Selected LED status is not recognized')
             response.success = False
             return response
 
-        if request.state == self.fb_panel['ON']:
+        if request.state == self.fb_panel['LED_ON']:
             GPIO.output(request.led_pin, GPIO.HIGH)
             self.remove_flashing_led(request.led_pin)
-        elif request.state == self.fb_panel['OFF']:
+        elif request.state == self.fb_panel['LED_OFF']:
             GPIO.output(request.led_pin, GPIO.LOW)
             self.remove_flashing_led(request.led_pin)
-        elif request.state == self.fb_panel['FLASHING']:
+        elif request.state == self.fb_panel['LED_FLASHING']:
             self.add_flashing_led(request.led_pin)
 
         response.success = True

@@ -100,8 +100,8 @@ class SerialController(Node):
         self.fb_panel = yaml.safe_load(open(os.path.join(self.directory, 'FarmbotPanel.yaml'), 'r'))
 
         # Initialize the LED states
-        self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['ON'])
-        self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['ON'])
+        self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_ON'])
+        self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_ON'])
 
         # Log the initialization
         self.get_logger().info('Serial Controller Initialized..')
@@ -264,13 +264,13 @@ class SerialController(Node):
             # Device Command Handler Cases
             case 'E':
                 self.temp.data = 'E'
-                self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['OFF'])
-                self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['FLASHING'])
+                self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_OFF'])
+                self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_FLASHING'])
 
             case 'F09':
                 self.temp.data = 'F09'
-                self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['ON'])
-                self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['ON'])
+                self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_ON'])
+                self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_ON'])
 
             case '@':
                 self.temp.data = '@'
