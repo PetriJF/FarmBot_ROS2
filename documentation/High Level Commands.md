@@ -69,7 +69,7 @@ Commands that control the different devices connected to the farmbot.
 | D_V_a |          | Turns on (**a** = 1) or off (**a** = 0) the vacuum pump. E.g. *D_V_1* |
 | D_C   |          | Checks if there is a tool mounted on the UTP mount                    |
 | D_S_C |          | Check the Soil Sensor reading                                         |
-| M_S   | P A      | Move the servo on pin P to the angle A                         |
+| M_SV   | P A      | Move the servo on pin P to the angle A                         |
 | P4_X  | X={0,1}  | Turn on/off peripheral 4                         |
 | P5_X  | X={0,1}  | Turn on/off peripheral 5                         |
 

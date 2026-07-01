@@ -227,7 +227,7 @@ class FarmbotControl(Node):
                 self.tools.peripheral_4(state=int(code[0][3]))
             case 'P5_0' | 'P5_1':
                 self.tools.peripheral_5(state=int(code[0][3]))
-            case 'M_S':
+            case 'M_SV':
                 self.get_logger().info(f'Trying to move servo {int(code[1])} to {int(code[2])}')
                 self.devices.move_servo(pin=int(code[1]), angle=float(code[2]))
 
