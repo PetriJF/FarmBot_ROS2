@@ -11,7 +11,6 @@ find_package(rosidl_default_generators REQUIRED)
 find_package(sensor_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/FBPanel.msg"
   "msg/GantryCommand.msg"
   "msg/ServoCommand.msg"
   "msg/HomeCommand.msg"
