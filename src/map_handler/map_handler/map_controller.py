@@ -520,7 +520,7 @@ class MapController(Node):
         # Turn on water pump
         cmd += f"DC_P_{plant['identifiers']['index']}_4\n"
         for i in range(pulses):
-            cmd += f'WaterPulses {2000}\n'
+            cmd += f'WaterPulses {self.watering_thresholds["water_pulses"]}\n'
 
         return cmd
 

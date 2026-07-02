@@ -2,3 +2,4 @@ threshold: 10.0
 dry_threshold_max: 350
 average_threshold_max: 500
 wet_threshold_max: 650
+water_pulses: 2000
