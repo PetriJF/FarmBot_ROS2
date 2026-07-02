@@ -170,7 +170,6 @@ class GPIOController(Node):
         if current_state == GPIO.LOW:
             self.cmd.data = 'E'
             self.lowlevel_command_pub.publish(self.cmd)
-            self.cmd.data = 'e'
             self.highlevel_command_pub.publish(self.cmd)
             self.get_logger().info('ESTOP button pressed')
 
@@ -180,7 +179,7 @@ class GPIOController(Node):
         if current_state == GPIO.LOW:
             self.cmd.data = 'F09'
             self.lowlevel_command_pub.publish(self.cmd)
-            self.cmd.data = 'E'
+            self.cmd.data = 'R'
             self.highlevel_command_pub.publish(self.cmd)
             self.get_logger().info('RESET button pressed')
 

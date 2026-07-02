@@ -48,7 +48,7 @@ class KeyboardTeleOp(Node):
         key is followed by more information that is to be used by the farmbot
         """
         # Valid Keys and Commands
-        valid_keys = ('e', 'E', '@', 'w', 'a', 's', 'd', '1', '2', '3', 'h', 'j', 'k', 'l', 'fh',
+        valid_keys = ('E', 'R', '@', 'w', 'a', 's', 'd', '1', '2', '3', 'h', 'j', 'k', 'l', 'fh',
                       'o', 'p',
                       'T_1_1', 'T_1_2', 'T_2_1', 'T_2_2', 'T_3_1', 'T_3_2',
                       'T_4_1', 'T_4_2', 'T_5_1', 'T_5_2', 'T_6_1', 'T_6_2',
@@ -57,18 +57,18 @@ class KeyboardTeleOp(Node):
                       'H_0', 'H_1', 'D_S_C', 'P4_0', 'P4_1')
         compound_cmds = ('C_0', 'P_1', 'P_2', 'C_1', 'C_2', 'T_1_0', 'T_2_0',
                          'T_3_0', 'T_4_0', 'T_5_0', 'T_6_0', 'S_1_0', 'S_2_0',
-                         'S_3_0', 'M', 'M_S', 'CONF', 'H_2', 'M_S')
+                         'S_3_0', 'M', 'M_S', 'CONF', 'H_2', 'M_SV')
         # Record the user input
         user_input = input('\nEnter command: ')
 
         # Send the user input to the farmbot controller if it is a valid key or command
         if user_input in valid_keys or user_input.split(' ')[0] in compound_cmds:
             # Send the command with priority at the UART controller
-            if user_input == 'e':
+            if user_input == 'E':
                 self.cmd.data = 'E'
                 self.priority_pub.publish(self.cmd)
                 self.get_logger().info('ESTOP button pressed')
-            elif user_input == 'E':
+            elif user_input == 'R':
                 self.cmd.data = 'F09'
                 self.priority_pub.publish(self.cmd)
                 self.get_logger().info('RESET button pressed')
