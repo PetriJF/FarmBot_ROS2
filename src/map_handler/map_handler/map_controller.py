@@ -58,9 +58,9 @@ class MapController(Node):
         )
 
         self.active_map_file = 'active_map.yaml'
-        tool_reffile = 'tool_reference.yaml'
-        tray_reffile = 'tray_reference.yaml'
-        tray_16_reffile = '16_seed_tray.yaml'
+        tool_ref_file = 'tool_reference.yaml'
+        tray_ref_file = 'tray_reference.yaml'
+        tray_16_ref_file = '16_seed_tray.yaml'
         reference_plant_file = 'plant_reference.yaml'
         reference_map_file = 'map_references.yaml'
         watering_guide_file = 'watering_guide.yaml'
@@ -83,10 +83,10 @@ class MapController(Node):
         # Loading the plant referencing method
         self.plant_ref = self.load_from_yaml(self.directory, reference_plant_file)
         # Loading the tool referencing method
-        self.tool_ref = self.load_from_yaml(self.directory, tool_reffile)
+        self.tool_ref = self.load_from_yaml(self.directory, tool_ref_file)
         # Loading the tray reference and 16 seed tray addon reference
-        self.tray_ref = self.load_from_yaml(self.directory, tray_reffile)
-        self.tray_16_ref = self.load_from_yaml(self.directory, tray_16_reffile)
+        self.tray_ref = self.load_from_yaml(self.directory, tray_ref_file)
+        self.tray_16_ref = self.load_from_yaml(self.directory, tray_16_ref_file)
         # Loading the watering thresholds
         self.watering_thresholds = self.load_from_yaml(self.directory, 'watering_threshold.yaml')
 
