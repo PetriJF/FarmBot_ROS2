@@ -58,9 +58,9 @@ class MapController(Node):
         )
 
         self.active_map_file = 'active_map.yaml'
-        tool_ref_file = 'tool_reference.yaml'
-        tray_ref_file = 'tray_reference.yaml'
-        tray_16_ref_file = '16_seed_tray.yaml'
+        tool_reffile = 'tool_reference.yaml'
+        tray_reffile = 'tray_reference.yaml'
+        tray_16_reffile = '16_seed_tray.yaml'
         reference_plant_file = 'plant_reference.yaml'
         reference_map_file = 'map_references.yaml'
         watering_guide_file = 'watering_guide.yaml'
@@ -70,33 +70,35 @@ class MapController(Node):
                                               file_name1=self.active_map_file,
                                               file_name2=reference_map_file)
 
-        self.water_guide_instance_ = self.load_from_yaml(self.directory, watering_guide_file)
+        self.water_guide_instance = self.load_from_yaml(self.directory, watering_guide_file)
 
         # Loading the tool exhanging module and the tool command object
-        self.tool_exchanger_ = ToolExchanger(node=self,
-                                             map_max_x=self.map_instance['map_reference']['x_len'],
-                                             map_max_y=self.map_instance['map_reference']['y_len'],
-                                             map_max_z=-self.map_instance['map_reference']['z_len']
-                                             )
-        self.tool_details_ = ToolDetails()
+        self.tool_exchanger = ToolExchanger(node=self,
+                                            map_max_x=self.map_instance['map_reference']['x_len'],
+                                            map_max_y=self.map_instance['map_reference']['y_len'],
+                                            map_max_z=-self.map_instance['map_reference']['z_len']
+                                            )
+        self.tool_details = ToolDetails()
 
         # Loading the plant referencing method
-        self.plant_ref_ = self.load_from_yaml(self.directory, reference_plant_file)
+        self.plant_ref = self.load_from_yaml(self.directory, reference_plant_file)
         # Loading the tool referencing method
-        self.tool_ref_ = self.load_from_yaml(self.directory, tool_ref_file)
+        self.tool_ref = self.load_from_yaml(self.directory, tool_reffile)
         # Loading the tray reference and 16 seed tray addon reference
-        self.tray_ref_ = self.load_from_yaml(self.directory, tray_ref_file)
-        self.tray_16_ref_ = self.load_from_yaml(self.directory, tray_16_ref_file)
+        self.tray_ref = self.load_from_yaml(self.directory, tray_reffile)
+        self.tray_16_ref = self.load_from_yaml(self.directory, tray_16_reffile)
+        # Loading the watering thresholds
+        self.watering_thresholds = self.load_from_yaml(self.directory, 'watering_threshold.yaml')
 
         # MapCommand subscriber
-        self.map_cmd_sub_ = self.create_subscription(MapCommand,
-                                                     'map_cmd', self.map_cmd_callback, 10)
+        self.map_cmd_sub = self.create_subscription(MapCommand,
+                                                    'map_cmd', self.map_cmd_callback, 10)
         # Plant Configuration Subscriber
-        self.plant_mng_sub_ = self.create_subscription(PlantManage,
-                                                       'plant_mng', self.plant_mng_callback, 10)
+        self.plant_mng_sub = self.create_subscription(PlantManage,
+                                                      'plant_mng', self.plant_mng_callback, 10)
         # Map information service server
-        self.map_info_server_ = self.create_service(StringRepReq,
-                                                    'map_info', self.map_command_server)
+        self.map_info_server = self.create_service(StringRepReq,
+                                                   'map_info', self.map_command_server)
 
         self.get_logger().info('Map Controller Initialized')
 
@@ -126,18 +128,18 @@ class MapController(Node):
                 match cmd_split[0]:
                     case 'X':
                         self.map_instance['map_reference']['x_len'] = float(cmd_split[1])
-                        self.tool_exchanger_.map_max_x = float(cmd_split[1])
+                        self.tool_exchanger.map_max_x = float(cmd_split[1])
                     case 'Y':
                         self.map_instance['map_reference']['y_len'] = float(cmd_split[1])
-                        self.tool_exchanger_.map_max_y = float(cmd_split[1])
+                        self.tool_exchanger.map_max_y = float(cmd_split[1])
                     case 'Z':
                         self.map_instance['map_reference']['z_len'] = float(cmd_split[1])
-                        self.tool_exchanger_.map_max_z = float(cmd_split[1])
+                        self.tool_exchanger.map_max_z = float(cmd_split[1])
                     case _:
                         self.get_logger().warn(f'Command ({update}) not recognized and ignored!')
 
             # Reset the tool object with the map reference dimensions
-            self.tool_exchanger_ = ToolExchanger(
+            self.tool_exchanger = ToolExchanger(
                 node=self,
                 map_max_x=self.map_instance['map_reference']['x_len'],
                 map_max_y=self.map_instance['map_reference']['y_len'],
@@ -180,18 +182,18 @@ class MapController(Node):
         Creates the reference of the plant based on the parsed informations
         and adds it to the active map
         """
-        self.plant_ref_['identifiers']['plant_name'] = plant_name
-        self.plant_ref_['position']['x'] = x
-        self.plant_ref_['position']['y'] = y
-        self.plant_ref_['position']['z'] = z
-        self.plant_ref_['plant_details']['plant_radius'] = exclusion_radius
-        self.plant_ref_['plant_details']['canopy_radius'] = canopy_radius
-        self.plant_ref_['plant_details']['max_height'] = max_z
-        self.plant_ref_['plant_details']['soil_moisture'] = 0.0
-        self.plant_ref_['status']['growth_stage'] = growth_stage
+        self.plant_ref['identifiers']['plant_name'] = plant_name
+        self.plant_ref['position']['x'] = x
+        self.plant_ref['position']['y'] = y
+        self.plant_ref['position']['z'] = z
+        self.plant_ref['plant_details']['plant_radius'] = exclusion_radius
+        self.plant_ref['plant_details']['canopy_radius'] = canopy_radius
+        self.plant_ref['plant_details']['max_height'] = max_z
+        self.plant_ref['plant_details']['soil_moisture'] = 0.0
+        self.plant_ref['status']['growth_stage'] = growth_stage
 
         index = self.map_instance['plant_details']['plant_count'] + 1
-        self.plant_ref_['identifiers']['index'] = copy.deepcopy(index)
+        self.plant_ref['identifiers']['index'] = copy.deepcopy(index)
 
         self.map_instance['plant_details']['plant_count'] += 1
         # Case for the first plant being added
@@ -199,7 +201,7 @@ class MapController(Node):
             self.map_instance['plant_details']['plants'] = {}
 
         self.map_instance['plant_details']['plants'][copy.deepcopy(index)] = copy.deepcopy(
-                                                                                    self.plant_ref_)
+                                                                                    self.plant_ref)
 
         self.save_to_yaml(self.map_instance, self.config_path, self.active_map_file,
                           create_if_empty=True)
@@ -428,7 +430,7 @@ class MapController(Node):
         (float, float): New (x, y) coordinates for the probing location.
         """
         # Define boundary limits
-        threshold = 10.0
+        threshold = self.watering_thresholds['threshold']
 
         min_x, min_y = threshold, threshold
         max_x, max_y = max_x - threshold, max_y - threshold
@@ -464,18 +466,18 @@ class MapController(Node):
     def water_plants(self, rigid=False):
         """Create the watering sequence by appending each plant's individual sequence."""
         # Setting the watering thresholds
-        DRY_TRESHOLD_MAX = 350
-        AVERAGE_THRESHOLD_MAX = 500
-        WET_THRESHOLD_MAX = 650
+        DRY_TRESHOLD_MAX = self.watering_thresholds['dry_threshold_max']
+        AVERAGE_THRESHOLD_MAX = self.watering_thresholds['average_threshold_max']
+        WET_THRESHOLD_MAX = self.watering_thresholds['wet_threshold_max']
 
         # Helper function that returns the pulse count based on sensor reading
         def map_moisture_reading(reading: int, plant_name: str) -> int:
             if reading <= DRY_TRESHOLD_MAX:
-                return self.water_guide_instance_[plant_name]['dry']
+                return self.water_guide_instance[plant_name]['dry']
             if reading <= AVERAGE_THRESHOLD_MAX:
-                return self.water_guide_instance_[plant_name]['average']
+                return self.water_guide_instance[plant_name]['average']
             if reading <= WET_THRESHOLD_MAX:
-                return self.water_guide_instance_[plant_name]['wet']
+                return self.water_guide_instance[plant_name]['wet']
             # If it gets here it means that it is too wet and therefore no watering happens
             return 0
 
@@ -515,7 +517,7 @@ class MapController(Node):
         cmd = f"CC_P_4/5_{plant['identifiers']['index']}\n"
         # go to seed location
         cmd += f'{plant_x} {plant_y} {0.0}\n'
-        # Turn on water pump pump
+        # Turn on water pump
         cmd += f"DC_P_{plant['identifiers']['index']}_4\n"
         for i in range(pulses):
             cmd += f'WaterPulses {2000}\n'
@@ -530,7 +532,7 @@ class MapController(Node):
         tray_type = int(elem[3][0])
 
         if cmd == 0:
-            tray_ref = copy.deepcopy(self.tray_ref_)
+            tray_ref = copy.deepcopy(self.tray_ref)
             info = elem[3].split('\n')
             tray_ref['name'] = info[1]
             tray_ref['seed_type'] = info[2] if not type else ''
@@ -564,18 +566,18 @@ class MapController(Node):
             return 'SUCCESS'
         elif cmd == 1 or cmd == 2:
             tool_ref = self.map_instance['map_reference']['tools']
-            self.tool_details_.x_pos = tool_ref['T' + index]['position']['x']
-            self.tool_details_.y_pos = tool_ref['T' + index]['position']['y']
-            self.tool_details_.z_pos = tool_ref['T' + index]['position']['z']
-            self.tool_details_.z_safe_inc = self.safe_z_increment_
-            self.tool_details_.release_dir = tool_ref['T' + index]['release_dir']
+            self.tool_details.x_pos = tool_ref['T' + index]['position']['x']
+            self.tool_details.y_pos = tool_ref['T' + index]['position']['y']
+            self.tool_details.z_pos = tool_ref['T' + index]['position']['z']
+            self.tool_details.z_safe_inc = self.safe_z_increment_
+            self.tool_details.release_dir = tool_ref['T' + index]['release_dir']
 
             self.get_logger().info(f"Mounting {tool_ref['T' + index]['name']}")
 
             if cmd == 1:
-                return self.tool_exchanger_.mount_tool(self.tool_details_)
+                return self.tool_exchanger.mount_tool(self.tool_details)
             else:
-                return self.tool_exchanger_.unmount_tool(self.tool_details_)
+                return self.tool_exchanger.unmount_tool(self.tool_details)
         elif cmd == 9:
             tools = self.map_instance['map_reference']['tools']
             if ('T' + index) in tools:
@@ -589,7 +591,7 @@ class MapController(Node):
 
     def add_tool(self, msg: str, index: str):
         """Add a tool's information to the active map dictionary."""
-        tool_ref = copy.deepcopy(self.tool_ref_)
+        tool_ref = copy.deepcopy(self.tool_ref)
 
         info = msg.split('\n')
         tool_ref['name'] = info[1]

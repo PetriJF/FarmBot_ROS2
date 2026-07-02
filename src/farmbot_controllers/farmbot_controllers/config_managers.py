@@ -5,7 +5,6 @@ Handles parameter recording, loading, and publishing for Farmbot firmware
 configuration management, including parameter service interfaces.
 """
 import os
-import time
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -155,7 +154,6 @@ class ConfigServer(Node):
                     self.param_cmd.data = ('parameter_command False True False False ' + str(key)
                                            + ' ' + str(value))
                     self.param_cmd_pub.publish(self.param_cmd)
-                    time.sleep(0.1)
 
         self.get_logger().info('Parameter loading complete!')
 
