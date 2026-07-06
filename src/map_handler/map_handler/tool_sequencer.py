@@ -98,19 +98,22 @@ class ToolExchanger:
         return cmd_seq
 
     def __get_release_direction(self, direction: int):
-        """Get tool release coordinate increments based on mounting orientation."""
-        if direction < 1 or dir > 4:
-            self.node_.get_logger().error('Release direction for the tool unrecognized!\
-                                          Check configuration!')
-            return
-        if direction == 1:
-            return -100.0, 0.0
-        if direction == 1:
-            return 100.0, 0.0
-        if direction == 1:
-            return 0.0, -100.0
-        if direction == 1:
-            return 0.0, 100.0
+        """
+        Get tool release coordinate increments based on mounting orientation.
+
+        1: -x, 2: +x, 3: -y, 4: +y
+        """
+        increments = {
+            1: (-100.0, 0.0),
+            2: (100.0, 0.0),
+            3: (0.0, -100.0),
+            4: (0.0, 100.0),
+        }
+        if direction not in increments:
+            self.node_.get_logger().error('Release direction for the tool unrecognized! '
+                                          'Check configuration!')
+            return 0.0, 0.0
+        return increments[direction]
 
     def __check_tool_details(self, cmd: ToolDetails, x_inc: float, y_inc: float):
         """Check if the tool position is reachable and valid."""
