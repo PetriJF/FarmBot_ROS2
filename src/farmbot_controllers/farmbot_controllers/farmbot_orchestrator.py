@@ -12,7 +12,7 @@ from rclpy.action import ActionClient
 from rclpy.action.client import ClientGoalHandle
 from rclpy.node import Node
 
-from std_msgs.msg import Bool, String
+from std_msgs.msg import Bool, Float64MultiArray, String
 
 
 class FarmbotOrchestrator(Node):
@@ -49,6 +49,11 @@ class FarmbotOrchestrator(Node):
         self.estop_pressed = Bool()
         self.estop_pressed.data = False
         self.farmbot_estop_pub = self.create_publisher(Bool, 'estop', 10)
+
+        # Feedback publisher
+        self.current_position = Float64MultiArray()
+        self.farmbot_current_position_pub = self.create_publisher(Float64MultiArray,
+                                                                  'current_position', 10)
 
         self.action_status_timer = self.create_timer(1.0 / tx_freq, self.check_action_status)
 
@@ -132,12 +137,14 @@ class FarmbotOrchestrator(Node):
 
     def goal_feedback_callback(self, feedback_msg):
         """Handle feedback messages from the FarmbotComms action server."""
-        current_position = feedback_msg.feedback.current_position
+        self.current_position.data = feedback_msg.feedback.current_position
         percentage = feedback_msg.feedback.percentage
-        self.get_logger().info(f'Current postion : X{current_position[0]} '
-                               f'Y{current_position[1]} Z{current_position[2]}')
+        self.get_logger().info(f'Current postion : X{self.current_position.data[0]} '
+                               f'Y{self.current_position.data[1]} Z{self.current_position.data[2]}')
         if percentage != 0.0:
             self.get_logger().info(f'Goal completion: {percentage:.2f} %')
+
+        self.farmbot_current_position_pub.publish(self.current_position)
 
     def goal_result_callback(self, future):
         """Handle the final result from the FarmbotComms action server."""
