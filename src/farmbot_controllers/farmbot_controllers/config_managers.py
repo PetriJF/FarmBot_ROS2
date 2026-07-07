@@ -76,7 +76,7 @@ class ConfigServer(Node):
 
         # Parameter Command publisher (Used for loading up parameters)
         self.param_cmd = String()
-        self.param_cmd_pub = self.create_publisher(String, 'farmbot_command', 10)
+        self.param_cmd_pub = self.create_publisher(String, 'farmbot_command', 200)
 
         # Farmbot Feedback Subscriber
         self.fb_feedback_sub = self.create_subscription(String,

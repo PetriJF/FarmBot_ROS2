@@ -55,8 +55,8 @@ class ToolExchanger:
         # move towards the release position
         cmd_seq += f'{cmd.x_pos + release_x_inc} {cmd.y_pos + release_y_inc} {cmd.z_pos}\n'
         # raise the tool head to a safe z-axis value
-        cmd_seq += f'{cmd.x_pos + release_x_inc} {cmd.y_pos + release_y_inc}\
-              {cmd.z_pos + cmd.z_safe_inc}\n'
+        cmd_seq += (f'{cmd.x_pos + release_x_inc} {cmd.y_pos + release_y_inc} '
+                    f'{cmd.z_pos + cmd.z_safe_inc}\n')
         # check if tool was mounted properly
         cmd_seq += 'DC_T_x_1\n'
         cmd_seq += 'CHECK 0'
@@ -83,8 +83,8 @@ class ToolExchanger:
         cmd_seq = 'CC_T_x_2\n'
 
         # move over the release position
-        cmd_seq += f'{cmd.x_pos + release_x_inc} {cmd.y_pos + release_y_inc}\
-              {cmd.z_pos + cmd.z_safe_inc}\n'
+        cmd_seq += (f'{cmd.x_pos + release_x_inc} {cmd.y_pos + release_y_inc} '
+                    f'{cmd.z_pos + cmd.z_safe_inc}\n')
         # lower towards the release position
         cmd_seq += f'{cmd.x_pos + release_x_inc} {cmd.y_pos + release_y_inc} {cmd.z_pos}\n'
         # move to the tool's home position

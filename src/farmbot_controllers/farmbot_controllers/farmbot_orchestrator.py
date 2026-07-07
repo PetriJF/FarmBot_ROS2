@@ -39,7 +39,7 @@ class FarmbotOrchestrator(Node):
 
         # Node subscripters and publishers
         self.uart_tx_sub = self.create_subscription(String, 'farmbot_command',
-                                                    self.farmbot_command_callback, 10)
+                                                    self.farmbot_command_callback, 200)
 
         self.busy_state = False
         self.current_cmd = ''

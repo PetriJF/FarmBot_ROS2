@@ -85,7 +85,7 @@ class DeviceCmdHandler:
                     + ' T' + command[7] + ' M' + command[8]
             # READ mode for the pin
             else:
-                self.uart_cmd = 'F42 P' + command[5] + ' M' + command[8]
+                self.uart_cmd = 'F42 P' + command[4] + ' M' + command[8]
 
             self.node.get_logger().info(self.uart_cmd)
             return self.uart_cmd
