@@ -71,8 +71,8 @@ class CameraController(Node):
             self.panorama_.map_x = float(info[1])
             self.panorama_.map_y = float(info[2])
             self.get_logger().info(
-                f'Updated camera map dimensions to {self.panorama_.map_x} \
-                and {self.panorama_.map_y}'
+                f'Updated camera map dimensions to {self.panorama_.map_x}'
+                f'and {self.panorama_.map_y}'
                 )
         elif request.data.split(' ')[0] == 'MOSAIC':
             # Save image for mosaic

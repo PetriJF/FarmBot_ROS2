@@ -184,8 +184,8 @@ class Sequencer:
         if not self.farmbot_estop and not self.wait_for_request.wait_flag:
             # If the command type was not set, ignore
             if self.command_type == '':
-                self.node.get_logger().warn(f"Command type not set! Not enough context! \
-                                            Command '{self.sequence[0]}' ignored")
+                self.node.get_logger().warn('Command type not set! Not enough context! '
+                                            f"Command '{self.sequence[0]}' ignored")
                 return
 
             # Used to check if a tool was mounted/unmounted properly.
@@ -193,8 +193,8 @@ class Sequencer:
             if (self.wait_for_request.result != -1 and self.wait_for_request.wait_for == 63
                     and self.wait_for_request.result == self.wait_for_request.expected):
                 self.node.get_logger().info(
-                    f"Tool {'mounted' if self.wait_for_request.expected == 0 else 'unmounted'} \
-                        successfully")
+                    f"Tool {'mounted' if self.wait_for_request.expected == 0 else 'unmounted'} "
+                    'successfully')
                 self.wait_for_request.expected = -1
                 self.wait_for_request.result = -1
                 self.wait_for_request.wait_for = -1
@@ -202,9 +202,9 @@ class Sequencer:
             elif (self.wait_for_request.result != -1 and self.wait_for_request.wait_for == 63
                     and self.wait_for_request.result != self.wait_for_request.expected):
                 self.node.get_logger().warn(
-                    f"FAILED TOOL \
-                        {'MOUNTING' if self.wait_for_request.expected == 0 else 'UNMOUNTING'}!! \
-                            Stopping sequence")
+                    'FAILED TOOL '
+                    f"{'MOUNTING' if self.wait_for_request.expected == 0 else 'UNMOUNTING'}!! "
+                    'Stopping sequence')
                 self.wait_for_request.expected = -1
                 self.wait_for_request.result = -1
                 self.wait_for_request.wait_for = -1
@@ -213,8 +213,8 @@ class Sequencer:
                 return
 
             if (self.wait_for_request.result != -1 and self.wait_for_request.wait_for == 59):
-                reading: str = f'SoilReading\
-                    {self.wait_for_request.index} {self.wait_for_request.result}'
+                reading: str = ('SoilReading '
+                                f'{self.wait_for_request.index} {self.wait_for_request.result}')
                 self.map_cmd_client(cmd=reading)
 
                 self.wait_for_request.expected = -1
@@ -261,8 +261,8 @@ class Sequencer:
                     if cmd[1] in ['0', '1']:
                         self.vacuum_pump(state=int(cmd[1]))
                     else:
-                        self.node.get_logger().warn('Vacuum pump command has a state other \
-                                                    than on or off. Command ignored!')
+                        self.node.get_logger().warn('Vacuum pump command has a state other '
+                                                    'than on or off. Command ignored!')
                 if cmd[0] == 'WaterPulses':
                     if int(cmd[1]):
                         self.water_pulses(delay=int(cmd[1]))
@@ -334,8 +334,8 @@ class Sequencer:
         self.wait_for_camera = True
 
         if sum([calib, update_map, mosaic]) > 1:
-            self.node.get_logger().warn('Cannot have more than 1 command \
-                                        type sent at the same time!')
+            self.node.get_logger().warn('Cannot have more than 1 command '
+                                        'type sent at the same time!')
 
         # Initializing the client and wait for map server confirmation
         client = self.node.create_client(StringRepReq, 'form_panorama')

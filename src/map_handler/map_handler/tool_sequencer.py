@@ -55,8 +55,8 @@ class ToolExchanger:
         # move towards the release position
         cmd_seq += f'{cmd.x_pos + release_x_inc} {cmd.y_pos + release_y_inc} {cmd.z_pos}\n'
         # raise the tool head to a safe z-axis value
-        cmd_seq += f'{cmd.x_pos + release_x_inc} {cmd.y_pos + release_y_inc}\
-              {cmd.z_pos + cmd.z_safe_inc}\n'
+        cmd_seq += (f'{cmd.x_pos + release_x_inc} {cmd.y_pos + release_y_inc} '
+                    f'{cmd.z_pos + cmd.z_safe_inc}\n')
         # check if tool was mounted properly
         cmd_seq += 'DC_T_x_1\n'
         cmd_seq += 'CHECK 0'
@@ -83,8 +83,8 @@ class ToolExchanger:
         cmd_seq = 'CC_T_x_2\n'
 
         # move over the release position
-        cmd_seq += f'{cmd.x_pos + release_x_inc} {cmd.y_pos + release_y_inc}\
-              {cmd.z_pos + cmd.z_safe_inc}\n'
+        cmd_seq += (f'{cmd.x_pos + release_x_inc} {cmd.y_pos + release_y_inc} '
+                    f'{cmd.z_pos + cmd.z_safe_inc}\n')
         # lower towards the release position
         cmd_seq += f'{cmd.x_pos + release_x_inc} {cmd.y_pos + release_y_inc} {cmd.z_pos}\n'
         # move to the tool's home position
@@ -98,19 +98,22 @@ class ToolExchanger:
         return cmd_seq
 
     def __get_release_direction(self, direction: int):
-        """Get tool release coordinate increments based on mounting orientation."""
-        if direction < 1 or dir > 4:
-            self.node_.get_logger().error('Release direction for the tool unrecognized!\
-                                          Check configuration!')
-            return
-        if direction == 1:
-            return -100.0, 0.0
-        if direction == 1:
-            return 100.0, 0.0
-        if direction == 1:
-            return 0.0, -100.0
-        if direction == 1:
-            return 0.0, 100.0
+        """
+        Get tool release coordinate increments based on mounting orientation.
+
+        1: -x, 2: +x, 3: -y, 4: +y
+        """
+        increments = {
+            1: (-100.0, 0.0),
+            2: (100.0, 0.0),
+            3: (0.0, -100.0),
+            4: (0.0, 100.0),
+        }
+        if direction not in increments:
+            self.node_.get_logger().error('Release direction for the tool unrecognized! '
+                                          'Check configuration!')
+            return 0.0, 0.0
+        return increments[direction]
 
     def __check_tool_details(self, cmd: ToolDetails, x_inc: float, y_inc: float):
         """Check if the tool position is reachable and valid."""
@@ -118,18 +121,18 @@ class ToolExchanger:
         if not self.__outside_bounds(x_min=0.0, x_max=self.map_max_x, y_min=0.0,
                                      y_max=self.map_max_y, z_min=self.map_max_z,
                                      z_max=0.0, x=cmd.x_pos, y=cmd.y_pos, z=cmd.z_pos):
-            self.node_.get_logger().warn(f'Max pos {self.map_max_x}  {self.map_max_y}  \
-                                         {self.map_max_z} ')
-            self.node_.get_logger().warn(f"Tool home position {cmd.x_pos} {cmd.y_pos} {cmd.z_pos}\
-                                         is outside of the farmbot's reach!")
+            self.node_.get_logger().warn(f'Max pos {self.map_max_x}  {self.map_max_y}  '
+                                         f'{self.map_max_z} ')
+            self.node_.get_logger().warn(f'Tool home position {cmd.x_pos} {cmd.y_pos} {cmd.z_pos} '
+                                         "is outside of the farmbot's reach!")
             return False
         # Check if the release position is valid
         if not self.__outside_bounds(x_min=0.0, x_max=self.map_max_x, y_min=0.0,
                                      y_max=self.map_max_y, z_min=self.map_max_z, z_max=0.0,
                                      x=cmd.x_pos + x_inc, y=cmd.y_pos + y_inc, z=cmd.z_pos):
-            self.node_.get_logger().warn(f"Tool release position {cmd.x_pos + x_inc} \
-                                         {cmd.y_pos + y_inc} {cmd.z_pos} is outside of\
-                                              the farmbot's reach!")
+            self.node_.get_logger().warn(f'Tool release position {cmd.x_pos + x_inc} '
+                                         f'{cmd.y_pos + y_inc} {cmd.z_pos} is outside of '
+                                         "the farmbot's reach!")
             return False
 
         return True

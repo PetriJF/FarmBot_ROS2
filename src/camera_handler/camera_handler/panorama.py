@@ -158,11 +158,11 @@ class Panorama:
         new_end_x = new_start_x + (roi_end_x - roi_start_x)
         new_end_y = new_start_y + (roi_end_y - roi_start_y)
 
-        self.node_.get_logger().info(f'start_x: {start_x}, start_y: {start_y}, \
-                                     roi_start_x: {roi_start_x}, roi_start_y: {roi_start_y}, \
-                                        roi_end_x: {roi_end_x}, roi_end_y: {roi_end_y}')
-        self.node_.get_logger().info(f'new_start_x: {new_start_x}, new_start_y: {new_start_y}, \
-                                     new_end_x: {new_end_x}, new_end_y: {new_end_y}')
+        self.node_.get_logger().info(f'start_x: {start_x}, start_y: {start_y}, '
+                                     f'roi_start_x: {roi_start_x}, roi_start_y: {roi_start_y}, '
+                                     f'roi_end_x: {roi_end_x}, roi_end_y: {roi_end_y}')
+        self.node_.get_logger().info(f'new_start_x: {new_start_x}, new_start_y: {new_start_y}, '
+                                     f'new_end_x: {new_end_x}, new_end_y: {new_end_y}')
 
         # Copy the overlapping area from new_image to map_image
         if roi_end_x > roi_start_x and roi_end_y > roi_start_y:

@@ -5,7 +5,6 @@ Handles parameter recording, loading, and publishing for Farmbot firmware
 configuration management, including parameter service interfaces.
 """
 import os
-import time
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -77,7 +76,7 @@ class ConfigServer(Node):
 
         # Parameter Command publisher (Used for loading up parameters)
         self.param_cmd = String()
-        self.param_cmd_pub = self.create_publisher(String, 'farmbot_command', 10)
+        self.param_cmd_pub = self.create_publisher(String, 'farmbot_command', 200)
 
         # Farmbot Feedback Subscriber
         self.fb_feedback_sub = self.create_subscription(String,
@@ -155,7 +154,6 @@ class ConfigServer(Node):
                     self.param_cmd.data = ('parameter_command False True False False ' + str(key)
                                            + ' ' + str(value))
                     self.param_cmd_pub.publish(self.param_cmd)
-                    time.sleep(0.1)
 
         self.get_logger().info('Parameter loading complete!')
 
@@ -235,8 +233,8 @@ class ConfigServer(Node):
             self.get_logger().warn('File path is invalid')
             return
 
-        self.get_logger().info(f'Saving current parameter configuration \
-                               at {os.path.join(path, file_name)}')
+        self.get_logger().info('Saving current parameter configuration '
+                               f'at {os.path.join(path, file_name)}')
 
         with open(os.path.join(path, file_name), 'w') as yaml_file:
             yaml.dump(self.param_vals, yaml_file, default_flow_style=False)
