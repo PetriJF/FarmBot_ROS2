@@ -8,8 +8,6 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 
-from farmbot_controllers.param_info import ParameterList
-
 from farmbot_interfaces.msg import MapCommand
 from farmbot_interfaces.srv import ParameterConfig, StringRepReq
 
@@ -35,20 +33,6 @@ class ConfigServer(Node):
         # Flag waiting for initialization to be done before the config is loaded
         self.firmware_init_done = False
 
-        # The dictionary containing all of the parameters for the farmbot
-        self.params = ParameterList()
-        param_names = vars(self.params)
-        self.param_vals = {
-            param_names[name]: 0
-            for name in param_names
-        }
-
-        # The share directory path and the file names for all the files
-        self.default_path = os.path.join(
-            get_package_share_directory('farmbot_controllers'),
-            'config'
-        )
-
         self.declare_parameter('ws_path', rclpy.Parameter.Type.STRING)
         self.declare_parameter('folder_config_name', rclpy.Parameter.Type.STRING)
 
@@ -58,6 +42,15 @@ class ConfigServer(Node):
 
         self.config_path = os.path.join(ws_path, folder_config_name)
         os.makedirs(self.config_path, exist_ok=True)
+
+        # The share directory path and the file names for all the files
+        self.default_path = os.path.join(
+            get_package_share_directory('farmbot_controllers'),
+            'config'
+        )
+
+        # The dictionary containing all of the parameters for the farmbot
+        self.params = self.load_from_yaml(self.default_path, 'ParameterList.yaml', 'r')
 
         self.base_config = 'firmwareDefault.yaml'  # default config loaded by the firmware
         self.custom1_config = 'Custom1.yaml'       # custom configuration,modify in source and build
@@ -189,16 +182,16 @@ class ConfigServer(Node):
             self.map_cmd.update = True
             self.map_cmd.update_info = [
                 'X ' + str(
-                    self.param_vals[self.params.MOVEMENT_AXIS_NR_STEPS_X]
-                    / self.param_vals[self.params.MOVEMENT_STEP_PER_MM_X]
+                    self.params['MOVEMENT_AXIS_NR_STEPS_X'][1]
+                    / self.params['MOVEMENT_STEP_PER_MM_X'][1]
                 ),
                 'Y ' + str(
-                    self.param_vals[self.params.MOVEMENT_AXIS_NR_STEPS_Y]
-                    / self.param_vals[self.params.MOVEMENT_STEP_PER_MM_Y]
+                    self.params['MOVEMENT_AXIS_NR_STEPS_Y'][1]
+                    / self.params['MOVEMENT_STEP_PER_MM_Y'][1]
                 ),
                 'Z ' + str(
-                    self.param_vals[self.params.MOVEMENT_AXIS_NR_STEPS_Z]
-                    / self.param_vals[self.params.MOVEMENT_STEP_PER_MM_Z]
+                    self.params['MOVEMENT_AXIS_NR_STEPS_Z'][1]
+                    / self.params['MOVEMENT_STEP_PER_MM_Z'][1]
                 ),
             ]
 
