@@ -39,8 +39,8 @@ class DeviceCmdHandler:
                 self.node.get_logger().info(self.uart_cmd)
                 return self.uart_cmd
         else:
-            self.node.get_logger().error('Wrong watering command type! First element should be 1\
-                                         (timed pulses msec) or 2 (volume pulses)!')
+            self.node.get_logger().error('Wrong watering command type! First element should be 1 '
+                                         '(timed pulses msec) or 2 (volume pulses)!')
 
     def i2c_cmd(self, command: list):
         """
@@ -115,8 +115,8 @@ class MotorCmdHandler:
         max_x, max_y, max_z = command[4], command[5], command[6]
 
         # Form the GCode command for the "move at location" action
-        self.uart_cmd = ('G01 ' if mode == 'True' else 'G00 ') + 'X' + x + ' Y' + y + ' Z' + z\
-            + ('' if mode == 'True' else (' A' + max_x + ' B' + max_y + ' C' + max_z))
+        self.uart_cmd = (('G01 ' if mode == 'True' else 'G00 ') + 'X' + x + ' Y' + y + ' Z' + z
+                         + ('' if mode == 'True' else (' A' + max_x + ' B' + max_y + ' C' + max_z)))
 
         self.node.get_logger().info(self.uart_cmd)
         return self.uart_cmd
@@ -126,9 +126,10 @@ class MotorCmdHandler:
         if command[0] == 'True':            # Home all axis
             self.uart_cmd = 'G28'
         elif command[1] == 'True':  # Set the current position as home
-            self.uart_cmd = 'F84 ' + 'X' + ('1 ' if command[3] == 'True' else '0 ')\
-                                         + 'Y' + ('1 ' if command[4] == 'True' else '0 ')\
-                                         + 'Z' + ('1' if command[5] == 'True' else '0')
+            self.uart_cmd = ('F84 '
+                             + 'X' + ('1 ' if command[3] == 'True' else '0 ')
+                             + 'Y' + ('1 ' if command[4] == 'True' else '0 ')
+                             + 'Z' + ('1' if command[5] == 'True' else '0'))
         else:
             if command[3] == 'False' and command[4] == 'False' and command[5] == 'False':
                 self.node.get_logger().error('No axis selected for homing/calibration!')

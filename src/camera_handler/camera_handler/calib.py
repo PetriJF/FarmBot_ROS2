@@ -161,8 +161,8 @@ class CalibrateCamera:
         """Capture the set of images, once everything is ready, compute the calibration details."""
         success = self.capture(run=run, x=x, y=y, z=z)
         if not success:
-            self.node_.get_logger().warn(f'Capture failed on calibration step {run}! \
-                                         Cancelled the calibration!')
+            self.node_.get_logger().warn(f'Capture failed on calibration step {run}! '
+                                         'Cancelled the calibration!')
             return 'FAILED'
 
         if run == POSITION_COUNT and success:

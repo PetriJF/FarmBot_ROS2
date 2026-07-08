@@ -121,18 +121,18 @@ class ToolExchanger:
         if not self.__outside_bounds(x_min=0.0, x_max=self.map_max_x, y_min=0.0,
                                      y_max=self.map_max_y, z_min=self.map_max_z,
                                      z_max=0.0, x=cmd.x_pos, y=cmd.y_pos, z=cmd.z_pos):
-            self.node_.get_logger().warn(f'Max pos {self.map_max_x}  {self.map_max_y}  \
-                                         {self.map_max_z} ')
-            self.node_.get_logger().warn(f"Tool home position {cmd.x_pos} {cmd.y_pos} {cmd.z_pos}\
-                                         is outside of the farmbot's reach!")
+            self.node_.get_logger().warn(f'Max pos {self.map_max_x}  {self.map_max_y}  '
+                                         f'{self.map_max_z} ')
+            self.node_.get_logger().warn(f'Tool home position {cmd.x_pos} {cmd.y_pos} {cmd.z_pos} '
+                                         "is outside of the farmbot's reach!")
             return False
         # Check if the release position is valid
         if not self.__outside_bounds(x_min=0.0, x_max=self.map_max_x, y_min=0.0,
                                      y_max=self.map_max_y, z_min=self.map_max_z, z_max=0.0,
                                      x=cmd.x_pos + x_inc, y=cmd.y_pos + y_inc, z=cmd.z_pos):
-            self.node_.get_logger().warn(f"Tool release position {cmd.x_pos + x_inc} \
-                                         {cmd.y_pos + y_inc} {cmd.z_pos} is outside of\
-                                              the farmbot's reach!")
+            self.node_.get_logger().warn(f'Tool release position {cmd.x_pos + x_inc} '
+                                         f'{cmd.y_pos + y_inc} {cmd.z_pos} is outside of '
+                                         "the farmbot's reach!")
             return False
 
         return True

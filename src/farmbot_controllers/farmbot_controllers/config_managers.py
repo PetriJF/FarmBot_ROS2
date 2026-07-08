@@ -233,8 +233,8 @@ class ConfigServer(Node):
             self.get_logger().warn('File path is invalid')
             return
 
-        self.get_logger().info(f'Saving current parameter configuration \
-                               at {os.path.join(path, file_name)}')
+        self.get_logger().info('Saving current parameter configuration '
+                               f'at {os.path.join(path, file_name)}')
 
         with open(os.path.join(path, file_name), 'w') as yaml_file:
             yaml.dump(self.param_vals, yaml_file, default_flow_style=False)

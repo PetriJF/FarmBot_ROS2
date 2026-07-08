@@ -74,16 +74,16 @@ class FarmbotControl(Node):
             # Movement Commands
             case 'M':
                 if len(code) != 4:
-                    self.get_logger().warning('You need to include all 3 coordinates!\
-                                              Command ignored!')
+                    self.get_logger().warning('You need to include all 3 coordinates! '
+                                              'Command ignored!')
                 else:
                     self.mvm.move_gantry_abs(x_coord=float(code[1]),
                                              y_coord=float(code[2]),
                                              z_coord=float(code[3]))
             case 'M_S':
                 if len(code) != 5:
-                    self.get_logger().warning('You need to include all 3 coordinates and a speed\
-                                              percentage! Command ignored!')
+                    self.get_logger().warning('You need to include all 3 coordinates and a speed '
+                                              'percentage! Command ignored!')
                 else:
                     self.mvm.move_gantry_s(x_coord=float(code[1]), y_coord=float(code[2]),
                                            z_coord=float(code[3]), speed=float(code[4]))
@@ -139,8 +139,8 @@ class FarmbotControl(Node):
             # Invert the encoder direction for a specified axis
             case 'C_2':
                 if len(code) == 1:
-                    self.get_logger().warning('You have not selected the axis encoder you want to\
-                                              flip. Command ignored')
+                    self.get_logger().warning('You have not selected the axis encoder you want to '
+                                              'flip. Command ignored')
                 else:
                     if code[1] in ['X', 'Y', 'Z']:
                         param = 130 + ((1 if code[1] == 'X' else 0) +
@@ -260,8 +260,8 @@ class FarmbotControl(Node):
         the model of the farmbot used.
         """
         if ver == '':
-            self.get_logger().warn('IGNORED. Cannot set configuration if the version of the farmbot\
-                                   is not set!')
+            self.get_logger().warn('IGNORED. Cannot set configuration if the version of the '
+                                   'farmbot is not set!')
             return
         if ver not in ['Genesis', 'genesis', 'Gen', 'gen',
                        'Express', 'express', 'Exp', 'exp',

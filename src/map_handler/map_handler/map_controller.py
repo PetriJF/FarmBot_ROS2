@@ -155,8 +155,8 @@ class MapController(Node):
         """Add and remove plants from the map."""
         # Check command validity
         if (cmd.add and cmd.remove) or (not cmd.add and not cmd.remove):
-            self.get_logger().warn('You must select either to add or remove a plant! Cannot do \
-                                   both/none in a commmand')
+            self.get_logger().warn('You must select either to add or remove a plant! Cannot do '
+                                   'both/none in a commmand')
             return
 
         if cmd.add:
@@ -247,10 +247,11 @@ class MapController(Node):
                 plant_type = plant['identifiers']['plant_name']
                 available, tray_index = self.__check_loaded_seeds(plant_type)
                 if not available:
-                    self.get_logger().warn(f"{plant['identifiers']['plant_name']} (index\
-                                            = {plant['identifiers']['index']}) could not be planted\
-                                                as {plant['identifiers']['plant_name']} seeds were \
-                                                    not found to be loaded into the seed trays")
+                    self.get_logger().warn(f"{plant['identifiers']['plant_name']} "
+                                           f"(index = {plant['identifiers']['index']}) "
+                                           'could not be planted as '
+                                           f"{plant['identifiers']['plant_name']} seeds were "
+                                           'not found to be loaded into the seed trays')
                     continue
 
                 cmd_sequence += self.seed_plant(
@@ -619,15 +620,15 @@ class MapController(Node):
         """
         plants = self.map_instance['plant_details']['plants']
         if index in plants:
-            self.get_logger().info(f"Plant of Index '{index}' has soil\
-                                    moisture reading: '{reading}'")
+            self.get_logger().info(f"Plant of Index '{index}' has soil "
+                                   f"moisture reading: '{reading}'")
             plants[index]['plant_details']['soil_moisture'] = copy.deepcopy(reading)
 
             self.save_to_yaml(self.map_instance, self.config_path,
                               self.active_map_file, create_if_empty=False)
         else:
-            self.get_logger().warn(f"Couldn't find plant with index '{index}' to add moisture\
-                                   reading to")
+            self.get_logger().warn(f"Couldn't find plant with index '{index}' to "
+                                   'add moisture reading to')
             return 'FAILED'
 
         return 'SUCCESS'
@@ -658,8 +659,8 @@ class MapController(Node):
             self.get_logger().info('Creating the active map configuration file..')
             os.makedirs(os.path.dirname(os.path.join(path, file_name)), exist_ok=True)
 
-        self.get_logger().info(f'Saving current parameter configuration at\
-                                {os.path.join(path, file_name)}')
+        self.get_logger().info('Saving current parameter configuration at '
+                               f'{os.path.join(path, file_name)}')
 
         with open(os.path.join(path, file_name), 'w') as yaml_file:
             yaml.dump(data, yaml_file, default_flow_style=False)
