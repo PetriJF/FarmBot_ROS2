@@ -69,7 +69,11 @@ class GPIOController(Node):
 
         # LED Flasher Button
         self.flash_state = False
-        flashing_frequency = 2.0
+
+        self.declare_parameter('flashing_frequency', rclpy.Parameter.Type.DOUBLE)
+        flashing_frequency = self.get_parameter('flashing_frequency'
+                                                ).get_parameter_value().double_value
+
         self.leds_to_flash = []
 
         self.led_flasher_timer = self.create_timer(1.0 / flashing_frequency, self.LED_flasher)
