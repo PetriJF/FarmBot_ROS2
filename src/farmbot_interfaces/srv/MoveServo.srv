@@ -1,0 +1,6 @@
+# F61
+uint16 pin                        # valid: 4, 5, 6, 11
+float32 angle
+---
+bool success
+string message

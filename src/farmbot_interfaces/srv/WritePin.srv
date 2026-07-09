@@ -1,0 +1,12 @@
+# F41 (single set) / F44 (pulse)        
+uint8 DIGITAL=0
+uint8 ANALOG=1
+uint16 pin
+uint8 mode
+int32 value
+bool pulse                        # true -> F44: value, wait delay_ms, then value2
+int32 value2
+uint32 delay_ms
+---
+bool success
+string message

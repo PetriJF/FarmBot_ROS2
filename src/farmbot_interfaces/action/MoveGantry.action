@@ -1,0 +1,15 @@
+geometry_msgs/Point target        # target position [mm]
+float32 speed_percent_x           # (0, 100] percent of axis max speed
+float32 speed_percent_y
+float32 speed_percent_z
+bool interpolated                 # true -> G01 (constant feed rate), false -> G00
+---
+uint8 OK=0
+uint8 FIRMWARE_ERROR=1            # firmware replied R03
+uint8 ESTOPPED=2                  # e-stop fired while moving
+uint8 ABORTED=3                   # '@' abort while moving
+uint8 code
+string message
+---
+geometry_msgs/Point position      # decoded from R82 while moving
+float32 progress                  # 0.0 .. 1.0
