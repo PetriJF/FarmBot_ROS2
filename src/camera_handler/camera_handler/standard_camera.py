@@ -34,7 +34,9 @@ class StandardCameraNode(Node):
         self.init_camera()
 
         # Camera Frequency
-        capture_freq = 1.0 / 30.0  # 30 frames a second
+        self.declare_parameter('capture_freq', rclpy.Parameter.Type.DOUBLE)
+        capture_freq = self.get_parameter('capture_freq').get_parameter_value().double_value
+
         self.camera_timer_ = self.create_timer(capture_freq, self.capture_image)
 
         self.get_logger().info('Standard Camera Node initialized...')
