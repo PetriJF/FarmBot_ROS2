@@ -96,7 +96,9 @@ def generate_launch_description():
             executable='standard_camera',
             name='standard_camera',
             output='screen',
-            parameters=[{'capture_freq': 1.0 / 30.0}],  # 30 frames a second
+            parameters=[
+                {'capture_freq': 1.0 / 30.0},  # 30 frames a second
+            ],
             condition=IfCondition(
                 PythonExpression([
                     "'", camera, "'",
