@@ -1,0 +1,6 @@
+# F22 / F23
+uint16 param
+int64 value
+bool during_calibration           # true -> F23, false -> F22
+---
+bool success

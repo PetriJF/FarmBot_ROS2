@@ -1,0 +1,13 @@
+uint8 GO_HOME=0                   # G28: travel to home
+uint8 FIND_HOME=1                 # F11/F12/F13: seek endstop per selected axis
+uint8 CALIBRATE=2                 # F14/F15/F16
+uint8 SET_HOME=3                  # F84: declare current position as home
+uint8 op
+bool x
+bool y
+bool z
+---
+uint8 code                        # same codes as MoveGantry
+string message
+---
+geometry_msgs/Point position

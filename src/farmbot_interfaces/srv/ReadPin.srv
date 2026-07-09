@@ -1,0 +1,5 @@
+uint16 pin
+uint8 mode                        # DIGITAL / ANALOG
+---
+bool success
+int32 value
