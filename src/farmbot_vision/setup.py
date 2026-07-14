@@ -18,7 +18,7 @@ setup(
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='Eliot',
-    maintainer_email='eliotboda@gmail.com',
+    maintainer_email='eliot.boda.2026@mumail.ie',
     description='Camera driver nodes for the ROS2 Farmbot vision system',
     license='MIT',
     tests_require=['pytest'],

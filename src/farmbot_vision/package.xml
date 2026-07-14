@@ -4,7 +4,7 @@
   <name>farmbot_vision</name>
   <version>0.0.0</version>
   <description>Camera driver nodes for the ROS2 Farmbot vision system</description>
-  <maintainer email="eliotboda@gmail.com">Eliot</maintainer>
+  <maintainer email="eliot.boda.2026@mumail.ie">Eliot</maintainer>
   <license>MIT</license>
 
   <test_depend>ament_copyright</test_depend>
