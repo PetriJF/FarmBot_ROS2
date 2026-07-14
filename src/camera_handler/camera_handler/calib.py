@@ -1,4 +1,8 @@
 """Camera calibration helpers for FarmBot using a circle grid calibration card."""
+# DEPRECATED: camera_handler is being replaced by farmbot_vision. The camera
+# driver has already moved there; calibration logic like this will follow.
+# Kept here for reference only -- do not build new work on top of this file.
+
 import math
 import os
 import time

@@ -83,7 +83,7 @@ def generate_launch_description():
             )
         ),
         Node(
-            package='camera_handler',
+            package='farmbot_vision',
             executable='standard_camera',
             name='standard_camera',
             output='screen',
@@ -98,7 +98,7 @@ def generate_launch_description():
             )
         ),
         Node(
-            package='camera_handler',
+            package='farmbot_vision',
             executable='luxonis_camera',
             name='luxonis_camera',
             output='screen',

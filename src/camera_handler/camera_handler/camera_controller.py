@@ -5,6 +5,10 @@ ROS2 CameraController node for FarmBot.
 Initializes panorama, calibration, and plant detection services,
 and exposes the camera-related ROS2 services.
 """
+# DEPRECATED: camera_handler is being replaced by farmbot_vision. The camera
+# driver has already moved there; calibration/stitching/detection will follow.
+# Kept here for reference only -- do not build new work on top of this file.
+
 # ROS2 Imports
 import math
 
