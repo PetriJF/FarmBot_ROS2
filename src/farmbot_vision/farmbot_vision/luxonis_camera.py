@@ -3,6 +3,12 @@ Module for Luxonis DepthAI camera streaming.
 
 Publishes RGB and depth images to ROS2 topics using CvBridge.
 """
+# NOT CURRENTLY IN USE. This node is written against the DepthAI v2 pipeline
+# API, which is deprecated and unavailable on newer Ubuntu releases. Needs
+# updating to the current DepthAI API before it can be run. The console
+# script entry point for this node is commented out in setup.py to avoid
+# confusion until that update happens.
+
 import os
 import threading
 
