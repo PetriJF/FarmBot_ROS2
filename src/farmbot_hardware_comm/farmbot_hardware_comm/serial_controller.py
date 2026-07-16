@@ -188,8 +188,6 @@ class SerialController(Node):
         try:
             fcode = self.fcode_encoder.encode_read_i2c(request)
             self.farmbot_cmd_sender(fcode)
-            response.success = True
-            response.value = 0
         except EncodeError as e:
             response.success = False
             response.message = str(e)
@@ -200,7 +198,6 @@ class SerialController(Node):
         try:
             fcode = self.fcode_encoder.encode_set_i2c(request)
             self.farmbot_cmd_sender(fcode)
-            response.success = True
         except EncodeError as e:
             response.success = False
             response.message = str(e)
@@ -211,7 +208,6 @@ class SerialController(Node):
         try:
             fcode = self.fcode_encoder.encode_configure_pin(request)
             self.farmbot_cmd_sender(fcode)
-            response.success = True
         except EncodeError as e:
             response.success = False
             response.message = str(e)
@@ -222,8 +218,6 @@ class SerialController(Node):
         try:
             fcode = self.fcode_encoder.encode_read_pin(request)
             self.farmbot_cmd_sender(fcode)
-            response.success = True
-            response.value = 0
         except EncodeError as e:
             response.success = False
             response.message = str(e)
@@ -234,7 +228,6 @@ class SerialController(Node):
         try:
             fcode = self.fcode_encoder.encode_write_pin(request)
             self.farmbot_cmd_sender(fcode)
-            response.success = True
         except EncodeError as e:
             response.success = False
             response.message = str(e)
@@ -290,7 +283,6 @@ class SerialController(Node):
         try:
             fcode = self.fcode_encoder.encode_move_servo(request)
             self.farmbot_cmd_sender(fcode)
-            response.success = True
         except EncodeError as e:
             response.success = False
             response.message = str(e)
@@ -301,8 +293,6 @@ class SerialController(Node):
         try:
             fcode = self.fcode_encoder.encode_read_parameter(request)
             self.farmbot_cmd_sender(fcode)
-            response.success = True
-            response.value = 0
         except EncodeError as e:
             response.success = False
             response.message = str(e)
@@ -313,7 +303,6 @@ class SerialController(Node):
         try:
             fcode = self.fcode_encoder.encode_write_parameter(request)
             self.farmbot_cmd_sender(fcode)
-            response.success = True
         except EncodeError as e:
             response.success = False
             response.message = str(e)
