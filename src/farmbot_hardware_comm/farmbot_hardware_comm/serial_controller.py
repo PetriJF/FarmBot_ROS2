@@ -24,6 +24,7 @@ from rclpy.action import ActionServer, GoalResponse
 # from rclpy.action import CancelResponse
 from rclpy.action.server import ServerGoalHandle
 from rclpy.node import Node
+from rclpy.task import Future
 
 # import serial
 
@@ -92,11 +93,12 @@ class SerialController(Node):
         # self.ser = serial.Serial(serial_port, serial_speed, timeout=1)
         # self.ser.reset_input_buffer()
         # # Create a timer to periodically check for incoming serial messages
-        # self.rx_timer = self.create_timer(1.0 / self.check_uart_freq, self.uart_receive)
+        #  self.rx_timer = self.create_timer(1.0 / self.check_uart_freq, self.uart_receive)
 
         # Used for setting the busy status on the ROS2 arch. while a command is running
         self.previous_cmd = ''
         # # self.status = ''
+        self.code_response: Future = None
 
         self.mission = {
             'starting_position': [],
@@ -132,12 +134,10 @@ class SerialController(Node):
         # Initialise motor servers
         self.move_gantry_server = ActionServer(self, MoveGantry, 'move_gantry',
                                                goal_callback=self.goal_callback,
-                                               execute_callback=self.gantry_execute_callback,
-                                               handle_accepted_callback=self.handle_gantry_callback)
+                                               execute_callback=self.gantry_execute_callback)
         self.home_axes_server = ActionServer(self, HomeAxes, 'home_axes',
                                              goal_callback=self.goal_callback,
-                                             execute_callback=self.home_execute_callback,
-                                             handle_accepted_callback=self.handle_home_callback)
+                                             execute_callback=self.home_execute_callback)
         self.move_servo_server = self.create_service(MoveServo, 'move_servo',
                                                      self.move_servo_command_server)
 
@@ -173,64 +173,121 @@ class SerialController(Node):
         self.get_logger().info('Serial Controller Initialized..')
 
     # Callbacks
-    def watering_command_server(self, request, response):
+    async def watering_command_server(self, request, response):
         """Handle the watering command service request."""
+        response = Watering.Response()
         try:
             fcode = self.fcode_encoder.encode_watering(request)
-            self.farmbot_cmd_sender(fcode)
         except EncodeError as e:
             response.success = False
             response.message = str(e)
             return response
 
-    def read_i2c_command_server(self, request, response):
+        self.code_response = Future()
+        self.farmbot_cmd_sender(fcode)
+        self.get_logger().info('before')
+        result = await self.code_response
+        self.get_logger().info('after')
+        self.code_response = None
+
+        response.success = result[0]
+        response.message = result[1]
+        return response
+
+    async def read_i2c_command_server(self, request, response):
         """Handle the read I2C command service request."""
+        response = ReadI2C.Response()
         try:
             fcode = self.fcode_encoder.encode_read_i2c(request)
             self.farmbot_cmd_sender(fcode)
         except EncodeError as e:
             response.success = False
             response.message = str(e)
+
+        self.code_response = Future()
+        self.farmbot_cmd_sender(fcode)
+        result = await self.code_response
+        self.code_response = None
+
+        response.success = result[0]
+        response.message = result[1]
+        response.value = result[2]
         return response
 
-    def set_i2c_command_server(self, request, response):
+    async def set_i2c_command_server(self, request, response):
         """Handle the read I2C command service request."""
+        response = SetI2C.Response()
         try:
             fcode = self.fcode_encoder.encode_set_i2c(request)
-            self.farmbot_cmd_sender(fcode)
         except EncodeError as e:
             response.success = False
             response.message = str(e)
+
+        self.code_response = Future()
+        self.farmbot_cmd_sender(fcode)
+        result = await self.code_response
+        self.code_response = None
+
+        response.success = result[0]
+        response.message = result[1]
         return response
 
-    def configure_pin_command_server(self, request, response):
+    async def configure_pin_command_server(self, request, response):
         """Handle the configure pin command service request."""
+        response = ConfigurePin.Response()
         try:
             fcode = self.fcode_encoder.encode_configure_pin(request)
             self.farmbot_cmd_sender(fcode)
         except EncodeError as e:
             response.success = False
             response.message = str(e)
+
+        self.code_response = Future()
+        self.farmbot_cmd_sender(fcode)
+        result = await self.code_response
+        self.code_response = None
+
+        response.success = result[0]
+        response.message = result[1]
         return response
 
-    def read_pin_command_server(self, request, response):
+    async def read_pin_command_server(self, request, response):
         """Handle the read pin command service request."""
+        response = ReadPin.Response()
         try:
             fcode = self.fcode_encoder.encode_read_pin(request)
             self.farmbot_cmd_sender(fcode)
         except EncodeError as e:
             response.success = False
             response.message = str(e)
+
+        self.code_response = Future()
+        self.farmbot_cmd_sender(fcode)
+        result = await self.code_response
+        self.code_response = None
+
+        response.success = result[0]
+        response.message = result[1]
+        response.value = result[2]
         return response
 
-    def write_pin_command_server(self, request, response):
+    async def write_pin_command_server(self, request, response):
         """Handle the write pin command service request."""
+        response = WritePin.Response()
         try:
             fcode = self.fcode_encoder.encode_write_pin(request)
             self.farmbot_cmd_sender(fcode)
         except EncodeError as e:
             response.success = False
             response.message = str(e)
+
+        self.code_response = Future()
+        self.farmbot_cmd_sender(fcode)
+        result = await self.code_response
+        self.code_response = None
+
+        response.success = result[0]
+        response.message = result[1]
         return response
 
     def goal_callback(self, goal_request):
@@ -247,9 +304,10 @@ class SerialController(Node):
 
         return GoalResponse.ACCEPT
 
-    def handle_gantry_callback(self, goal_handle: ServerGoalHandle):
+    async def gantry_execute_callback(self, goal_handle: ServerGoalHandle):
         """Handle the gantry execute callback action."""
         self.goal_handle = goal_handle
+        result = MoveGantry.Result()
 
         try:
             fcode = self.fcode_encoder.encode_move_gantry(goal_handle.request)
@@ -259,26 +317,63 @@ class SerialController(Node):
             self.mission['final_position'] += ([goal_handle.request.target.x]
                                                + [goal_handle.request.target.y]
                                                + [goal_handle.request.target.z])
-            self.farmbot_cmd_sender(fcode)
         except EncodeError as e:
-            result = MoveGantry.Result()
             result.code = MoveGantry.REJECTED
             result.message = str(e)
-            return result
 
-    def handle_home_callback(self, goal_handle: ServerGoalHandle):
+        self.code_response = Future()
+        self.farmbot_cmd_sender(fcode)
+        response = await self.code_response
+        self.code_response = None
+
+        if response[0]:
+            result.code = MoveGantry.OK
+            result.message = response[1]
+        elif response[1] == 'firmware error':
+            result.code = MoveGantry.FIRMWARE_ERROR
+            result.message = response[1]
+        elif response[1] == 'aborted':
+            result.code = MoveGantry.ABORTED
+            result.message = response[1]
+        elif response[1] == 'estopped':
+            result.code = MoveGantry.ESTOPPED
+            result.message = response[1]
+
+        return result
+
+    async def home_execute_callback(self, goal_handle: ServerGoalHandle):
         """Handle the home execute callback action."""
         self.goal_handle = goal_handle
+        result = HomeAxes.Result()
 
         try:
             fcode = self.fcode_encoder.encode_home_axes(goal_handle.request)
             self.farmbot_cmd_sender(fcode)
         except EncodeError as e:
-            result = HomeAxes.Result()
-            result.code = 4
+            result.code = HomeAxes.REJECTED
             result.message = str(e)
 
-    def move_servo_command_server(self, request, response):
+        self.code_response = Future()
+        self.farmbot_cmd_sender(fcode)
+        response = await self.code_response
+        self.code_response = None
+
+        if response[0]:
+            result.code = HomeAxes.OK
+            result.message = response[1]
+        elif response[1] == 'firmware error':
+            result.code = HomeAxes.FIRMWARE_ERROR
+            result.message = response[1]
+        elif response[1] == 'aborted':
+            result.code = HomeAxes.ABORTED
+            result.message = response[1]
+        elif response[1] == 'estopped':
+            result.code = HomeAxes.ESTOPPED
+            result.message = response[1]
+
+        return result
+
+    async def move_servo_command_server(self, request, response):
         """Handle the move servo command service request."""
         try:
             fcode = self.fcode_encoder.encode_move_servo(request)
@@ -286,69 +381,118 @@ class SerialController(Node):
         except EncodeError as e:
             response.success = False
             response.message = str(e)
+
+        self.code_response = Future()
+        self.farmbot_cmd_sender(fcode)
+        result = await self.code_response
+        self.code_response = None
+
+        response.success = result[0]
+        response.message = result[1]
         return response
 
-    def read_parameter_command_server(self, request, response):
+    async def read_parameter_command_server(self, request, response):
         """Handle the read parameter command service request."""
+        response = ReadParameter.Response()
         try:
             fcode = self.fcode_encoder.encode_read_parameter(request)
             self.farmbot_cmd_sender(fcode)
         except EncodeError as e:
             response.success = False
             response.message = str(e)
+
+        self.code_response = Future()
+        self.farmbot_cmd_sender(fcode)
+        result = await self.code_response
+        self.code_response = None
+
+        response.success = result[0]
+        response.message = result[1]
+        response.value = result[2]
         return response
 
-    def write_parameter_command_server(self, request, response):
+    async def write_parameter_command_server(self, request, response):
         """Handle the write parameter command service request."""
+        response = WriteParameter.Response()
         try:
             fcode = self.fcode_encoder.encode_write_parameter(request)
             self.farmbot_cmd_sender(fcode)
         except EncodeError as e:
             response.success = False
             response.message = str(e)
+
+        self.code_response = Future()
+        self.farmbot_cmd_sender(fcode)
+        result = await self.code_response
+        self.code_response = None
+
+        response.success = result[0]
+        response.message = result[1]
         return response
 
-    def list_all_command_server(self, request, response):
+    async def list_all_command_server(self, request, response):
         """Handle the list all parameter command service request."""
+        response = Trigger.Response()
+
+        self.code_response = Future()
         self.farmbot_cmd_sender('F20')
-        response.success = True
+        result = await self.code_response
+        self.code_response = None
+
+        response.success = result[0]
+        response.message = result[1]
         return response
 
-    def estop_command_server(self, request, response):
+    async def estop_command_server(self, request, response):
         """Handle the estop command service request."""
+        response = Trigger.Response()
+
+        self.code_response = Future()
+        self.farmbot_cmd_sender('E')
+        result = await self.code_response
         self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_OFF'])
         self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_FLASHING'])
-        self.farmbot_cmd_sender('E')
-
         self.estop_active.data = True
         self.estop_active_pub.publish(self.estop_active)
+        self.code_response = None
 
-        response.success = True
+        response.success = result[0]
+        response.message = result[1]
         return response
 
-    def resume_command_server(self, request, response):
+    async def resume_command_server(self, request, response):
         """Handle the reset estop command service request."""
+        response = Trigger.Response()
+
+        self.code_response = Future()
+        self.farmbot_cmd_sender('F09')
+        result = await self.code_response
         self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_ON'])
         self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_ON'])
-        self.farmbot_cmd_sender('F09')
-
         self.estop_active.data = False
         self.estop_active_pub.publish(self.estop_active)
+        self.code_response = None
 
-        response.success = True
+        response.success = result[0]
+        response.message = result[1]
         return response
 
-    def abort_command_server(self, request, response):
+    async def abort_command_server(self, request, response):
         """Handle the abort command service request."""
-        self.farmbot_cmd_sender('@')
+        response = Trigger.Response()
 
-        if not self.abort_active:
+        self.code_response = Future()
+        self.farmbot_cmd_sender('@')
+        result = await self.code_response
+        if not self.abort_active.data:
             self.abort_active.data = True
         else:
             self.abort_active.data = False
         self.abort_active_pub.publish(self.abort_active)
+        self.code_response = None
 
-        response.success = True
+        response.success = result[0]
+        response.message = result[1]
         return response
 
     def farmbot_cmd_sender(self, cmd: str):
@@ -365,12 +509,14 @@ class SerialController(Node):
         # self.ser.write(cmd.encode('utf-8'))
 
     # Receiving messages from Farmbot
-    def uart_receive(self, cmd: String):
+    async def uart_receive(self, cmd: String):
         """Timer callback that reads from UART and handles the response codes and commands."""
         # # Read from serial
         # line = self.ser.readline().decode('utf-8').rstrip()
         line = cmd.data
         # If a command is read, handle it
+
+        self.get_logger().info(f'Received message: {line}')
         if line:
             self.get_logger().info(f'Received message: {line}')
 
@@ -390,27 +536,12 @@ class SerialController(Node):
         # Extract the command code
         rep_code = (message).split(' ')[0]
 
-        self.fb_response = ''
-        match rep_code:
-            case 'R82':
-                code_position = (message).split(' ')
-                self.fb_position.point.x = float(code_position[1][1:])
-                self.fb_position.point.y = float(code_position[2][1:])
-                self.fb_position.point.z = float(code_position[3][1:])
-                self.fb_position_pub.publish(self.fb_position)
-            case 'R03':
-                self.fb_response = 'FIRMWARE_ERROR'
-            case 'R86':
-                self.fb_response = 'ABORTED'
-            case 'R02':
-                self.fb_response = 'OK'
-            case 'R87':
-                self.fb_response = 'ESTOPPED'
-            case 'R08':
-                self.fb_response = 'ECHO'
-            case 'R41' | 'R21':
-                code = (message).split(' ')
-                self.fb_response = code[2][1:]
+        if rep_code == 'R82':
+            code_position = (message).split(' ')
+            self.fb_position.point.x = float(code_position[1][1:])
+            self.fb_position.point.y = float(code_position[2][1:])
+            self.fb_position.point.z = float(code_position[3][1:])
+            self.fb_position_pub.publish(self.fb_position)
 
         # If a running command has finished OR the response for a request was retrieved
         # OR the sent command was acknowledged by the farmbot
@@ -437,10 +568,33 @@ class SerialController(Node):
                                                                   feedback.position.z]))
             self.goal_handle.publish_feedback(feedback)
 
+        if (command_type
+           and rep_code in self.non_immediate_cmds[cmd_type][self.previous_cmd]['responses']
+           and self.code_response and not self.code_response.done()):
+            match rep_code:
+                case 'R03':
+                    result = [False, 'firmware error', None]
+                    self.code_response.set_result(result)
+                case 'R86':
+                    result = [False, 'aborted', None]
+                    self.code_response.set_result(result)
+                case 'R02':
+                    result = [True, '', None]
+                    self.code_response.set_result(result)
+                case 'R87':
+                    result = [False, 'estopped', None]
+                    self.code_response.set_result(result)
+                case 'R08':
+                    result = [True, '', None]
+                    self.code_response.set_result(result)
+                case 'R41' | 'R21':
+                    code = (message).split(' ')
+                    value = code[2][1:]
+                    result = [True, '', value]
+                    self.code_response.set_result(result)
+
         # Send the reporting message for further processing by other nodes
         self.serial_feedback_pub.publish(self.serial_feedback)
-        if self.fb_response != '':
-            self.response_handler(command_type, rep_code)
 
     def percentage_calculation(self, current_position: list):
         """Calculate the percentage of progress made in the movement."""
@@ -457,164 +611,6 @@ class SerialController(Node):
         if denominator != 0:
             return sum(axis_completion) / denominator
         return 1
-
-    def response_handler(self, cmd_type: str, rep_code: str):
-        """Dispatch a command response to the appropriate sender."""
-        if rep_code in self.non_immediate_cmds[cmd_type][self.previous_cmd]['responses']:
-            match cmd_type:
-                case 'watering':
-                    self.watering_response()
-                case 'read_i2c':
-                    self.read_i2c_response()
-                case 'set_i2c':
-                    self.set_i2c_response()
-                case 'configure_pin':
-                    self.configure_pin_response()
-                case 'read_pin':
-                    self.read_pin_response()
-                case 'write_pin':
-                    self.write_pin_response()
-                case 'move_gantry':
-                    self.gantry_execute_callback()
-                case 'home_axes':
-                    self.home_execute_callback()
-                case 'move_servo':
-                    self.move_servo_response()
-                case 'read_parameter':
-                    self.read_parameter_response()
-                case 'write_parameter':
-                    self.write_parameter_response()
-                case 'trigger_command':
-                    return
-                case _:
-                    self.get_logger().info(f'{cmd_type}: This type of command is not supported by '
-                                           'the response handler')
-                    return
-
-    def watering_response(self):
-        """Create the standard response for the watering server."""
-        response = Watering.Response()
-        response.success = True
-        response.message = ''
-        return response
-
-    def read_i2c_response(self):
-        """Create the standard response for the read_i2c server."""
-        response = ReadI2C.Response()
-        if self.fb_response not in ['ESTOPPED', 'ABORTED', 'ECHO', 'OK', 'FIRMWARE_ERROR']:
-            response.success = True
-            response.value = int(self.fb_response)
-            response.message = ''
-        else:
-            response.success = False
-            response.message = self.fb_response
-        return response
-
-    def set_i2c_response(self):
-        """Create the standard response for the set_i2c server."""
-        response = SetI2C.Response()
-        if self.fb_response == 'OK':
-            response.success = True
-            response.message = ''
-        else:
-            response.success = False
-            response.message = self.fb_response
-        return response
-
-    def configure_pin_response(self):
-        """Create the standard response for the configure_pin server."""
-        response = ConfigurePin.Response()
-        response.success = True
-        response.message = ''
-        return response
-
-    def read_pin_response(self):
-        """Create the standard response for the read_pin server."""
-        response = ReadPin.Response()
-        if self.fb_response not in ['ESTOPPED', 'ABORTED', 'ECHO', 'OK', 'FIRMWARE_ERROR']:
-            response.success = True
-            response.value = int(self.fb_response)
-            response.message = ''
-        else:
-            response.success = False
-            response.message = self.fb_response
-        return response
-
-    def write_pin_response(self):
-        """Create the standard response for the write_pin server."""
-        response = WritePin.Response()
-        if self.previous_cmd == 'F44':
-            if self.response == 'OK':
-                response.success = True
-                response.message = ''
-            else:
-                response.success = False
-                response.message = self.response
-            return response
-        else:
-            response.success = True
-            response.message = ''
-            return response
-
-    def gantry_execute_callback(self):
-        """Create the standard response for the move_gantry action server."""
-        result = MoveGantry.Result()
-        if self.fb_response == 'OK':
-            result.code = MoveGantry.OK
-            result.message = ''
-        elif self.fb_response == 'FIRMWARE_ERROR':
-            result.code = MoveGantry.FIRMWARE_ERROR
-            result.message = self.fb_response
-        elif self.fb_response == 'ABORTED':
-            result.code = MoveGantry.ABORTED
-            result.message = self.fb_response
-        elif self.fb_response == 'ESTOPPED':
-            result.code = MoveGantry.ESTOPPED
-            result.message = self.fb_response
-        return result
-
-    def home_execute_callback(self):
-        """Create the standard response for the home_axes action server."""
-        result = HomeAxes.Result()
-        if self.fb_response == 'OK':
-            result.code = HomeAxes.OK
-            result.message = ''
-        elif self.fb_response == 'FIRMWARE_ERROR':
-            result.code = HomeAxes.FIRMWARE_ERROR
-            result.message = self.fb_response
-        elif self.fb_response == 'ABORTED':
-            result.code = HomeAxes.ABORTED
-            result.message = self.fb_response
-        elif self.fb_response == 'ESTOPPED':
-            result.code = HomeAxes.ESTOPPED
-            result.message = self.fb_response
-        return result
-
-    def move_servo_response(self):
-        """Create the standard response for the move_servo server."""
-        response = MoveServo.Response()
-        response.success = True
-        response.message = ''
-        return response
-
-    def read_parameter_response(self):
-        """Create the standard response for the read_parameter server."""
-        response = ReadParameter.Response()
-        if self.fb_response not in ['ESTOPPED', 'ABORTED', 'ECHO', 'OK', 'FIRMWARE_ERROR']:
-            response.success = True
-            response.value = int(self.fb_response)
-            response.message = ''
-        else:
-            response.success = False
-            response.message = self.fb_response
-        return response
-
-    def write_parameter_response(self):
-        """Create the standard response for the write_parameter server."""
-        response = WriteParameter.Response()
-        response.success = True
-        response.message = ''
-        return response
 
 ####################################################################################################
 

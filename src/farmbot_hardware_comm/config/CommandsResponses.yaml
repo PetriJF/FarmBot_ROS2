@@ -64,14 +64,20 @@ write_parameter:
   F22: 
     responses: ['R08']
 
-trigger_command:
+list_all_parameter:
   F20: 
     responses: ['R02', 'R03','R86','R87']
+
 # Priority commands
+resume:
   F09: 
     responses: ['R02', 'R03']
+
+estop:
   E: 
     responses: ['R87']
+
+abort:
   '@':
-    responses: ['R86']
+    responses: ['R86', 'R08']
 
