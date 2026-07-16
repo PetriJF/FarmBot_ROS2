@@ -22,10 +22,21 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/PlantManage.msg"
   "msg/MapCommand.msg"
   "msg/ImageMessage.msg"
+  "srv/ConfigurePin.srv"
   "srv/LedPanelHandler.srv"
+  "srv/MoveServo.srv"
   "srv/ParameterConfig.srv"
+  "srv/ReadI2C.srv"
+  "srv/ReadParameter.srv"
+  "srv/ReadPin.srv"
+  "srv/SetI2C.srv"
   "srv/StringRepReq.srv"
+  "srv/Watering.srv"
+  "srv/WriteParameter.srv"
+  "srv/WritePin.srv"
   "action/FarmbotComms.action"
+  "action/HomeAxes.action"
+  "action/MoveGantry.action"
   DEPENDENCIES sensor_msgs
 )
 

@@ -153,6 +153,8 @@ def generate_launch_description():
                         {'serial_port': serial_port},
                         {'serial_speed': 115200},
                         {'check_uart_freq': 100},
+                        {'ws_path': ws_path},
+                        {'folder_config_name': 'local_config'},
                     ]
                 )
             ]

@@ -2,3 +2,4 @@ uint16 pin                        # F43: set pin input/output mode
 bool output                       # false = input, true = output
 ---
 bool success
+string message

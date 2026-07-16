@@ -1,0 +1,7 @@
+# F52
+uint16 element      # Element in tool holder
+uint16 parameter    # Parameter number
+uint16 value        # Value number
+---
+bool success
+string message

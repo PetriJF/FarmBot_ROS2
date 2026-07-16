@@ -1,5 +1,6 @@
-# F21, answer decoded from R21
+# F21
 uint16 param
 ---
 bool success
 int64 value
+string message

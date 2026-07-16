@@ -3,245 +3,262 @@ Module that converts high-level commands into FCode commands that Farmbot can in
 
 It includes the Device Command Handler, Motor Command Handler, and State Command Handler modules.
 """
-from farmbot_interfaces.msg import StatusCommand
+import os
 
-from rclpy.node import Node
+from ament_index_python.packages import get_package_share_directory
+
+from farmbot_interfaces.action import HomeAxes, MoveGantry
+from farmbot_interfaces.srv import (ConfigurePin, MoveServo, ReadI2C, ReadParameter, ReadPin,
+                                    SetI2C, Watering, WriteParameter, WritePin)
+
+import yaml
 
 
-class DeviceCmdHandler:
-    """Module handling device and peripheral commands."""
+class EncodeError(Exception):
+    """Raised when a request cannot be encoded into a valid FCode command."""
 
-    def __init__(self, node: Node):
-        """Initialize the DeviceCmdHandler class."""
-        self.node = node
-        self.uart_cmd = str()
+    pass
 
-        # Log the initialization
-        self.node.get_logger().info('Device Command Handler Initialized..')
 
-    def water_cmd(self, command: list):
+class Encoder:
+    """Encode incoming FarmBot service/action requests into FCode commands."""
+
+    # def __init__(self, config_path):
+    def __init__(self):
+        """Initialize the encoder class."""
+        # self.active_config = yaml.safe_load(open(os.path.join(config_path,
+        #                                                       'activeConfig.yaml'), 'r'))
+        # self.active_map = yaml.safe_load(open(os.path.join(config_path,
+        #                                                    'active_map.yaml'), 'r'))
+
+        self.directory = os.path.join(
+            get_package_share_directory('farmbot_hardware_comm'),
+            'config'
+        )
+        self.cmd_validation = yaml.safe_load(open(os.path.join(self.directory,
+                                                               'CommandValidation.yaml'), 'r'))
+
+    # Water commands
+    def encode_watering(self, req: Watering.Request) -> str:
         """
         Watering style command.
 
         Used to set the watering to be either time based (1) or
         measured using a flow meter (2)
         """
-        # Valid watering commands
-        valid_commands = (1, 2)
+        WATERING_VALID_COMMAND = self.cmd_validation['watering_valid_command']
 
-        if int(command[0]) in valid_commands:
-            if int(command[1]) <= 0:
-                self.node.get_logger().warning('The time constraint/volume constraint was not set!')
-            else:
-                self.uart_cmd = 'F0' + command[0] + (' T' if command[0] == '1' else ' N')
-                + command[1]
+        if req.command in WATERING_VALID_COMMAND:
+            if req.dose <= 0:
+                raise EncodeError('The time constraint/volume constraint was not set!')
+            return f'F0{req.command} {"T" if req.command == 1 else "N"}{req.dose}'
 
-                self.node.get_logger().info(self.uart_cmd)
-                return self.uart_cmd
-        else:
-            self.node.get_logger().error('Wrong watering command type! First element should be 1 '
-                                         '(timed pulses msec) or 2 (volume pulses)!')
+        raise EncodeError(f'command {req.command} is not a valid watering command type '
+                          f'{WATERING_VALID_COMMAND}. First element should be 1 '
+                          '(timed pulses msec) or 2 (volume pulses)!')
 
-    def i2c_cmd(self, command: list):
+    # I2C commands (Not implemented on the Farmduino yet)
+    def encode_read_i2c(self, req: ReadI2C.Request) -> str:
         """
-        I2C Command Handler.
+        Encode the ReadI2C request into a FCode command.
 
-        Used to read or write to the I2C devices connected
-        to the farmduino.
+        Used to read from the I2C devices connected to the farmduino.
         """
-        if command[0] == 'True':    # I2C SET
-            self.uart_cmd = 'F51 E' + command[1] + ' P' + command[2] + ' V' + command[3]
-        else:           # I2C READ
-            self.uart_cmd = 'F52 E' + command[1] + ' P' + command[2]
+        VALID_I2C_ELEMENTS = self.cmd_validation['valid_i2c_element']
 
-        self.node.get_logger().info(self.uart_cmd)
-        return self.uart_cmd
+        if req.pin not in VALID_I2C_ELEMENTS:
+            raise EncodeError(f'element {req.element} is not a valid i2c element '
+                              f'{VALID_I2C_ELEMENTS}')
+        return f'F52 E{req.element} P{req.parameter}'
 
-    def pin_cmd(self, command: list):
+    def encode_set_i2c(self, req: SetI2C.Request) -> str:
         """
-        Pin Command Handler.
+        Encode the SetI2C request into a FCode command.
 
-        Handles reading (F42) and setting (F41, F43, F44)
-        pins. Note that this covers both analog and digital pins, and the pin
-        mode needs to be set accordingly!
+        Used to write to the I2C devices connected to the farmduino.
         """
-        # Check if in set mode, but no set command selected
-        if (command[0] == 'True' and command[1] == 'False' and command[2] == 'False'
-                and command[3] == 'False'):
-            self.node.get_logger().error(
-                'Pin is in SET mode, but no SET CASE was selected. '
-                'Use set_io, set_value or set_value2 to indicate what '
-                'set mode you want!'
-            )
-        else:
-            # SET mode for the pin
-            if command[0] == 'True':
-                if command[1] == 'True':    # NOTE: pin_mode should be 0 for input and 1 for output
-                    self.uart_cmd = 'F43 P' + command[4] + ' M' + command[8]
-                elif command[2] == 'True':  # NOTE: pin_mode should be 0 for digital, 1 for analog
-                    self.uart_cmd = 'F41 P' + command[4] + ' V' + command[5] + ' M' + command[8]
-                elif command[3] == 'True':  # NOTE: pin_mode should be 0 for digital, 1 for analog
-                    self.uart_cmd = 'F44 P' + command[4] + ' V' + command[5] + ' W' + command[6]
-                    + ' T' + command[7] + ' M' + command[8]
-            # READ mode for the pin
-            else:
-                self.uart_cmd = 'F42 P' + command[4] + ' M' + command[8]
+        VALID_I2C_ELEMENTS = self.cmd_validation['valid_i2c_element']
 
-            self.node.get_logger().info(self.uart_cmd)
-            return self.uart_cmd
+        if req.pin not in VALID_I2C_ELEMENTS:
+            raise EncodeError(f'element {req.element} is not a valid i2c element '
+                              f'{VALID_I2C_ELEMENTS}')
+        return f'F51 E{req.element} P{req.parameter} V{req.value}'
 
+    # Pin commands
+    def encode_configure_pin(self, req: ConfigurePin.Request) -> str:
+        """
+        Encode the ConfigurePin request into a FCode command.
 
-class MotorCmdHandler:
-    """Module handling motor and actuator commands."""
+        Used to change the input/output mode of a pin on the Farmduino.
+        """
+        VALID_PINS = (i for i in range(self.cmd_validation['valid_pins_bounds'][0],
+                                       self.cmd_validation['valid_pins_bounds'][1]))
 
-    def __init__(self, node: Node):
-        """Initialize the MotorCmdHandler class."""
-        self.node = node
-        self.uart_cmd = str()
+        if req.pin not in VALID_PINS:
+            raise EncodeError(f'pin {req.pin} is not a configurable pin {VALID_PINS}')
+        return f'F43 P{req.pin} M{int(req.output)}'
 
-        # Log the initialization
-        self.node.get_logger().info('Motor Command Handler Initialized..')
+    def encode_read_pin(self, req: ReadPin.Request) -> str:
+        """
+        Encode the ReadPin request into a FCode command.
 
-    def gantry_cmd(self, command: list):
+        Used to change the digital/analog mode of a pin on the Farmduino.
+        """
+        VALID_PINS = (i for i in range(self.cmd_validation['valid_pins_bounds'][0],
+                                       self.cmd_validation['valid_pins_bounds'][1]))
+
+        if req.pin not in VALID_PINS:
+            raise EncodeError(f'pin {req.pin} is not a readable pin {VALID_PINS}')
+        return f'F42 P{req.pin} M{int(req.output)}'
+
+    def encode_write_pin(self, req: WritePin.Request) -> str:
+        """
+        Encode the WritePin request into a FCode command.
+
+        Used to change the value of a pin on the Farmduino.
+        """
+        VALID_PINS = (i for i in range(self.cmd_validation['valid_pins_bounds'][0],
+                                       self.cmd_validation['valid_pins_bounds'][1]))
+
+        if req.pin not in VALID_PINS:
+            raise EncodeError(f'pin {req.pin} is not a writable pin {VALID_PINS}')
+        if req.pulse:
+            return f'F44 P{req.pin} V{req.value} W{req.value2} T{req.delay_ms} M{int(req.mode)}'
+
+        return f'F41 P{req.pin} V{req.value} M{int(req.mode)}'
+
+    # Gantry commands
+    def encode_move_gantry(self, req: MoveGantry.Goal) -> str:
         """
         Handle gantry commands.
 
         Note that homing and calibration must be done through the
-        home_handler topic
+        HomeAxes action
         """
-        mode = command[0]
-        # Getting the target location and the speed
-        x, y, z = command[1], command[2], command[3]
-        max_x, max_y, max_z = command[4], command[5], command[6]
+        # x_edge = self.active_map['map_reference']['x_len']
+        # y_edge = self.active_map['map_reference']['y_len']
+        # z_edge = self.active_map['map_reference']['z_len']
+        x_edge = 6
+        y_edge = 3
+        z_edge = 1
 
-        # Form the GCode command for the "move at location" action
-        self.uart_cmd = (('G01 ' if mode == 'True' else 'G00 ') + 'X' + x + ' Y' + y + ' Z' + z
-                         + ('' if mode == 'True' else (' A' + max_x + ' B' + max_y + ' C' + max_z)))
+        if (req.target.x > x_edge or req.target.y > y_edge or req.target.z > z_edge
+           or req.target.x < 0 or req.target.y < 0 or req.target.z < 0):
+            raise EncodeError(f"Point {req.target} is outside the greenhouse's boundaries"
+                              f'({x_edge}, {y_edge}, {z_edge})')
 
-        self.node.get_logger().info(self.uart_cmd)
-        return self.uart_cmd
+        if req.interpolated:
+            return f'G01 X{req.target.x} Y{req.target.y} Z{req.target.z}'
+        return (f'G00 X{req.target.x} Y{req.target.y} Z{req.target.z} '
+                f'A{req.speed_percent_x} B{req.speed_percent_y} C{req.speed_percent_z}')
 
-    def home_cmd(self, command: list):
+    # Home commands
+    def encode_home_axes(self, req: HomeAxes.Goal) -> str:
         """Handle homing and calibration commands."""
-        if command[0] == 'True':            # Home all axis
-            self.uart_cmd = 'G28'
-        elif command[1] == 'True':  # Set the current position as home
-            self.uart_cmd = ('F84 '
-                             + 'X' + ('1 ' if command[3] == 'True' else '0 ')
-                             + 'Y' + ('1 ' if command[4] == 'True' else '0 ')
-                             + 'Z' + ('1' if command[5] == 'True' else '0'))
-        else:
-            if command[3] == 'False' and command[4] == 'False' and command[5] == 'False':
-                self.node.get_logger().error('No axis selected for homing/calibration!')
-            else:
-                if command[3] == 'True':            # Find home or calibrate x axis
-                    self.uart_cmd = 'F11' if command[2] == 'False' else 'F14'
-                if command[4] == 'True':            # Find home or calibrate y axis
-                    self.uart_cmd = 'F12' if command[2] == 'False' else 'F15'
-                if command[5] == 'True':            # Find home or calibrate z axis
-                    self.uart_cmd = 'F13' if command[2] == 'False' else 'F16'
+        HOMING_VALID_COMMAND = self.cmd_validation['homing_valid_command']
 
-        self.node.get_logger().info(self.uart_cmd)
-        return self.uart_cmd
+        if req.op in HOMING_VALID_COMMAND:
+            if req.op == 0:
+                return 'G28'
+            elif req.op in [1, 2]:
+                if not req.x and not req.y and not req.z:
+                    raise EncodeError('No axis selected for homing/calibration!')
+                else:
+                    if req.x:                            # Find home or calibrate x axis
+                        return 'F11' if req.op == 2 else 'F14'
+                    if req.y:                            # Find home or calibrate y axis
+                        return 'F12' if req.op == 2 else 'F15'
+                    if req.z:                            # Find home or calibrate z axis
+                        return 'F13' if req.op == 2 else 'F16'
+            return 'F84'
 
-    def servo_cmd(self, command: list):
+        raise EncodeError(f'command {req.op} is not a valid homing command type '
+                          f'{HOMING_VALID_COMMAND}.')
+
+    # Servo commands
+    def encode_move_servo(self, req: MoveServo.Request) -> str:
         """
         Handle servo command interpretation.
 
         Note that servos can be attached only on pins
         4, 5, 6 and 11 on the Farmduino
         """
-        # The valid servo pins
-        valid_servo_pins = (4, 5, 6, 11)
+        VALID_SERVO_PINS = self.cmd_validation['valid_servo_pins']
 
-        # If the servo pin is within the valid pins:
-        if (int(command[0]) in valid_servo_pins):
-            # Request servo attached to PIN to be rotated to ANGLE
-            self.uart_cmd = 'F61 P' + command[0] + ' V' + command[1]
+        if req.pin not in VALID_SERVO_PINS:
+            raise EncodeError(f'pin {req.pin} is not a valid servo pin {VALID_SERVO_PINS}')
+        return f'F61 P{req.pin} V{req.angle:.0f}'
 
-            self.node.get_logger().info(self.uart_cmd)
-            return self.uart_cmd
-        else:
-            self.node.get_logger().error(
-                command[0] + ' is not within the valid servo pins(4, 5, 6, 11)!'
-                )
-
-
-class StateCmdHandler:
-    """Module handling commands for manipulating the farmbot's parameters, state and status."""
-
-    def __init__(self, node: Node):
-        """Initialize the StateCmdHandler class."""
-        self.node = node
-        self.uart_cmd = str()
-
-        # Log the initialization
-        self.node.get_logger().info('State Command Handler Initialized..')
-
-    def param_cmd(self, command: list):
+    # Parameter commands
+    def encode_read_parameter(self, req: ReadParameter.Request) -> str:
         """
-        Parameter Command Handler.
+        Encode the ReadParameter request into a FCode command.
 
-        Used to manipulate the Farmduino
-        parameters by manipulating code friendly commands into the
-        GCode (FCode) commands utilized in the UART communication
-        scheme
+        Used to read the parameters from the Farmduino.
         """
-        if command[0] == 'True':        # List all parameters
-            self.uart_cmd = 'F20'
-        else:
-            if command[2] == 'True':    # Read a parameter
-                self.uart_cmd = 'F21 P' + command[4]
-            elif command[1] == 'True':  # Write to a parameter
-                self.uart_cmd = 'F22 P' + command[4] + ' V' + command[5]
-            elif command[3] == 'True':  # Update a parameter (in the calibration state)
-                self.uart_cmd = 'F23 P' + command[4] + ' V' + command[5]
+        VALID_PARAMETERS = list(self.activeConfig.keys())           # TODO: Checks Parameters values
 
-        self.node.get_logger().info(self.uart_cmd)
-        return self.uart_cmd
+        if req.param not in VALID_PARAMETERS:
+            raise EncodeError(f'parameter {req.param} is not a valid parameter')
+        return f'F21 P{req.param}'
 
-    def state_cmd(self, command: list):
+    def encode_write_parameter(self, req: WriteParameter.Request) -> str:
         """
-        State Command Handler.
+        Encode the WriteParameter request into a FCode command.
 
-        Used as the main pipeline for specific commands.
-        E - End Stop, @ - Abort Movement, F09 - Report Endstop, F81 - Report
-        Current Position and F83 - Report Software Version
+        Used to write to the parameters on the Farmduino.
         """
-        state_counter = command.count('True')
+        VALID_PARAMETERS = list(self.activeConfig.keys())
 
-        # Check that only one start command is in effect
-        if state_counter != 1:
-            self.node.get_logger().error(
-                'Make sure to include only 1 state handler command!'
-                'Your input has ' + str(state_counter) + ' commands')
-        else:
-            if command[0] == 'True':         # Electronic stop
-                self.uart_cmd = 'E'
-            elif command[1] == 'True':       # Abort current movement command
-                self.uart_cmd = '@'
-            elif command[2] == 'True':       # Reset the Electronic stop
-                self.uart_cmd = 'F09'
-            elif command[3] == 'True':       # Report End Stop
-                self.uart_cmd = 'F81'
-            elif command[4] == 'True':       # Report Current Position
-                self.uart_cmd = 'F82'
-            elif command[5] == 'True':       # Report Software Version
-                self.uart_cmd = 'F83'
+        if req.param not in VALID_PARAMETERS:
+            raise EncodeError(f'parameter {req.param} is not a valid parameter')
+        if req.during_calibration:
+            return f'F23 P{req.param} V{req.value}'
+        return f'F22 P{req.param} V{req.value}'
 
-            self.node.get_logger().info(self.uart_cmd)
-            return self.uart_cmd
+    # DEPRECATED
+    # def state_cmd(self, command: list):
+    #     """
+    #     State Command Handler.
 
-    def status_cmd(self, cmd: StatusCommand):
-        """
-        Allow the read and write of a status command for the Farmbot.
+    #     Used as the main pipeline for specific commands.
+    #     E - End Stop, @ - Abort Movement, F09 - Report Endstop, F81 - Report
+    #     Current Position and F83 - Report Software Version
+    #     """
+    #     state_counter = command.count('True')
 
-        Check documentation for more information on status commands
-        """
-        if cmd.mode:    # Write mode
-            self.uart_cmd = 'F32 P' + str(cmd.p) + ' V' + str(cmd.v)
-        else:           # Read mode
-            self.uart_cmd = 'F31 P' + str(cmd.p)
+    #     # Check that only one start command is in effect
+    #     if state_counter != 1:
+    #         self.node.get_logger().error(
+    #             'Make sure to include only 1 state handler command!'
+    #             'Your input has ' + str(state_counter) + ' commands')
+    #     else:
+    #         if command[0] == 'True':         # Electronic stop
+    #             self.uart_cmd = 'E'
+    #         elif command[1] == 'True':       # Abort current movement command
+    #             self.uart_cmd = '@'
+    #         elif command[2] == 'True':       # Reset the Electronic stop
+    #             self.uart_cmd = 'F09'
+    #         elif command[3] == 'True':       # Report End Stop
+    #             self.uart_cmd = 'F81'
+    #         elif command[4] == 'True':       # Report Current Position
+    #             self.uart_cmd = 'F82'
+    #         elif command[5] == 'True':       # Report Software Version
+    #             self.uart_cmd = 'F83'
 
-        self.node.get_logger().info(self.uart_cmd)
-        return self.uart_cmd
+    #         self.node.get_logger().info(self.uart_cmd)
+    #         return self.uart_cmd
+
+    # def status_cmd(self, cmd: StatusCommand):
+    #     """
+    #     Allow the read and write of a status command for the Farmbot.
+
+    #     Check documentation for more information on status commands
+    #     """
+    #     if cmd.mode:    # Write mode
+    #         self.uart_cmd = 'F32 P' + str(cmd.p) + ' V' + str(cmd.v)
+    #     else:           # Read mode
+    #         self.uart_cmd = 'F31 P' + str(cmd.p)
+
+    #     self.node.get_logger().info(self.uart_cmd)
+    #     return self.uart_cmd
