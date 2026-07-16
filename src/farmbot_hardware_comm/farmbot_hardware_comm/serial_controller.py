@@ -23,6 +23,7 @@ import rclpy
 from rclpy.action import ActionServer, GoalResponse
 # from rclpy.action import CancelResponse
 from rclpy.action.server import ServerGoalHandle
+from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
 from rclpy.task import Future
 
@@ -117,43 +118,60 @@ class SerialController(Node):
         self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_ON'])
         self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_ON'])
 
+        self.cmd_callback_group = ReentrantCallbackGroup()
+
         # Initialise device servers
         self.watering_server = self.create_service(Watering, 'watering',
-                                                   self.watering_command_server)
+                                                   self.watering_command_server,
+                                                   callback_group=self.cmd_callback_group)
         self.read_i2c_server = self.create_service(ReadI2C, 'read_i2c',
-                                                   self.read_i2c_command_server)
+                                                   self.read_i2c_command_server,
+                                                   callback_group=self.cmd_callback_group)
         self.set_i2c_server = self.create_service(SetI2C, 'set_i2c',
-                                                  self.set_i2c_command_server)
+                                                  self.set_i2c_command_server,
+                                                  callback_group=self.cmd_callback_group)
         self.configure_pin_server = self.create_service(ConfigurePin, 'configure_pin',
-                                                        self.configure_pin_command_server)
+                                                        self.configure_pin_command_server,
+                                                        callback_group=self.cmd_callback_group)
         self.read_pin_server = self.create_service(ReadPin, 'read_pin',
-                                                   self.read_pin_command_server)
+                                                   self.read_pin_command_server,
+                                                   callback_group=self.cmd_callback_group)
         self.write_pin_server = self.create_service(WritePin, 'write_pin',
-                                                    self.write_pin_command_server)
+                                                    self.write_pin_command_server,
+                                                    callback_group=self.cmd_callback_group)
 
         # Initialise motor servers
         self.move_gantry_server = ActionServer(self, MoveGantry, 'move_gantry',
                                                goal_callback=self.goal_callback,
-                                               execute_callback=self.gantry_execute_callback)
+                                               execute_callback=self.gantry_execute_callback,
+                                               callback_group=self.cmd_callback_group)
         self.home_axes_server = ActionServer(self, HomeAxes, 'home_axes',
                                              goal_callback=self.goal_callback,
-                                             execute_callback=self.home_execute_callback)
+                                             execute_callback=self.home_execute_callback,
+                                             callback_group=self.cmd_callback_group)
         self.move_servo_server = self.create_service(MoveServo, 'move_servo',
-                                                     self.move_servo_command_server)
+                                                     self.move_servo_command_server,
+                                                     callback_group=self.cmd_callback_group)
 
         # Initialise state servers
         self.read_parameter_server = self.create_service(ReadParameter, 'read_parameter',
-                                                         self.read_parameter_command_server)
+                                                         self.read_parameter_command_server,
+                                                         callback_group=self.cmd_callback_group)
         self.write_parameter_server = self.create_service(WriteParameter, 'write_parameter',
-                                                          self.write_parameter_command_server)
-        self.list_all_parameters_server = self.create_service(Trigger, 'list_all_parameters',
-                                                              self.list_all_command_server)
+                                                          self.write_parameter_command_server,
+                                                          callback_group=self.cmd_callback_group)
+        self.list_all_parameter_server = self.create_service(Trigger, 'list_all_parameters',
+                                                             self.list_all_command_server,
+                                                             callback_group=self.cmd_callback_group)
         self.estop_trigger_server = self.create_service(Trigger, 'estop',
-                                                        self.estop_command_server)
+                                                        self.estop_command_server,
+                                                        callback_group=self.cmd_callback_group)
         self.resume_trigger_server = self.create_service(Trigger, 'resume',
-                                                         self.resume_command_server)
+                                                         self.resume_command_server,
+                                                         callback_group=self.cmd_callback_group)
         self.abort_trigger_server = self.create_service(Trigger, 'abort',
-                                                        self.abort_command_server)
+                                                        self.abort_command_server,
+                                                        callback_group=self.cmd_callback_group)
 
         # Initialise publishers
         self.fb_position = PointStamped()
@@ -172,10 +190,19 @@ class SerialController(Node):
         # Log the initialization
         self.get_logger().info('Serial Controller Initialized..')
 
+    async def _run_command(self, fcode: str):
+        if self.code_response is not None and not self.code_response.done():
+            return False, 'busy', None
+
+        self.code_response = Future()
+        self.farmbot_cmd_sender(fcode)
+        result = await self.code_response
+        self.code_response = None
+        return result[0], result[1], result[2]
+
     # Callbacks
     async def watering_command_server(self, request, response):
         """Handle the watering command service request."""
-        response = Watering.Response()
         try:
             fcode = self.fcode_encoder.encode_watering(request)
         except EncodeError as e:
@@ -183,15 +210,7 @@ class SerialController(Node):
             response.message = str(e)
             return response
 
-        self.code_response = Future()
-        self.farmbot_cmd_sender(fcode)
-        self.get_logger().info('before')
-        result = await self.code_response
-        self.get_logger().info('after')
-        self.code_response = None
-
-        response.success = result[0]
-        response.message = result[1]
+        response.success, response.message, _ = await self._run_command(fcode)
         return response
 
     async def read_i2c_command_server(self, request, response):
@@ -203,15 +222,9 @@ class SerialController(Node):
         except EncodeError as e:
             response.success = False
             response.message = str(e)
+            return response
 
-        self.code_response = Future()
-        self.farmbot_cmd_sender(fcode)
-        result = await self.code_response
-        self.code_response = None
-
-        response.success = result[0]
-        response.message = result[1]
-        response.value = result[2]
+        response.success, response.message, response.value = await self._run_command(fcode)
         return response
 
     async def set_i2c_command_server(self, request, response):
@@ -222,14 +235,9 @@ class SerialController(Node):
         except EncodeError as e:
             response.success = False
             response.message = str(e)
+            return response
 
-        self.code_response = Future()
-        self.farmbot_cmd_sender(fcode)
-        result = await self.code_response
-        self.code_response = None
-
-        response.success = result[0]
-        response.message = result[1]
+        response.success, response.message, _ = await self._run_command(fcode)
         return response
 
     async def configure_pin_command_server(self, request, response):
@@ -241,14 +249,9 @@ class SerialController(Node):
         except EncodeError as e:
             response.success = False
             response.message = str(e)
+            return response
 
-        self.code_response = Future()
-        self.farmbot_cmd_sender(fcode)
-        result = await self.code_response
-        self.code_response = None
-
-        response.success = result[0]
-        response.message = result[1]
+        response.success, response.message, _ = await self._run_command(fcode)
         return response
 
     async def read_pin_command_server(self, request, response):
@@ -260,15 +263,9 @@ class SerialController(Node):
         except EncodeError as e:
             response.success = False
             response.message = str(e)
+            return response
 
-        self.code_response = Future()
-        self.farmbot_cmd_sender(fcode)
-        result = await self.code_response
-        self.code_response = None
-
-        response.success = result[0]
-        response.message = result[1]
-        response.value = result[2]
+        response.success, response.message, response.value = await self._run_command(fcode)
         return response
 
     async def write_pin_command_server(self, request, response):
@@ -280,14 +277,9 @@ class SerialController(Node):
         except EncodeError as e:
             response.success = False
             response.message = str(e)
+            return response
 
-        self.code_response = Future()
-        self.farmbot_cmd_sender(fcode)
-        result = await self.code_response
-        self.code_response = None
-
-        response.success = result[0]
-        response.message = result[1]
+        response.success, response.message, _ = await self._run_command(fcode)
         return response
 
     def goal_callback(self, goal_request):
@@ -320,11 +312,10 @@ class SerialController(Node):
         except EncodeError as e:
             result.code = MoveGantry.REJECTED
             result.message = str(e)
+            return result
 
-        self.code_response = Future()
-        self.farmbot_cmd_sender(fcode)
-        response = await self.code_response
-        self.code_response = None
+        response = []
+        response[0], response[1], _ = await self._run_command(fcode)
 
         if response[0]:
             result.code = MoveGantry.OK
@@ -352,11 +343,10 @@ class SerialController(Node):
         except EncodeError as e:
             result.code = HomeAxes.REJECTED
             result.message = str(e)
+            return result
 
-        self.code_response = Future()
-        self.farmbot_cmd_sender(fcode)
-        response = await self.code_response
-        self.code_response = None
+        response = []
+        response[0], response[1], _ = await self._run_command(fcode)
 
         if response[0]:
             result.code = HomeAxes.OK
@@ -381,14 +371,9 @@ class SerialController(Node):
         except EncodeError as e:
             response.success = False
             response.message = str(e)
+            return response
 
-        self.code_response = Future()
-        self.farmbot_cmd_sender(fcode)
-        result = await self.code_response
-        self.code_response = None
-
-        response.success = result[0]
-        response.message = result[1]
+        response.success, response.message, _ = await self._run_command(fcode)
         return response
 
     async def read_parameter_command_server(self, request, response):
@@ -400,15 +385,9 @@ class SerialController(Node):
         except EncodeError as e:
             response.success = False
             response.message = str(e)
+            return response
 
-        self.code_response = Future()
-        self.farmbot_cmd_sender(fcode)
-        result = await self.code_response
-        self.code_response = None
-
-        response.success = result[0]
-        response.message = result[1]
-        response.value = result[2]
+        response.success, response.message, response.value = await self._run_command(fcode)
         return response
 
     async def write_parameter_command_server(self, request, response):
@@ -420,79 +399,53 @@ class SerialController(Node):
         except EncodeError as e:
             response.success = False
             response.message = str(e)
+            return response
 
-        self.code_response = Future()
-        self.farmbot_cmd_sender(fcode)
-        result = await self.code_response
-        self.code_response = None
-
-        response.success = result[0]
-        response.message = result[1]
+        response.success, response.message, _ = await self._run_command(fcode)
         return response
 
     async def list_all_command_server(self, request, response):
         """Handle the list all parameter command service request."""
         response = Trigger.Response()
 
-        self.code_response = Future()
-        self.farmbot_cmd_sender('F20')
-        result = await self.code_response
-        self.code_response = None
-
-        response.success = result[0]
-        response.message = result[1]
+        response.success, response.message, _ = await self._run_command('F20')
         return response
 
     async def estop_command_server(self, request, response):
         """Handle the estop command service request."""
         response = Trigger.Response()
 
-        self.code_response = Future()
-        self.farmbot_cmd_sender('E')
-        result = await self.code_response
         self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_OFF'])
         self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_FLASHING'])
         self.estop_active.data = True
         self.estop_active_pub.publish(self.estop_active)
-        self.code_response = None
 
-        response.success = result[0]
-        response.message = result[1]
+        response.success, response.message, _ = await self._run_command('E')
         return response
 
     async def resume_command_server(self, request, response):
         """Handle the reset estop command service request."""
         response = Trigger.Response()
 
-        self.code_response = Future()
-        self.farmbot_cmd_sender('F09')
-        result = await self.code_response
         self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_ON'])
         self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_ON'])
         self.estop_active.data = False
         self.estop_active_pub.publish(self.estop_active)
-        self.code_response = None
 
-        response.success = result[0]
-        response.message = result[1]
+        response.success, response.message, _ = await self._run_command('F09')
         return response
 
     async def abort_command_server(self, request, response):
         """Handle the abort command service request."""
         response = Trigger.Response()
 
-        self.code_response = Future()
-        self.farmbot_cmd_sender('@')
-        result = await self.code_response
         if not self.abort_active.data:
             self.abort_active.data = True
         else:
             self.abort_active.data = False
         self.abort_active_pub.publish(self.abort_active)
-        self.code_response = None
 
-        response.success = result[0]
-        response.message = result[1]
+        response.success, response.message, _ = await self._run_command('F09')
         return response
 
     def farmbot_cmd_sender(self, cmd: str):
@@ -515,8 +468,6 @@ class SerialController(Node):
         # line = self.ser.readline().decode('utf-8').rstrip()
         line = cmd.data
         # If a command is read, handle it
-
-        self.get_logger().info(f'Received message: {line}')
         if line:
             self.get_logger().info(f'Received message: {line}')
 
