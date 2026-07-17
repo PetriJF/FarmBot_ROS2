@@ -60,15 +60,16 @@ def generate_launch_description():
             name='controller',
             output='screen'
         ),
-        Node(
-            package='farmbot_controllers',
-            executable='farmbot_orchestrator',
-            name='farmbot_orchestrator',
-            output='screen',
-            parameters=[
-                {'tx_freq': 10},
-            ]
-        ),
+        # Orchestrator is deprecated
+        # Node(
+        #     package='farmbot_controllers',
+        #     executable='farmbot_orchestrator',
+        #     name='farmbot_orchestrator',
+        #     output='screen',
+        #     parameters=[
+        #         {'tx_freq': 10},
+        #     ]
+        # ),
         Node(
             package='map_handler',
             executable='map_controller',

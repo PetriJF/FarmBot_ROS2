@@ -136,17 +136,21 @@ class Encoder:
         """
         x_edge = self.active_map['map_reference']['x_len']
         y_edge = self.active_map['map_reference']['y_len']
-        z_edge = self.active_map['map_reference']['z_len']
+        # z_edge = self.active_map['map_reference']['z_len']
 
-        if (req.target.x > x_edge or req.target.y > y_edge or req.target.z > z_edge
-           or req.target.x < 0 or req.target.y < 0 or req.target.z < 0):
-            raise EncodeError(f"Point {req.target} is outside the greenhouse's boundaries"
-                              f'({x_edge}, {y_edge}, {z_edge})')
+        # edges of 0 mean "not calibrated yet" -> no bounds check
+        if x_edge > 0 and y_edge > 0:
+            if (req.target.x > x_edge or req.target.y > y_edge
+               or req.target.x < 0 or req.target.y < 0):
+                raise EncodeError(f"Point {req.target} is outside the greenhouse's boundaries"
+                                  f'({x_edge}, {y_edge})')
 
         if req.interpolated:
             return f'G01 X{req.target.x} Y{req.target.y} Z{req.target.z}'
         return (f'G00 X{req.target.x} Y{req.target.y} Z{req.target.z} '
-                f'A{req.speed_percent_x} B{req.speed_percent_y} C{req.speed_percent_z}')
+                f'A{req.speed_percent_x / 100 * self.active_config[71]:.0f} '
+                f'B{req.speed_percent_y / 100 * self.active_config[72]:.0f} '
+                f'C{req.speed_percent_z / 100 * self.active_config[73]:.0f}')
 
     # Home commands
     def encode_home_axes(self, req: HomeAxes.Goal) -> str:
@@ -159,14 +163,16 @@ class Encoder:
             elif req.op in [1, 2]:
                 if not req.x and not req.y and not req.z:
                     raise EncodeError('No axis selected for homing/calibration!')
+                elif [req.x, req.y, req.z].count(True) > 1:
+                    raise EncodeError('Select a single axis for homing/calibration!')
                 else:
                     if req.x:                            # Find home or calibrate x axis
-                        return 'F11' if req.op == 2 else 'F14'
+                        return 'F11' if req.op == 1 else 'F14'
                     if req.y:                            # Find home or calibrate y axis
-                        return 'F12' if req.op == 2 else 'F15'
+                        return 'F12' if req.op == 1 else 'F15'
                     if req.z:                            # Find home or calibrate z axis
-                        return 'F13' if req.op == 2 else 'F16'
-            return 'F84'
+                        return 'F13' if req.op == 1 else 'F16'
+            return f'F84 X{int(req.x)} Y{int(req.y)} Z{int(req.z)}'  # Set Home
 
         raise EncodeError(f'command {req.op} is not a valid homing command type '
                           f'{HOMING_VALID_COMMAND}.')
