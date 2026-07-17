@@ -23,13 +23,12 @@ class EncodeError(Exception):
 class Encoder:
     """Encode incoming FarmBot service/action requests into FCode commands."""
 
-    # def __init__(self, config_path):
-    def __init__(self):
+    def __init__(self, config_path):
         """Initialize the encoder class."""
-        # self.active_config = yaml.safe_load(open(os.path.join(config_path,
-        #                                                       'activeConfig.yaml'), 'r'))
-        # self.active_map = yaml.safe_load(open(os.path.join(config_path,
-        #                                                    'active_map.yaml'), 'r'))
+        self.active_config = yaml.safe_load(open(os.path.join(config_path,
+                                                              'activeConfig.yaml'), 'r'))
+        self.active_map = yaml.safe_load(open(os.path.join(config_path,
+                                                           'active_map.yaml'), 'r'))
 
         self.directory = os.path.join(
             get_package_share_directory('farmbot_hardware_comm'),
@@ -66,7 +65,7 @@ class Encoder:
         """
         VALID_I2C_ELEMENTS = self.cmd_validation['valid_i2c_element']
 
-        if req.pin not in VALID_I2C_ELEMENTS:
+        if req.element not in VALID_I2C_ELEMENTS:
             raise EncodeError(f'element {req.element} is not a valid i2c element '
                               f'{VALID_I2C_ELEMENTS}')
         return f'F52 E{req.element} P{req.parameter}'
@@ -79,7 +78,7 @@ class Encoder:
         """
         VALID_I2C_ELEMENTS = self.cmd_validation['valid_i2c_element']
 
-        if req.pin not in VALID_I2C_ELEMENTS:
+        if req.element not in VALID_I2C_ELEMENTS:
             raise EncodeError(f'element {req.element} is not a valid i2c element '
                               f'{VALID_I2C_ELEMENTS}')
         return f'F51 E{req.element} P{req.parameter} V{req.value}'
@@ -95,7 +94,7 @@ class Encoder:
                                        self.cmd_validation['valid_pins_bounds'][1]))
 
         if req.pin not in VALID_PINS:
-            raise EncodeError(f'pin {req.pin} is not a configurable pin {VALID_PINS}')
+            raise EncodeError(f'pin {req.pin} is not a configurable pin')
         return f'F43 P{req.pin} M{int(req.output)}'
 
     def encode_read_pin(self, req: ReadPin.Request) -> str:
@@ -108,8 +107,8 @@ class Encoder:
                                        self.cmd_validation['valid_pins_bounds'][1]))
 
         if req.pin not in VALID_PINS:
-            raise EncodeError(f'pin {req.pin} is not a readable pin {VALID_PINS}')
-        return f'F42 P{req.pin} M{int(req.output)}'
+            raise EncodeError(f'pin {req.pin} is not a readable pin')
+        return f'F42 P{req.pin} M{int(req.mode)}'
 
     def encode_write_pin(self, req: WritePin.Request) -> str:
         """
@@ -121,7 +120,7 @@ class Encoder:
                                        self.cmd_validation['valid_pins_bounds'][1]))
 
         if req.pin not in VALID_PINS:
-            raise EncodeError(f'pin {req.pin} is not a writable pin {VALID_PINS}')
+            raise EncodeError(f'pin {req.pin} is not a writable pin')
         if req.pulse:
             return f'F44 P{req.pin} V{req.value} W{req.value2} T{req.delay_ms} M{int(req.mode)}'
 
@@ -135,12 +134,9 @@ class Encoder:
         Note that homing and calibration must be done through the
         HomeAxes action
         """
-        # x_edge = self.active_map['map_reference']['x_len']
-        # y_edge = self.active_map['map_reference']['y_len']
-        # z_edge = self.active_map['map_reference']['z_len']
-        x_edge = 6
-        y_edge = 3
-        z_edge = 1
+        x_edge = self.active_map['map_reference']['x_len']
+        y_edge = self.active_map['map_reference']['y_len']
+        z_edge = self.active_map['map_reference']['z_len']
 
         if (req.target.x > x_edge or req.target.y > y_edge or req.target.z > z_edge
            or req.target.x < 0 or req.target.y < 0 or req.target.z < 0):
@@ -196,7 +192,7 @@ class Encoder:
 
         Used to read the parameters from the Farmduino.
         """
-        VALID_PARAMETERS = list(self.activeConfig.keys())           # TODO: Checks Parameters values
+        VALID_PARAMETERS = list(self.active_config.keys())          # TODO: Checks Parameters values
 
         if req.param not in VALID_PARAMETERS:
             raise EncodeError(f'parameter {req.param} is not a valid parameter')
@@ -208,7 +204,7 @@ class Encoder:
 
         Used to write to the parameters on the Farmduino.
         """
-        VALID_PARAMETERS = list(self.activeConfig.keys())
+        VALID_PARAMETERS = list(self.active_config.keys())
 
         if req.param not in VALID_PARAMETERS:
             raise EncodeError(f'parameter {req.param} is not a valid parameter')

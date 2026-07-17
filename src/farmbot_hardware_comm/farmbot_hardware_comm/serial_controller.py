@@ -27,7 +27,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
 from rclpy.task import Future
 
-# import serial
+import serial
 
 from std_msgs.msg import Bool, String
 
@@ -52,53 +52,52 @@ class SerialController(Node):
         """Node Constructor."""
         super().__init__('SerialController')
 
-        # # self.uart_cmd = String()
-        # # self.temp = String()
+        # self.uart_cmd = String()
+        # self.temp = String()
         self.goal_handle = None
 
-        # self.declare_parameter('serial_port', rclpy.Parameter.Type.STRING)
-        # self.declare_parameter('serial_speed', rclpy.Parameter.Type.INTEGER)
-        # self.declare_parameter('check_uart_freq', rclpy.Parameter.Type.INTEGER)
-        # self.declare_parameter('ws_path', rclpy.Parameter.Type.STRING)
-        # self.declare_parameter('folder_config_name', rclpy.Parameter.Type.STRING)
+        self.declare_parameter('serial_port', rclpy.Parameter.Type.STRING)
+        self.declare_parameter('serial_speed', rclpy.Parameter.Type.INTEGER)
+        self.declare_parameter('check_uart_freq', rclpy.Parameter.Type.INTEGER)
+        self.declare_parameter('ws_path', rclpy.Parameter.Type.STRING)
+        self.declare_parameter('folder_config_name', rclpy.Parameter.Type.STRING)
 
-        # serial_port = self.get_parameter('serial_port').get_parameter_value().string_value
-        # serial_speed = self.get_parameter('serial_speed').get_parameter_value().integer_value
-        # self.check_uart_freq = self.get_parameter(
-        #     'check_uart_freq').get_parameter_value().integer_value
-        # ws_path = self.get_parameter('ws_path').get_parameter_value().string_value
-        # folder_config_name = self.get_parameter(
-        #     'folder_config_name').get_parameter_value().string_value
+        serial_port = self.get_parameter('serial_port').get_parameter_value().string_value
+        serial_speed = self.get_parameter('serial_speed').get_parameter_value().integer_value
+        self.check_uart_freq = self.get_parameter(
+            'check_uart_freq').get_parameter_value().integer_value
+        ws_path = self.get_parameter('ws_path').get_parameter_value().string_value
+        folder_config_name = self.get_parameter(
+            'folder_config_name').get_parameter_value().string_value
 
-        # config_path = os.path.join(ws_path, folder_config_name)
+        config_path = os.path.join(ws_path, folder_config_name)
 
         # Initializing farmbot encoder module
-        # self.fcode_encoder = Encoder(config_path)
-        self.fcode_encoder = Encoder()
+        self.fcode_encoder = Encoder(config_path)
 
-        # # # UART receive publisher
-        # # self.fb_feedback_pub = self.create_publisher(String, 'farmbot_feedback', 10)
+        # # UART receive publisher
+        # self.fb_feedback_pub = self.create_publisher(String, 'farmbot_feedback', 10)
 
-        # # # Initialize the Action Server
-        # # self.farmbot_comm_server = ActionServer(
-        # #     self,
-        # #     FarmbotComms,
-        # #     'farmbot_communication',
-        # #     goal_callback=self.communication_goal_callback,
-        # #     execute_callback=self.execute_callback,
-        # #     cancel_callback=self.cancel_callback,
-        # #     handle_accepted_callback=self.handle_callback,
-        # # )
+        # # Initialize the Action Server
+        # self.farmbot_comm_server = ActionServer(
+        #     self,
+        #     FarmbotComms,
+        #     'farmbot_communication',
+        #     goal_callback=self.communication_goal_callback,
+        #     execute_callback=self.execute_callback,
+        #     cancel_callback=self.cancel_callback,
+        #     handle_accepted_callback=self.handle_callback,
+        # )
 
-        # # Initialize Serial Communication
-        # self.ser = serial.Serial(serial_port, serial_speed, timeout=1)
-        # self.ser.reset_input_buffer()
-        # # Create a timer to periodically check for incoming serial messages
-        #  self.rx_timer = self.create_timer(1.0 / self.check_uart_freq, self.uart_receive)
+        # Initialize Serial Communication
+        self.ser = serial.Serial(serial_port, serial_speed, timeout=1)
+        self.ser.reset_input_buffer()
+        # Create a timer to periodically check for incoming serial messages
+        self.rx_timer = self.create_timer(1.0 / self.check_uart_freq, self.uart_receive)
 
         # Used for setting the busy status on the ROS2 arch. while a command is running
         self.previous_cmd = ''
-        # # self.status = ''
+        # self.status = ''
         self.code_response: Future = None
 
         self.mission = {
@@ -184,15 +183,12 @@ class SerialController(Node):
         self.serial_feedback = String()
         self.serial_feedback_pub = self.create_publisher(String, 'serial_feedback', 10)
 
-        self.fake_serial_sub = self.create_subscription(String,
-                                                        'test', self.uart_receive, 10)
-
         # Log the initialization
         self.get_logger().info('Serial Controller Initialized..')
 
     async def _run_command(self, fcode: str):
         if self.code_response is not None and not self.code_response.done():
-            return False, 'busy', None
+            return False, 'busy', -1
 
         self.code_response = Future()
         self.farmbot_cmd_sender(fcode)
@@ -218,10 +214,10 @@ class SerialController(Node):
         response = ReadI2C.Response()
         try:
             fcode = self.fcode_encoder.encode_read_i2c(request)
-            self.farmbot_cmd_sender(fcode)
         except EncodeError as e:
             response.success = False
             response.message = str(e)
+            response.value = -1
             return response
 
         response.success, response.message, response.value = await self._run_command(fcode)
@@ -245,7 +241,6 @@ class SerialController(Node):
         response = ConfigurePin.Response()
         try:
             fcode = self.fcode_encoder.encode_configure_pin(request)
-            self.farmbot_cmd_sender(fcode)
         except EncodeError as e:
             response.success = False
             response.message = str(e)
@@ -259,10 +254,10 @@ class SerialController(Node):
         response = ReadPin.Response()
         try:
             fcode = self.fcode_encoder.encode_read_pin(request)
-            self.farmbot_cmd_sender(fcode)
         except EncodeError as e:
             response.success = False
             response.message = str(e)
+            response.value = -1
             return response
 
         response.success, response.message, response.value = await self._run_command(fcode)
@@ -273,7 +268,6 @@ class SerialController(Node):
         response = WritePin.Response()
         try:
             fcode = self.fcode_encoder.encode_write_pin(request)
-            self.farmbot_cmd_sender(fcode)
         except EncodeError as e:
             response.success = False
             response.message = str(e)
@@ -310,24 +304,25 @@ class SerialController(Node):
                                                + [goal_handle.request.target.y]
                                                + [goal_handle.request.target.z])
         except EncodeError as e:
-            result.code = MoveGantry.REJECTED
+            result.code = MoveGantry.Result.REJECTED
             result.message = str(e)
             return result
 
-        response = []
+        response = [0, 0]
         response[0], response[1], _ = await self._run_command(fcode)
 
         if response[0]:
-            result.code = MoveGantry.OK
+            result.code = MoveGantry.Result.OK
             result.message = response[1]
+            goal_handle.succeed()
         elif response[1] == 'firmware error':
-            result.code = MoveGantry.FIRMWARE_ERROR
+            result.code = MoveGantry.Result.FIRMWARE_ERROR
             result.message = response[1]
         elif response[1] == 'aborted':
-            result.code = MoveGantry.ABORTED
+            result.code = MoveGantry.Result.ABORTED
             result.message = response[1]
         elif response[1] == 'estopped':
-            result.code = MoveGantry.ESTOPPED
+            result.code = MoveGantry.Result.ESTOPPED
             result.message = response[1]
 
         return result
@@ -339,26 +334,26 @@ class SerialController(Node):
 
         try:
             fcode = self.fcode_encoder.encode_home_axes(goal_handle.request)
-            self.farmbot_cmd_sender(fcode)
         except EncodeError as e:
-            result.code = HomeAxes.REJECTED
+            result.code = HomeAxes.Result.REJECTED
             result.message = str(e)
             return result
 
-        response = []
+        response = [0, 0]
         response[0], response[1], _ = await self._run_command(fcode)
 
         if response[0]:
-            result.code = HomeAxes.OK
+            result.code = HomeAxes.Result.OK
             result.message = response[1]
+            goal_handle.succeed()
         elif response[1] == 'firmware error':
-            result.code = HomeAxes.FIRMWARE_ERROR
+            result.code = HomeAxes.Result.FIRMWARE_ERROR
             result.message = response[1]
         elif response[1] == 'aborted':
-            result.code = HomeAxes.ABORTED
+            result.code = HomeAxes.Result.ABORTED
             result.message = response[1]
         elif response[1] == 'estopped':
-            result.code = HomeAxes.ESTOPPED
+            result.code = HomeAxes.Result.ESTOPPED
             result.message = response[1]
 
         return result
@@ -367,7 +362,6 @@ class SerialController(Node):
         """Handle the move servo command service request."""
         try:
             fcode = self.fcode_encoder.encode_move_servo(request)
-            self.farmbot_cmd_sender(fcode)
         except EncodeError as e:
             response.success = False
             response.message = str(e)
@@ -381,10 +375,10 @@ class SerialController(Node):
         response = ReadParameter.Response()
         try:
             fcode = self.fcode_encoder.encode_read_parameter(request)
-            self.farmbot_cmd_sender(fcode)
         except EncodeError as e:
             response.success = False
             response.message = str(e)
+            response.value = -1
             return response
 
         response.success, response.message, response.value = await self._run_command(fcode)
@@ -395,7 +389,6 @@ class SerialController(Node):
         response = WriteParameter.Response()
         try:
             fcode = self.fcode_encoder.encode_write_parameter(request)
-            self.farmbot_cmd_sender(fcode)
         except EncodeError as e:
             response.success = False
             response.message = str(e)
@@ -415,37 +408,42 @@ class SerialController(Node):
         """Handle the estop command service request."""
         response = Trigger.Response()
 
+        self.farmbot_cmd_sender('E')
+
         self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_OFF'])
         self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_FLASHING'])
         self.estop_active.data = True
         self.estop_active_pub.publish(self.estop_active)
 
-        response.success, response.message, _ = await self._run_command('E')
+        response.success = True
         return response
 
     async def resume_command_server(self, request, response):
         """Handle the reset estop command service request."""
         response = Trigger.Response()
 
+        self.farmbot_cmd_sender('F09')
+
         self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_ON'])
         self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_ON'])
         self.estop_active.data = False
         self.estop_active_pub.publish(self.estop_active)
 
-        response.success, response.message, _ = await self._run_command('F09')
+        response.success = True
         return response
 
     async def abort_command_server(self, request, response):
         """Handle the abort command service request."""
         response = Trigger.Response()
 
+        self.farmbot_cmd_sender('@')
         if not self.abort_active.data:
             self.abort_active.data = True
         else:
             self.abort_active.data = False
         self.abort_active_pub.publish(self.abort_active)
 
-        response.success, response.message, _ = await self._run_command('F09')
+        response.success = True
         return response
 
     def farmbot_cmd_sender(self, cmd: str):
@@ -459,14 +457,13 @@ class SerialController(Node):
 
         self.get_logger().info(f'Sent message: {cmd}')
         #  Send through serial the command
-        # self.ser.write(cmd.encode('utf-8'))
+        self.ser.write(cmd.encode('utf-8'))
 
     # Receiving messages from Farmbot
-    async def uart_receive(self, cmd: String):
+    def uart_receive(self):
         """Timer callback that reads from UART and handles the response codes and commands."""
-        # # Read from serial
-        # line = self.ser.readline().decode('utf-8').rstrip()
-        line = cmd.data
+        # Read from serial
+        line = self.ser.readline().decode('utf-8').rstrip()
         # If a command is read, handle it
         if line:
             self.get_logger().info(f'Received message: {line}')
@@ -492,6 +489,7 @@ class SerialController(Node):
             self.fb_position.point.x = float(code_position[1][1:])
             self.fb_position.point.y = float(code_position[2][1:])
             self.fb_position.point.z = float(code_position[3][1:])
+            self.fb_position.header.stamp = self.get_clock().now().to_msg()
             self.fb_position_pub.publish(self.fb_position)
 
         # If a running command has finished OR the response for a request was retrieved
@@ -524,23 +522,23 @@ class SerialController(Node):
            and self.code_response and not self.code_response.done()):
             match rep_code:
                 case 'R03':
-                    result = [False, 'firmware error', None]
+                    result = [False, 'firmware error', -1]
                     self.code_response.set_result(result)
                 case 'R86':
-                    result = [False, 'aborted', None]
+                    result = [False, 'aborted', -1]
                     self.code_response.set_result(result)
                 case 'R02':
-                    result = [True, '', None]
+                    result = [True, '', -1]
                     self.code_response.set_result(result)
                 case 'R87':
-                    result = [False, 'estopped', None]
+                    result = [False, 'estopped', -1]
                     self.code_response.set_result(result)
                 case 'R08':
-                    result = [True, '', None]
+                    result = [True, '', -1]
                     self.code_response.set_result(result)
                 case 'R41' | 'R21':
                     code = (message).split(' ')
-                    value = code[2][1:]
+                    value = int(code[2][1:])
                     result = [True, '', value]
                     self.code_response.set_result(result)
 
