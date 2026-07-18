@@ -1,0 +1,8 @@
+# F01 or F02
+uint8 TIMED_DOSING=1
+uint8 PULSE_DOSING=2
+uint8 command            # valid: 1 = Time-based, 2 = Pulse-based
+float32 dose             # water flow time if 1, flow meter that measures pulses if 2
+---
+bool success
+string message

@@ -7,7 +7,12 @@ bool x
 bool y
 bool z
 ---
-uint8 code                        # same codes as MoveGantry
+uint8 OK=0
+uint8 FIRMWARE_ERROR=1            # firmware replied R03
+uint8 ESTOPPED=2                  # e-stop fired while moving
+uint8 ABORTED=3                   # '@' abort while moving
+uint8 REJECTED=4                  # goal were rejected
+uint8 code
 string message
 ---
 geometry_msgs/Point position

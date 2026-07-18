@@ -60,15 +60,16 @@ def generate_launch_description():
             name='controller',
             output='screen'
         ),
-        Node(
-            package='farmbot_controllers',
-            executable='farmbot_orchestrator',
-            name='farmbot_orchestrator',
-            output='screen',
-            parameters=[
-                {'tx_freq': 10},
-            ]
-        ),
+        # Orchestrator is deprecated
+        # Node(
+        #     package='farmbot_controllers',
+        #     executable='farmbot_orchestrator',
+        #     name='farmbot_orchestrator',
+        #     output='screen',
+        #     parameters=[
+        #         {'tx_freq': 10},
+        #     ]
+        # ),
         Node(
             package='map_handler',
             executable='map_controller',
@@ -153,6 +154,8 @@ def generate_launch_description():
                         {'serial_port': serial_port},
                         {'serial_speed': 115200},
                         {'check_uart_freq': 100},
+                        {'ws_path': ws_path},
+                        {'folder_config_name': 'local_config'},
                     ]
                 )
             ]

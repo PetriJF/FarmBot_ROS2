@@ -1,43 +1,83 @@
 # Contains all commands and their possible end responses
 
-long_term:
-  G00: 
-    responses: ['R02', 'R03']
-  G01: 
-    responses: ['R02', 'R03']
-  G28: 
-    responses: ['R02', 'R03']
-  F11:
-    responses: ['R02', 'R03']
-  F12: 
-    responses: ['R02', 'R03']
-  F13: 
-    responses: ['R02', 'R03']
+watering:
+  F01:
+    responses: ['R08']
+  F02:
+    responses: ['R08']
 
-calibration:
-  F14: 
-    responses: ['R02', 'R03']
-  F15: 
-    responses: ['R02', 'R03']
-  F16: 
-    responses: ['R02', 'R03']
+read_i2c:
+  F52:
+    responses: ['']                     # Not implemented
 
-blocking:
-  F20: 
-    responses: ['R02', 'R03']
+set_i2c:
+  F51:
+    responses: ['']
+
+configure_pin:
+  F43:
+    responses: ['R08']
+
+read_pin:
+  F42:
+    responses: ['R41','R03''R86','R87']
+
+write_pin:
   F44: 
-    responses: ['R02', 'R03']
+    responses: ['R02','R03','R86','R87']
+  F41:
+    responses: ['R08']
+
+move_gantry:
+  G00: 
+    responses: ['R02','R03','R86','R87']
+  G01: 
+    responses: ['R02','R03','R86','R87']
+
+home_axes:
+  G28: 
+    responses: ['R02','R03','R86','R87']
+  F11:
+    responses: ['R02','R03','R86','R87']
+  F12: 
+    responses: ['R02','R03','R86','R87']
+  F13: 
+    responses: ['R02','R03','R86','R87']
+  F14: 
+    responses: ['R02','R03','R86','R87']
+  F15: 
+    responses: ['R02','R03','R86','R87']
+  F16: 
+    responses: ['R02','R03','R86','R87']
+
+move_servo:
+  F61: 
+    responses: ['R08']
+
+read_parameter:
   F21: 
-    responses: ['R21']
-  F42: 
-    responses: ['R41']
+    responses: ['R21','R03','R86','R87']
+
+write_parameter:
+  F23: 
+    responses: ['R08']
+  F22: 
+    responses: ['R08']
+
+list_all_parameter:
+  F20: 
+    responses: ['R20','R03','R86','R87']
 
 # Priority commands
-priority:
+resume:
   F09: 
-    responses: ['R02', 'R03']
+    responses: ['R02','R03']
+
+estop:
   E: 
     responses: ['R87']
+
+abort:
   '@':
-    responses: ['R86']
+    responses: ['R86', 'R02']
 
