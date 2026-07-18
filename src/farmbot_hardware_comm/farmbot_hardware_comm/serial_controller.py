@@ -25,6 +25,7 @@ from rclpy.action import ActionServer, GoalResponse
 from rclpy.action.server import ServerGoalHandle
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile
 from rclpy.task import Future
 
 import serial
@@ -113,6 +114,7 @@ class SerialController(Node):
                                                                    'CommandsResponses.yaml'), 'r'))
 
         self.fb_panel = yaml.safe_load(open(os.path.join(self.directory, 'FarmbotPanel.yaml'), 'r'))
+        self.led_client = self.create_client(LedPanelHandler, 'set_led')
         # Initialize the LED states
         self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_ON'])
         self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_ON'])
@@ -176,10 +178,14 @@ class SerialController(Node):
         self.fb_position = PointStamped()
         self.fb_position.header.stamp = self.get_clock().now().to_msg()
         self.fb_position_pub = self.create_publisher(PointStamped, 'farmbot_position', 10)
+        # Latched for late subscriptions of estop/abort state
+        latched_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.estop_active = Bool()
-        self.estop_active_pub = self.create_publisher(Bool, 'estop_active', 10)
+        self.estop_active_pub = self.create_publisher(Bool, 'estop_active', latched_qos)
+        self.estop_active_pub.publish(self.estop_active)
         self.abort_active = Bool()
-        self.abort_active_pub = self.create_publisher(Bool, 'abort_active', 10)
+        self.abort_active_pub = self.create_publisher(Bool, 'abort_active', latched_qos)
+        self.abort_active_pub.publish(self.abort_active)
         self.serial_feedback = String()
         self.serial_feedback_pub = self.create_publisher(String, 'serial_feedback', 10)
 
@@ -194,6 +200,7 @@ class SerialController(Node):
         self.farmbot_cmd_sender(fcode)
         result = await self.code_response
         self.code_response = None
+        self.previous_cmd = ''
         return result[0], result[1], result[2]
 
     # Callbacks
@@ -288,6 +295,10 @@ class SerialController(Node):
             self.get_logger().info('Goal rejected because an estop or abort command is running')
             return GoalResponse.REJECT
 
+        if self.code_response is not None and not self.code_response.done():
+            self.get_logger().info('Goal rejected: another command is already in flight')
+            return GoalResponse.REJECT
+
         return GoalResponse.ACCEPT
 
     async def gantry_execute_callback(self, goal_handle: ServerGoalHandle):
@@ -297,15 +308,16 @@ class SerialController(Node):
 
         try:
             fcode = self.fcode_encoder.encode_move_gantry(goal_handle.request)
-            self.mission['starting_position'] += ([self.fb_position.point.x]
-                                                  + [self.fb_position.point.y]
-                                                  + [self.fb_position.point.z])
-            self.mission['final_position'] += ([goal_handle.request.target.x]
-                                               + [goal_handle.request.target.y]
-                                               + [goal_handle.request.target.z])
+            self.mission['starting_position'] = [self.fb_position.point.x,
+                                                 self.fb_position.point.y,
+                                                 self.fb_position.point.z]
+            self.mission['final_position'] = [goal_handle.request.target.x,
+                                              goal_handle.request.target.y,
+                                              goal_handle.request.target.z]
         except EncodeError as e:
             result.code = MoveGantry.Result.REJECTED
             result.message = str(e)
+            goal_handle.abort()
             return result
 
         response = [0, 0]
@@ -324,6 +336,12 @@ class SerialController(Node):
         elif response[1] == 'estopped':
             result.code = MoveGantry.Result.ESTOPPED
             result.message = response[1]
+        else:
+            result.code = MoveGantry.Result.REJECTED
+            result.message = response[1]
+
+        if not response[0]:
+            goal_handle.abort()
 
         return result
 
@@ -337,6 +355,7 @@ class SerialController(Node):
         except EncodeError as e:
             result.code = HomeAxes.Result.REJECTED
             result.message = str(e)
+            goal_handle.abort()
             return result
 
         response = [0, 0]
@@ -355,6 +374,12 @@ class SerialController(Node):
         elif response[1] == 'estopped':
             result.code = HomeAxes.Result.ESTOPPED
             result.message = response[1]
+        else:
+            result.code = HomeAxes.Result.REJECTED
+            result.message = response[1]
+
+        if not response[0]:
+            goal_handle.abort()
 
         return result
 
@@ -422,14 +447,14 @@ class SerialController(Node):
         """Handle the reset estop command service request."""
         response = Trigger.Response()
 
-        self.farmbot_cmd_sender('F09')
+        response.success, response.message, _ = await self._run_command('F09')
 
-        self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_ON'])
-        self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_ON'])
-        self.estop_active.data = False
-        self.estop_active_pub.publish(self.estop_active)
+        if response.success:
+            self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_ON'])
+            self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_ON'])
+            self.estop_active.data = False
+            self.estop_active_pub.publish(self.estop_active)
 
-        response.success = True
         return response
 
     async def abort_command_server(self, request, response):
@@ -437,11 +462,11 @@ class SerialController(Node):
         response = Trigger.Response()
 
         self.farmbot_cmd_sender('@')
-        if not self.abort_active.data:
-            self.abort_active.data = True
-        else:
-            self.abort_active.data = False
-        self.abort_active_pub.publish(self.abort_active)
+        # Only latch when a command was actually interrupted (or unlatch a prior abort)
+        if ((self.code_response is not None and not self.code_response.done())
+                or self.abort_active.data):
+            self.abort_active.data = not self.abort_active.data
+            self.abort_active_pub.publish(self.abort_active)
 
         response.success = True
         return response
@@ -492,6 +517,11 @@ class SerialController(Node):
             self.fb_position.header.stamp = self.get_clock().now().to_msg()
             self.fb_position_pub.publish(self.fb_position)
 
+        # E-Stop pressed on the robot
+        if rep_code == 'R87' and not self.estop_active.data:
+            self.estop_active.data = True
+            self.estop_active_pub.publish(self.estop_active)
+
         # If a running command has finished OR the response for a request was retrieved
         # OR the sent command was acknowledged by the farmbot
         command_type = ''
@@ -500,7 +530,9 @@ class SerialController(Node):
                 command_type = cmd_type
                 break
 
-        if command_type == 'home_axes':
+        if self.goal_handle is None or not self.goal_handle.is_active:
+            pass
+        elif command_type == 'home_axes':
             feedback = HomeAxes.Feedback()
             feedback.position.x = self.fb_position.point.x
             feedback.position.y = self.fb_position.point.y
@@ -518,7 +550,7 @@ class SerialController(Node):
             self.goal_handle.publish_feedback(feedback)
 
         if (command_type
-           and rep_code in self.non_immediate_cmds[cmd_type][self.previous_cmd]['responses']
+           and rep_code in self.non_immediate_cmds[command_type][self.previous_cmd]['responses']
            and self.code_response and not self.code_response.done()):
             match rep_code:
                 case 'R03':
@@ -787,21 +819,16 @@ class SerialController(Node):
 
     def LED_client(self, led_pin, state):
         """Service client for switching an LED on or off."""
-        client = self.create_client(LedPanelHandler, 'set_led')
-        delay = 0
-
-        while not client.wait_for_service(1.0):
-            delay += 1
-            self.get_logger().warn('Waiting for LED Handling Server...')
-            if delay >= 5:
-                self.get_logger().error('LED Handling Server not available!')
-                return
+        # Never block the executor waiting for the LED server (estop path!)
+        if not self.led_client.service_is_ready():
+            self.get_logger().warn('LED Handling Server not available!')
+            return
 
         request = LedPanelHandler.Request()
         request.led_pin = led_pin
         request.state = state
 
-        future = client.call_async(request=request)
+        future = self.led_client.call_async(request=request)
         future.add_done_callback(self.LED_panel_callback)
 
     def LED_panel_callback(self, future):
