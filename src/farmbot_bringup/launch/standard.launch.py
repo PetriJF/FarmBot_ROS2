@@ -88,7 +88,14 @@ def generate_launch_description():
             name='standard_camera',
             output='screen',
             parameters=[
-                {'capture_freq': 1.0 / 30.0},  # 30 frames a second
+                {'camera_index': 0},
+                {'image_width': 640},
+                {'image_height': 480},
+                {'frame_rate': 30.0},
+                {'pixel_format': 'MJPG'},  # MJPG avoids USB-bandwidth fps throttling
+                {'frame_id': 'camera'},
+                {'auto_exposure': False},  # manual exposure needed for full 30 fps
+                {'exposure': 156.0},       # tune for scene brightness (higher = brighter/darker)
             ],
             condition=IfCondition(
                 PythonExpression([
