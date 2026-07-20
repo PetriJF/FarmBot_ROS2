@@ -54,7 +54,7 @@ class Movement:
         """
         self.send_home_goal(op=HomeAxes.Goal.FIND_HOME, x_axis=x, y_axis=y, z_axis=z)
 
-    def calibrate_axis(self, x: bool, y: bool, z: bool):
+    def calibrate_axis(self, x: bool, y: bool, z: bool, on_done=None):
         """
         Call the FarmBot HomeAxes action to calibrate a specific axis.
 
@@ -65,8 +65,10 @@ class Movement:
             x {Bool}: True if the X-Axis is to be calibrated. Defaults to False
             y {Bool}: True if the Y-Axis is to be calibrated. Defaults to False
             z {Bool}: True if the Z-Axis is to be calibrated. Defaults to False
+            on_done {callable}: Optional completion callback.
         """
-        self.send_home_goal(op=HomeAxes.Goal.CALIBRATE, x_axis=x, y_axis=y, z_axis=z)
+        self.send_home_goal(op=HomeAxes.Goal.CALIBRATE, x_axis=x, y_axis=y, z_axis=z,
+                            on_done=on_done)
 
     def set_curr_to_home(self, x: bool, y: bool, z: bool):
         """
@@ -77,7 +79,7 @@ class Movement:
         """
         self.send_home_goal(op=HomeAxes.Goal.SET_HOME, x_axis=x, y_axis=y, z_axis=z)
 
-    def send_home_goal(self, op: int, x_axis=False, y_axis=False, z_axis=False):
+    def send_home_goal(self, op: int, x_axis=False, y_axis=False, z_axis=False, on_done=None):
         """
         Send a HomeAxes goal to the FarmBot action server.
 
@@ -89,6 +91,7 @@ class Movement:
             x_axis {bool}: Whether the X axis is selected.
             y_axis {bool}: Whether the Y axis is selected.
             z_axis {bool}: Whether the Z axis is selected.
+            on_done {callable}: Optional completion callback.
         """
         self._server_availability('HomeAxes', self.home_axes_client)
 
@@ -101,7 +104,7 @@ class Movement:
         self.home_axes_client.send_goal_async(
             goal,
             feedback_callback=self.home_goal_feedback_callback
-            ).add_done_callback(self.goal_response_callback)
+        ).add_done_callback(lambda future: self.goal_response_callback(future, on_done))
 
     def home_goal_feedback_callback(self, feedback_msg: HomeAxes.Feedback):
         """
@@ -141,7 +144,8 @@ class Movement:
                                    x_speed=speed, y_speed=speed, z_speed=speed, interpolated=False)
 
     def send_move_gantry_goal(self, x_coord: float, y_coord: float, z_coord: float,
-                              interpolated=True, x_speed=100.0, y_speed=100.0, z_speed=100.0):
+                              interpolated=True, x_speed=100.0, y_speed=100.0, z_speed=100.0,
+                              on_done=None):
         """
         Send a MoveGantry goal to the FarmBot action server.
 
@@ -154,8 +158,9 @@ class Movement:
             z_coord {float}: Target Z coordinate.
             interpolated {bool}: Whether the movement should be interpolated.
             x_speed {float}: X axis speed percentage.
-           y_speed {float}: Y axis speed percentage.
+            y_speed {float}: Y axis speed percentage.
             z_speed {float}: Z axis speed percentage.
+            on_done {callable}: Optional completion callback
         """
         self._server_availability('MoveGantry', self.move_gantry_client)
 
@@ -171,7 +176,7 @@ class Movement:
         self.move_gantry_client.send_goal_async(
             goal,
             feedback_callback=self.move_gantry_goal_feedback_callback
-            ).add_done_callback(self.goal_response_callback)
+        ).add_done_callback(lambda future: self.goal_response_callback(future, on_done))
 
     def move_gantry_goal_feedback_callback(self, feedback_msg: MoveGantry.Feedback):
         """
@@ -186,7 +191,7 @@ class Movement:
                                     f'Y{curr_position.y} Z{curr_position.z} \n'
                                     f'Goal completion: {percentage*100:.2f} %')
 
-    def goal_response_callback(self, future):
+    def goal_response_callback(self, future, on_done=None):
         """
         Handle the action server goal response.
 
@@ -199,14 +204,17 @@ class Movement:
             self.node.get_logger().info('Goal accepted')
 
             self.goal_handle.get_result_async().add_done_callback(
-                self.goal_result_callback
+                lambda result_future: self.goal_result_callback(result_future, on_done)
             )
 
         else:
             self.busy_state = False
             self.node.get_logger().warn('Goal rejected')
+            # A rejected goal never produces a result so break the sequence caller
+            if on_done is not None:
+                on_done(None)
 
-    def goal_result_callback(self, future):
+    def goal_result_callback(self, future, on_done=None):
         """
         Handle the final result from the action server.
 
@@ -230,3 +238,6 @@ class Movement:
 
         elif cmd_status == result.OK:
             self.node.get_logger().info('The command was successful and has been completed')
+
+        if on_done is not None:
+            on_done(result)

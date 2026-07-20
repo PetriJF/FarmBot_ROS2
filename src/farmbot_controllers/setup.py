@@ -30,6 +30,7 @@ setup(
     entry_points={
         'console_scripts': [
             'farmbot_controller = farmbot_controllers.farmbot_controller:main',
+            'task_sequencer = farmbot_controllers.task_sequencer:main'
         ],
     },
 )
