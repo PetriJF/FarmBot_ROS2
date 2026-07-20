@@ -21,6 +21,12 @@ from rclpy.node import Node
 from std_msgs.msg import String
 
 
+class ServerError(Exception):
+    """Raised when a server is not available."""
+
+    pass
+
+
 class FarmbotControl(Node):
     """ROS2 node for FarmBot control, coordinating movement, devices, and tools."""
 
@@ -338,7 +344,7 @@ def main(args=None):
 
     try:
         rclpy.spin(main_ctrl_node)
-    except KeyboardInterrupt:
+    except KeyboardInterrupt | ServerError:
         main_ctrl_node.destroy_node()
 
     main_ctrl_node.destroy_node()

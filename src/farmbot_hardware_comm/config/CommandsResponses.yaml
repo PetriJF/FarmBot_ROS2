@@ -68,6 +68,18 @@ list_all_parameter:
   F20: 
     responses: ['R20','R03','R86','R87']
 
+report_end_stops:
+  F81:
+    responses: [R81]
+
+report_current_position:
+  F82:
+    responses: [R82]
+
+report_software_version:
+  F83:
+    responses: [R83]
+
 # Priority commands
 resume:
   F09: 
