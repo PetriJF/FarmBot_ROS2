@@ -8,6 +8,14 @@ from rclpy.node import Node
 
 from std_msgs.msg import String
 
+from std_srvs.srv import Trigger
+
+
+class ServerError(Exception):
+    """Raised when a server is not available."""
+
+    pass
+
 
 class State:
     """
@@ -30,19 +38,67 @@ class State:
         # The publisher for the state commands
         self.state_pub = self.node.create_publisher(String, 'farmbot_command', 10)
 
-    # State handling functions
+    def _waiting_server(self, cmd_name: str, client):
+        delay = 0
+        while not client.wait_for_service(1.0):
+            delay += 1
+            self.get_logger().warn(f'Waiting for {cmd_name} Server...')
+            if delay >= 5:
+                raise ServerError(f'{cmd_name} Server not available!')
 
+        request = Trigger.Request()
+        future = client.call_async(request=request)
+        future.add_done_callback(self.client_callback)
+
+    # Service Client
     def estop(self):
-        """Impose the electronic stop, turning off all the motors."""
-        self.define_state(estop=True)
+        """Service client for estop."""
+        client = self.create_client(Trigger, 'estop')
+        try:
+            self._waiting_server('Estop', client)
+        except ServerError as e:
+            self.get_logger().error(e)
+            return
 
     def abort_movement(self):
-        """Abort the current movement command."""
-        self.define_state(abort_movement=True)
+        """Service client for abort."""
+        client = self.create_client(Trigger, 'abort')
+        try:
+            self._waiting_server('Abort', client)
+        except ServerError as e:
+            self.get_logger().error(e)
+            return
 
     def reset_estop(self):
-        """Reset the electronic stop."""
-        self.define_state(reset_estop=True)
+        """Service client for abort."""
+        client = self.create_client(Trigger, 'resume')
+        try:
+            self._waiting_server('Reset estop', client)
+        except ServerError as e:
+            self.get_logger().error(e)
+            return
+
+    def client_callback(self, future):
+        """Service client callback once the request is send."""
+        try:
+            response = future.result()
+            if not response:
+                self.get_logger().warn('Command Failure!')
+        except Exception as e:
+            self.get_logger().error('Service call failed %r' % (e, ))
+
+    # # State handling functions
+    # def estop(self):
+    #     """Impose the electronic stop, turning off all the motors."""
+    #     self.define_state(estop=True)
+
+    # def abort_movement(self):
+    #     """Abort the current movement command."""
+    #     self.define_state(abort_movement=True)
+
+    # def reset_estop(self):
+    #     """Reset the electronic stop."""
+    #     self.define_state(reset_estop=True)
 
     def request_end_stop(self):
         """Request the end stops."""
