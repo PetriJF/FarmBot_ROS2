@@ -4,13 +4,17 @@ ROS2 Farmbot state module.
 Provides state command helpers for emergency stop, abort, reset, and other
 command-handler interactions via the farmbot_command publisher.
 """
-from farmbot_controller import ServerError
-
 from rclpy.node import Node
 
 # from std_msgs.msg import String
 
 from std_srvs.srv import Trigger
+
+
+class ServerError(Exception):
+    """Raised when a server is not available."""
+
+    pass
 
 
 class State:
@@ -54,48 +58,42 @@ class State:
         """Service client for estop."""
         try:
             self._server_availability('Estop', self.estop_client)
-        except ServerError as e:
-            self.node.get_logger().fatal(e)
+        except ServerError:
             raise
 
     def abort_movement(self):
         """Service client for abort."""
         try:
             self._server_availability('Abort', self.abort_client)
-        except ServerError as e:
-            self.node.get_logger().fatal(e)
+        except ServerError:
             raise
 
     def reset_estop(self):
         """Service client for abort."""
         try:
             self._server_availability('Reset estop', self.resume_client)
-        except ServerError as e:
-            self.node.get_logger().fatal(e)
+        except ServerError:
             raise
 
     def request_end_stop(self):
         """Service client to request the end stops."""
         try:
             self._server_availability('End stop request', self.end_stop_client)
-        except ServerError as e:
-            self.node.get_logger().fatal(e)
+        except ServerError:
             raise
 
     def request_sw_version(self):
         """Service client to request the software version."""
         try:
             self._server_availability('Software version request', self.sw_version_client)
-        except ServerError as e:
-            self.node.get_logger().fatal(e)
+        except ServerError:
             raise
 
     def request_curr_pos(self):
         """Service client to request the current position."""
         try:
             self._server_availability('Current position request', self.curr_position_client)
-        except ServerError as e:
-            self.node.get_logger().fatal(e)
+        except ServerError:
             raise
 
     def client_callback(self, future):
@@ -108,8 +106,11 @@ class State:
             elif not response.success:
                 self.node.get_logger().warn(f'Command {response.message}!')
 
-            else:
+            elif response.message:
                 self.node.get_logger().info(response.message)
+
+            else:
+                self.node.get_logger().info('Command succesful')
 
         except Exception as e:
             self.node.get_logger().error('Service call failed %r' % (e, ))

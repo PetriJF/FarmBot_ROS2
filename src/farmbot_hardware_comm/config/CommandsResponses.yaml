@@ -49,6 +49,8 @@ home_axes:
     responses: ['R02','R03','R86','R87']
   F16: 
     responses: ['R02','R03','R86','R87']
+  F84: 
+    responses: ['R08']
 
 move_servo:
   F61: 
@@ -66,7 +68,7 @@ write_parameter:
 
 list_all_parameter:
   F20: 
-    responses: ['R20','R03','R86','R87']
+    responses: ['R02','R03','R86','R87']
 
 report_end_stops:
   F81:

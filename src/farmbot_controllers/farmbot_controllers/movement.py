@@ -3,8 +3,6 @@ Movement module for the FarmBot controller node.
 
 Provides gantry motion, calibration, and homing command helpers.
 """
-from farmbot_controller import ServerError
-
 from farmbot_interfaces.action import HomeAxes, MoveGantry
 
 from rclpy.action import ActionClient
@@ -12,6 +10,12 @@ from rclpy.action.client import ClientGoalHandle
 from rclpy.node import Node
 
 # from std_msgs.msg import String
+
+
+class ServerError(Exception):
+    """Raised when a server is not available."""
+
+    pass
 
 
 class Movement:
@@ -30,8 +34,8 @@ class Movement:
         self.Y_MAX_SPEED = 400.0
         self.Z_MAX_SPEED = 400.0
 
-        self.move_gantry_client = ActionClient(self, MoveGantry, 'move_gantry')
-        self.home_axes_client = ActionClient(self, HomeAxes, 'send_home_goal')
+        self.move_gantry_client = ActionClient(self.node, MoveGantry, 'move_gantry')
+        self.home_axes_client = ActionClient(self.node, HomeAxes, 'home_axes')
 
         # self.gantry_config = String()    # Used for gantry configuration (homing, calibration)
         # self.move_gantry_cmd = String()  # Used for moving the gantry along the 3 axis
@@ -39,7 +43,7 @@ class Movement:
         # self.movement_pub = self.node.create_publisher(String, 'farmbot_command', 10)
 
     def _server_availability(self, cmd_name: str, client):
-        if not client.wait_for_service(1.0):
+        if not client.wait_for_server(1.0):
             raise ServerError(f'{cmd_name} Server not available!')
 
     # Calibration and Homing Functions
@@ -47,13 +51,7 @@ class Movement:
         """Go to the home position on each axis."""
         self.send_home_goal(op=HomeAxes.Goal.GO_HOME)
 
-    def find_all_homes(self):
-        """Find the home for all the axis on the farmbot."""
-        self.send_home_goal(op=HomeAxes.Goal.FIND_HOME, x_axis=True)
-        self.send_home_goal(op=HomeAxes.Goal.FIND_HOME, y_axis=True)
-        self.send_home_goal(op=HomeAxes.Goal.FIND_HOME, z_axis=True)
-
-    def find_axis_home(self, x=False, y=False, z=False):
+    def find_axis_home(self, x: bool, y: bool, z: bool):
         """
         Home the selected axis on the farmbot.
 
@@ -66,13 +64,7 @@ class Movement:
         """
         self.send_home_goal(op=HomeAxes.Goal.FIND_HOME, x_axis=x, y_axis=y, z_axis=z)
 
-    def calibrate_all_axis(self):
-        """Calibrate the lengths for all the axis on the farmbot."""
-        self.send_home_goal(op=HomeAxes.Goal.CALIBRATE, x_axis=True)
-        self.send_home_goal(op=HomeAxes.Goal.CALIBRATE, y_axis=True)
-        self.send_home_goal(op=HomeAxes.Goal.CALIBRATE, z_axis=True)
-
-    def calibrate_axis(self, x=False, y=False, z=False):
+    def calibrate_axis(self, x: bool, y: bool, z: bool):
         """
         Calibrate the selected axis on the farmbot.
 
@@ -93,8 +85,7 @@ class Movement:
         """Send the home axes goal its action server."""
         try:
             self._server_availability('HomeAxes', self.home_axes_client)
-        except ServerError as e:
-            self.node.get_logger().fatal(e)
+        except ServerError:
             raise
 
         goal = HomeAxes.Goal()
@@ -146,8 +137,7 @@ class Movement:
         """Send the move gantry goal its action server."""
         try:
             self._server_availability('MoveGantry', self.move_gantry_client)
-        except ServerError as e:
-            self.node.get_logger().fatal(e)
+        except ServerError:
             raise
 
         goal = MoveGantry.Goal()
@@ -177,7 +167,7 @@ class Movement:
         self.goal_handle: ClientGoalHandle = future.result()
 
         if self.goal_handle.accepted:
-            self.get_logger().info('Goal accepted')
+            self.node.get_logger().info('Goal accepted')
 
             self.goal_handle.get_result_async().add_done_callback(
                 self.goal_result_callback
@@ -185,7 +175,7 @@ class Movement:
 
         else:
             self.busy_state = False
-            self.get_logger().warn('Goal rejected')
+            self.node.get_logger().warn('Goal rejected')
 
     def goal_result_callback(self, future):
         """Handle the final result from the action server."""
@@ -193,19 +183,19 @@ class Movement:
         cmd_status = result.code
 
         if cmd_status == result.ESTOPPED:
-            self.get_logger().info('The current command has been stopped by a estop request')
+            self.node.get_logger().info('The current command has been stopped by a estop request')
 
         elif cmd_status == result.ABORTED:
-            self.get_logger().info('The Farmbot has been paused.')
+            self.node.get_logger().info('The Farmbot has been paused.')
 
         elif cmd_status == result.FIRMWARE_ERROR:
-            self.get_logger().info('The command has finished with due to a firmware error.')
+            self.node.get_logger().info('The command has finished with due to a firmware error.')
 
         elif cmd_status == result.REJECTED:
-            self.get_logger().info(f'The command has been rejected. {result.message}')
+            self.node.get_logger().info(f'The command has been rejected. {result.message}')
 
         elif cmd_status == result.OK:
-            self.get_logger().info('The command was successful and has been completed')
+            self.node.get_logger().info('The command was successful and has been completed')
 
     # def go_home(self):
     #     """Go to the home position on each axis."""

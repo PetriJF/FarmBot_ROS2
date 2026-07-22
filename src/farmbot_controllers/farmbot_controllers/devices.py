@@ -5,14 +5,18 @@ Device control utilities for ROS2 Farmbot.
 ROS2 Python Module that enables the control of the different devices
 that are connected to the Farmbot
 """
-from farmbot_controller import ServerError
-
 from farmbot_interfaces.srv import (ConfigurePin, MoveServo, ReadI2C, ReadPin,
                                     SetI2C, Watering, WritePin)
 
 from rclpy.node import Node
 
 # from std_msgs.msg import String
+
+
+class ServerError(Exception):
+    """Raised when a server is not available."""
+
+    pass
 
 
 class DeviceControl:
@@ -48,8 +52,7 @@ class DeviceControl:
         """Service client to read from an I2C device."""
         try:
             self._server_availability('ReadI2C', self.read_i2c_client)
-        except ServerError as e:
-            self.node.get_logger().fatal(e)
+        except ServerError:
             raise
 
         request = ReadI2C.Request()
@@ -63,8 +66,7 @@ class DeviceControl:
         """Service client to set a value to an I2C device."""
         try:
             self._server_availability('SetI2C', self.set_i2c_client)
-        except ServerError as e:
-            self.node.get_logger().fatal(e)
+        except ServerError:
             raise
 
         request = SetI2C.Request()
@@ -78,7 +80,7 @@ class DeviceControl:
     # Water Control Handlers
     # NOTE: The documentation mentions that the commands are not implemented. Need to investigate
 
-    def water_command(self, mode: bool, unit: int):
+    def water_command(self, mode: bool, unit: float):
         """
         Service client to set up the water control commands.
 
@@ -94,15 +96,14 @@ class DeviceControl:
         """
         try:
             self._server_availability('Watering', self.watering_client)
-        except ServerError as e:
-            self.node.get_logger().fatal(e)
+        except ServerError:
             raise
 
         request = Watering.Request()
         if mode:
-            request.command = Watering.Request.PULSE_DOSING
+            request.command = request.PULSE_DOSING
         else:
-            request.command = Watering.Request.TIMED_DOSING
+            request.command = request.TIMED_DOSING
 
         request.dose = unit
 
@@ -111,7 +112,7 @@ class DeviceControl:
 
     # Pin Control Handlers
     def set_pin_value(self, pin: int, value: int, pin_mode: bool,
-                      pulse=False, value2=0, delay_ms=0):
+                      pulse: bool, value2=0, delay_ms=0):
         """
         Service client to set a farmduino pin to a selected value and pin_mode.
 
@@ -122,8 +123,7 @@ class DeviceControl:
         """
         try:
             self._server_availability('WritePin', self.write_pin_client)
-        except ServerError as e:
-            self.node.get_logger().fatal(e)
+        except ServerError:
             raise
 
         request = WritePin.Request()
@@ -140,23 +140,6 @@ class DeviceControl:
         future = self.write_pin_client.call_async(request=request)
         future.add_done_callback(self.client_callback)
 
-    def set_pin_value_2(self, pin: int, value1: int, delay: int, value2: int, pin_mode: bool):
-        """
-        Set a farmduino pin to a selected value and pin_mode with a delay.
-
-        Setting value1 to pin and waiting for delay milliseconds. After the delay,
-        value2 is set. Both sets are done in the selected pin_mode (0 for digital
-        and 1 for analog)
-
-        Args:
-            pin {int}: The pin the value is set on
-            value1 {int}: First value to set
-            delay {int}: delay between the 2 values in milliseconds
-            value2 {int}: Second value to set
-            pin_mode {bool}: 0 for digital, 1 for analog
-        """
-        self.set_pin_value(pin, value1, pin_mode, pulse=True, value2=value2, delay_ms=delay)
-
     def read_pin(self, pin: int, pin_mode: bool):
         """
         Service client to read the value from the selected pin in the parsed pin_mode.
@@ -167,8 +150,7 @@ class DeviceControl:
         """
         try:
             self._server_availability('ReadPin', self.read_pin_client)
-        except ServerError as e:
-            self.node.get_logger().fatal(e)
+        except ServerError:
             raise
 
         request = ReadPin.Request()
@@ -180,7 +162,26 @@ class DeviceControl:
         request.pin = pin
 
         future = self.read_pin_client.call_async(request=request)
-        future.add_done_callback(self.client_callback)
+        future.add_done_callback(self.read_client_callback)
+
+    def read_client_callback(self, future):
+        """Service client callback once the request is send."""
+        try:
+            response = future.result()
+            if not response:
+                self.node.get_logger().warn('Command Failure!')
+
+            elif not response.success:
+                self.node.get_logger().warn(f'Command {response.message}!')
+
+            elif response.value != -1:
+                self.node.get_logger().info(f'The value of the pin is {response.value}')
+
+            else:
+                self.node.get_logger().info('Command succesful')
+
+        except Exception as e:
+            self.node.get_logger().error('Service call failed %r' % (e, ))
 
     def set_pin_io(self, pin: int, io_mode: bool):
         """
@@ -192,8 +193,7 @@ class DeviceControl:
         """
         try:
             self._server_availability('ConfigurePin', self.configure_pin_client)
-        except ServerError as e:
-            self.node.get_logger().fatal(e)
+        except ServerError:
             raise
 
         request = ConfigurePin.Request()
@@ -207,8 +207,7 @@ class DeviceControl:
         """Create the move servo command."""
         try:
             self._server_availability('MoveServo', self.move_servo_client)
-        except ServerError as e:
-            self.node.get_logger().fatal(e)
+        except ServerError:
             raise
 
         request = MoveServo.Request()
@@ -228,11 +227,8 @@ class DeviceControl:
             elif not response.success:
                 self.node.get_logger().warn(f'Command {response.message}!')
 
-            elif response.value != -1:
-                self.node.get_logger().info(f'The value of the parameter is {response.value}')
-
             else:
-                self.node.get_logger().info('The command was completed successfully ')
+                self.node.get_logger().info('Command succesful')
 
         except Exception as e:
             self.node.get_logger().error('Service call failed %r' % (e, ))

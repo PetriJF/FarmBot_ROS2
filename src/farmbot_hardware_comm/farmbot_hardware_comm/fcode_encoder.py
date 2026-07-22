@@ -198,7 +198,7 @@ class Encoder:
 
         Used to read the parameters from the Farmduino.
         """
-        VALID_PARAMETERS = list(self.active_config.keys())          # TODO: Checks Parameters values
+        VALID_PARAMETERS = list(self.active_config.keys())        # TODO: Checks Parameters values
 
         if req.param not in VALID_PARAMETERS:
             raise EncodeError(f'parameter {req.param} is not a valid parameter')

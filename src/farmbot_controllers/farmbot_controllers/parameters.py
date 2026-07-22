@@ -4,8 +4,6 @@ Parameter command module for the FarmBot controller node.
 Provides read, list, and write parameter operations using the ROS2
 farmbot_command publisher.
 """
-from farmbot_controller import ServerError
-
 from farmbot_interfaces.srv import ReadParameter, WriteParameter
 
 from rclpy.node import Node
@@ -13,6 +11,12 @@ from rclpy.node import Node
 # from std_msgs.msg import String
 
 from std_srvs.srv import Trigger
+
+
+class ServerError(Exception):
+    """Raised when a server is not available."""
+
+    pass
 
 
 class Parameters:
@@ -24,7 +28,7 @@ class Parameters:
 
         self.read_param_client = self.node.create_client(ReadParameter, 'read_parameter')
         self.write_param_client = self.node.create_client(WriteParameter, 'write_parameter')
-        self.list_all_param_client = self.node.create_client(Trigger, 'list_all_parameter')
+        self.list_all_param_client = self.node.create_client(Trigger, 'list_all_parameters')
 
         # # Used for reading and writing to the FarmBot Parameters
         # self.paramHandler = String()
@@ -35,7 +39,7 @@ class Parameters:
         if not client.wait_for_service(1.0):
             raise ServerError(f'{cmd_name} Server not available!')
 
-    def readParam(self, param=int):
+    def readParam(self, param: int):
         """
         Service client to read the value on parameter {param}.
 
@@ -44,56 +48,16 @@ class Parameters:
         """
         try:
             self._server_availability('ReadParameter', self.read_param_client)
-        except ServerError as e:
-            self.node.get_logger().fatal(e)
+        except ServerError:
             raise
 
         request = ReadParameter.Request()
         request.param = param
 
         future = self.read_param_client.call_async(request=request)
-        future.add_done_callback(self.client_callback)
+        future.add_done_callback(self.read_client_callback)
 
-    def listAllParams(self):
-        """Service client to list all parameters."""
-        try:
-            self._server_availability('ListAllParameters', self.list_all_param_client)
-        except ServerError as e:
-            self.node.get_logger().fatal(e)
-            raise
-
-        request = Trigger.Request()
-
-        future = self.list_all_param_client.call_async(request=request)
-        future.add_done_callback(self.client_callback)
-
-    def writeParam(self, param=int, value=int, during_calibration=False):
-        """
-        Service client to write {value} to parameter {param}.
-
-        Args:
-            param {Int}: Parameter in question
-            value {Int}: Value written to param if write or update modes are active
-        """
-        try:
-            self._server_availability('WriteParameter', self.write_param_client)
-        except ServerError as e:
-            self.node.get_logger().fatal(e)
-            raise
-
-        request = WriteParameter.Request()
-        request.param = param
-        request.value = value
-        request.during_calibration = during_calibration
-
-        future = self.read_param_client.call_async(request=request)
-        future.add_done_callback(self.client_callback)
-
-    def updateParam(self, param=int, value=int):
-        """Notify customer service that calibration is in progress."""
-        self.writeParam(param, value, True)
-
-    def client_callback(self, future):
+    def read_client_callback(self, future):
         """Service client callback once the request is send."""
         try:
             response = future.result()
@@ -105,6 +69,58 @@ class Parameters:
 
             elif response.value != -1:
                 self.node.get_logger().info(f'The value of the parameter is {response.value}')
+
+            else:
+                self.node.get_logger().info('Command succesful')
+
+        except Exception as e:
+            self.node.get_logger().error('Service call failed %r' % (e, ))
+
+    def listAllParams(self):
+        """Service client to list all parameters."""
+        try:
+            self._server_availability('ListAllParameters', self.list_all_param_client)
+        except ServerError:
+            raise
+
+        request = Trigger.Request()
+
+        future = self.list_all_param_client.call_async(request=request)
+        future.add_done_callback(self.client_callback)
+
+    def writeParam(self, param: int, value: int, during_calibration: bool):
+        """
+        Service client to write {value} to parameter {param}.
+
+        Args:
+            param {Int}: Parameter in question
+            value {Int}: Value written to param if write or update modes are active
+        """
+        try:
+            self._server_availability('WriteParameter', self.write_param_client)
+        except ServerError:
+            raise
+
+        request = WriteParameter.Request()
+        request.param = param
+        request.value = value
+        request.during_calibration = during_calibration
+
+        future = self.write_param_client.call_async(request=request)
+        future.add_done_callback(self.client_callback)
+
+    def client_callback(self, future):
+        """Service client callback once the request is send."""
+        try:
+            response = future.result()
+            if not response:
+                self.node.get_logger().warn('Command Failure!')
+
+            elif not response.success:
+                self.node.get_logger().warn(f'Command {response.message}!')
+
+            else:
+                self.node.get_logger().info('Command succesful')
 
         except Exception as e:
             self.node.get_logger().error('Service call failed %r' % (e, ))
