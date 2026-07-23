@@ -11,7 +11,7 @@ from ament_index_python.packages import get_package_share_directory
 from farmbot_controllers.param_info import ParameterList
 
 from farmbot_interfaces.msg import MapCommand
-from farmbot_interfaces.srv import ParameterConfig, StringRepReq
+from farmbot_interfaces.srv import ParameterConfig, StringRepReq, WriteParameter
 
 import rclpy
 from rclpy.node import Node
@@ -19,6 +19,12 @@ from rclpy.node import Node
 from std_msgs.msg import String
 
 import yaml
+
+
+class ServerError(Exception):
+    """Raised when a server is not available."""
+
+    pass
 
 
 class ConfigServer(Node):
@@ -73,6 +79,9 @@ class ConfigServer(Node):
         self.config_loading_server = self.create_service(StringRepReq,
                                                          'load_param_config',
                                                          self.param_loading_server)
+
+        # Config parameter clients
+        self.write_param_client = self.create_client(WriteParameter, 'write_parameter')
 
         # Parameter Command publisher (Used for loading up parameters)
         self.param_cmd = String()
@@ -151,11 +160,32 @@ class ConfigServer(Node):
             loaded_firmware_config = yaml.safe_load(yaml_file)
             for key, value in self.param_vals.items():
                 if (loaded_firmware_config[key] != value):
-                    self.param_cmd.data = ('parameter_command False True False False ' + str(key)
-                                           + ' ' + str(value))
-                    self.param_cmd_pub.publish(self.param_cmd)
+                    # self.param_cmd.data = ('parameter_command False True False False ' + str(key)
+                    #                        + ' ' + str(value))
+                    # self.param_cmd_pub.publish(self.param_cmd)
+                    self.writeParam(key, value, True)
 
         self.get_logger().info('Parameter loading complete!')
+
+    def writeParam(self, param: int, value: int, during_calibration: bool):
+        """
+        Service client to write {value} to parameter {param}.
+
+        Args:
+            param {Int}: Parameter in question
+            value {Int}: Value written to param if write or update modes are active
+        """
+        if not self.write_param_client.wait_for_service(1.0):
+            self.node.get_logger().fatal('WriteParameter Server not available!')
+            raise ServerError('ConfigServer node failed: server unavailable')
+
+        request = WriteParameter.Request()
+        request.param = param
+        request.value = value
+        request.during_calibration = during_calibration
+
+        future = self.write_param_client.call_async(request=request)
+        future.add_done_callback(self.client_callback)
 
     def config_request_server(self, request, response):
         """Service server that receives commands, returns responses, and executes instructions."""
@@ -278,6 +308,8 @@ def main(args=None):
         rclpy.spin(config_server)
     except KeyboardInterrupt:
         pass
+    except ServerError as e:
+        config_server.get_logger().info(f'{e}')
     finally:
         config_server.destroy_node()
         rclpy.shutdown()
