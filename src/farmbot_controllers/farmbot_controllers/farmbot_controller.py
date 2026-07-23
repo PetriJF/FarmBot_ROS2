@@ -340,6 +340,9 @@ def main(args=None):
         rclpy.spin(main_ctrl_node)
     except KeyboardInterrupt:
         main_ctrl_node.destroy_node()
+    except Exception as e:
+        main_ctrl_node.get_logger().info(f'{e}')
+        main_ctrl_node.destroy_node()
 
     main_ctrl_node.destroy_node()
     rclpy.shutdown()

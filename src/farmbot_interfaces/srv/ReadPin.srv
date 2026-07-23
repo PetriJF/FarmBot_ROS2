@@ -1,3 +1,5 @@
+uint8 DIGITAL=0
+uint8 ANALOG=1
 uint16 pin
 uint8 mode                        # DIGITAL / ANALOG
 ---

@@ -173,6 +173,15 @@ class SerialController(Node):
         self.abort_trigger_server = self.create_service(Trigger, 'abort',
                                                         self.abort_command_server,
                                                         callback_group=self.cmd_callback_group)
+        self.end_stop_trigger_server = self.create_service(Trigger, 'end_stop',
+                                                           self.end_stop_command_server,
+                                                           callback_group=self.cmd_callback_group)
+        self.sw_version_trigger_server = self.create_service(Trigger, 'sw_version',
+                                                             self.sw_version_command_server,
+                                                             callback_group=self.cmd_callback_group)
+        self.curr_pos_trigger_server = self.create_service(Trigger, 'curr_pos',
+                                                           self.curr_position_command_server,
+                                                           callback_group=self.cmd_callback_group)
 
         # Initialise publishers
         self.fb_position = PointStamped()
@@ -471,6 +480,27 @@ class SerialController(Node):
         response.success = True
         return response
 
+    async def end_stop_command_server(self, request, response):
+        """Handle the end stops command service request."""
+        response = Trigger.Response()
+
+        response.success, response.message, _ = await self._run_command('F81')
+        return response
+
+    async def sw_version_command_server(self, request, response):
+        """Handle the software version command service request."""
+        response = Trigger.Response()
+
+        response.success, response.message, _ = await self._run_command('F83')
+        return response
+
+    async def curr_position_command_server(self, request, response):
+        """Handle the software version command service request."""
+        response = Trigger.Response()
+
+        response.success, response.message, _ = await self._run_command('F82')
+        return response
+
     def farmbot_cmd_sender(self, cmd: str):
         """Send the commands to the farmbot through serial."""
         # Ensure the endline char at the end of the command
@@ -532,6 +562,7 @@ class SerialController(Node):
 
         if self.goal_handle is None or not self.goal_handle.is_active:
             pass
+
         elif command_type == 'home_axes':
             feedback = HomeAxes.Feedback()
             feedback.position.x = self.fb_position.point.x
@@ -572,6 +603,9 @@ class SerialController(Node):
                     code = (message).split(' ')
                     value = int(code[2][1:])
                     result = [True, '', value]
+                    self.code_response.set_result(result)
+                case 'R81' | 'R82' | 'R83':
+                    result = [True, message[4:], -1]
                     self.code_response.set_result(result)
 
         # Send the reporting message for further processing by other nodes
