@@ -338,8 +338,10 @@ def main(args=None):
 
     try:
         rclpy.spin(main_ctrl_node)
-    except (KeyboardInterrupt, Exception) as e:
-        main_ctrl_node.get_logger().fatal(f'{e}')
+    except KeyboardInterrupt:
+        main_ctrl_node.destroy_node()
+    except Exception as e:
+        main_ctrl_node.get_logger().info(f'{e}')
         main_ctrl_node.destroy_node()
 
     main_ctrl_node.destroy_node()

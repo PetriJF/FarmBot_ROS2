@@ -47,8 +47,12 @@ class State:
 
     def _server_availability(self, cmd_name: str, client):
         if not client.wait_for_service(1.0):
-            raise ServerError(f'{cmd_name} Server not available!')
+            self.node.get_logger().fatal(f'{cmd_name} Server not available!')
+            raise ServerError('States module failed: server unavailable')
+        self.send_request(client)
 
+    def send_request(self, client):
+        """Send a Trigger service request asynchronously."""
         request = Trigger.Request()
         future = client.call_async(request=request)
         future.add_done_callback(self.client_callback)
@@ -56,45 +60,27 @@ class State:
     # Service Client
     def estop(self):
         """Service client for estop."""
-        try:
-            self._server_availability('Estop', self.estop_client)
-        except ServerError:
-            raise
+        self._server_availability('Estop', self.estop_client)
 
     def abort_movement(self):
         """Service client for abort."""
-        try:
-            self._server_availability('Abort', self.abort_client)
-        except ServerError:
-            raise
+        self._server_availability('Abort', self.abort_client)
 
     def reset_estop(self):
         """Service client for abort."""
-        try:
-            self._server_availability('Reset estop', self.resume_client)
-        except ServerError:
-            raise
+        self._server_availability('Reset estop', self.resume_client)
 
     def request_end_stop(self):
         """Service client to request the end stops."""
-        try:
-            self._server_availability('End stop request', self.end_stop_client)
-        except ServerError:
-            raise
+        self._server_availability('End stop request', self.end_stop_client)
 
     def request_sw_version(self):
         """Service client to request the software version."""
-        try:
-            self._server_availability('Software version request', self.sw_version_client)
-        except ServerError:
-            raise
+        self._server_availability('Software version request', self.sw_version_client)
 
     def request_curr_pos(self):
         """Service client to request the current position."""
-        try:
-            self._server_availability('Current position request', self.curr_position_client)
-        except ServerError:
-            raise
+        self._server_availability('Current position request', self.curr_position_client)
 
     def client_callback(self, future):
         """Service client callback once the request is send."""

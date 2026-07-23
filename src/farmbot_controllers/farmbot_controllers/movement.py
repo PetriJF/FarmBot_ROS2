@@ -44,7 +44,8 @@ class Movement:
 
     def _server_availability(self, cmd_name: str, client):
         if not client.wait_for_server(1.0):
-            raise ServerError(f'{cmd_name} Server not available!')
+            self.node.get_logger().fatal(f'{cmd_name} Server not available!')
+            raise ServerError('Movement module failed: server unavailable')
 
     # Calibration and Homing Functions
     def go_home(self):
@@ -83,10 +84,7 @@ class Movement:
 
     def send_home_goal(self, op: int, x_axis=False, y_axis=False, z_axis=False):
         """Send the home axes goal its action server."""
-        try:
-            self._server_availability('HomeAxes', self.home_axes_client)
-        except ServerError:
-            raise
+        self._server_availability('HomeAxes', self.home_axes_client)
 
         goal = HomeAxes.Goal()
         goal.op = op
@@ -135,10 +133,7 @@ class Movement:
     def send_move_gantry_goal(self, x_coord: float, y_coord: float, z_coord: float,
                               interpolated=True, x_speed=100.0, y_speed=100.0, z_speed=100.0):
         """Send the move gantry goal its action server."""
-        try:
-            self._server_availability('MoveGantry', self.move_gantry_client)
-        except ServerError:
-            raise
+        self._server_availability('MoveGantry', self.move_gantry_client)
 
         goal = MoveGantry.Goal()
         goal.target.x = x_coord

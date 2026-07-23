@@ -37,7 +37,8 @@ class Parameters:
 
     def _server_availability(self, cmd_name: str, client):
         if not client.wait_for_service(1.0):
-            raise ServerError(f'{cmd_name} Server not available!')
+            self.node.get_logger().fatal(f'{cmd_name} Server not available!')
+            raise ServerError('Parameter module failed: server unavailable')
 
     def readParam(self, param: int):
         """
@@ -46,10 +47,7 @@ class Parameters:
         Args:
             param {Int}: Parameter in question
         """
-        try:
-            self._server_availability('ReadParameter', self.read_param_client)
-        except ServerError:
-            raise
+        self._server_availability('ReadParameter', self.read_param_client)
 
         request = ReadParameter.Request()
         request.param = param
@@ -78,10 +76,7 @@ class Parameters:
 
     def listAllParams(self):
         """Service client to list all parameters."""
-        try:
-            self._server_availability('ListAllParameters', self.list_all_param_client)
-        except ServerError:
-            raise
+        self._server_availability('ListAllParameters', self.list_all_param_client)
 
         request = Trigger.Request()
 
@@ -96,10 +91,7 @@ class Parameters:
             param {Int}: Parameter in question
             value {Int}: Value written to param if write or update modes are active
         """
-        try:
-            self._server_availability('WriteParameter', self.write_param_client)
-        except ServerError:
-            raise
+        self._server_availability('WriteParameter', self.write_param_client)
 
         request = WriteParameter.Request()
         request.param = param

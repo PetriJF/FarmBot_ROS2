@@ -45,15 +45,13 @@ class DeviceControl:
 
     def _server_availability(self, cmd_name: str, client):
         if not client.wait_for_service(1.0):
-            raise ServerError(f'{cmd_name} Server not available!')
+            self.node.get_logger().fatal(f'{cmd_name} Server not available!')
+            raise ServerError('Devices module failed: server unavailable')
 
     # I2C Control Handlers
     def i2c_read(self, element: int, parameter: int):
         """Service client to read from an I2C device."""
-        try:
-            self._server_availability('ReadI2C', self.read_i2c_client)
-        except ServerError:
-            raise
+        self._server_availability('ReadI2C', self.read_i2c_client)
 
         request = ReadI2C.Request()
         request.element = element
@@ -64,10 +62,7 @@ class DeviceControl:
 
     def i2c_set(self, element: int, parameter: int, value: int):
         """Service client to set a value to an I2C device."""
-        try:
-            self._server_availability('SetI2C', self.set_i2c_client)
-        except ServerError:
-            raise
+        self._server_availability('SetI2C', self.set_i2c_client)
 
         request = SetI2C.Request()
         request.element = element
@@ -94,10 +89,7 @@ class DeviceControl:
             unit {int}: The amount of time (in time based watering) in millisec. or the pulse
                         count of the flow meter.
         """
-        try:
-            self._server_availability('Watering', self.watering_client)
-        except ServerError:
-            raise
+        self._server_availability('Watering', self.watering_client)
 
         request = Watering.Request()
         if mode:
@@ -121,10 +113,7 @@ class DeviceControl:
             value {int}: Value to set
             pin_mode {bool}: 0 for digital, 1 for analog
         """
-        try:
-            self._server_availability('WritePin', self.write_pin_client)
-        except ServerError:
-            raise
+        self._server_availability('WritePin', self.write_pin_client)
 
         request = WritePin.Request()
         request.pin = pin
@@ -148,10 +137,7 @@ class DeviceControl:
             pin {int}: The pin to read the value from
             pin_mode{bool}: 0 for digital, 1 for analog
         """
-        try:
-            self._server_availability('ReadPin', self.read_pin_client)
-        except ServerError:
-            raise
+        self._server_availability('ReadPin', self.read_pin_client)
 
         request = ReadPin.Request()
         if pin_mode:
@@ -191,10 +177,7 @@ class DeviceControl:
             pin {int}: the pin to set the IO for
             io_mode(bool): 0 for input, 1 for output
         """
-        try:
-            self._server_availability('ConfigurePin', self.configure_pin_client)
-        except ServerError:
-            raise
+        self._server_availability('ConfigurePin', self.configure_pin_client)
 
         request = ConfigurePin.Request()
         request.output = io_mode
@@ -205,10 +188,7 @@ class DeviceControl:
 
     def move_servo(self, pin: int, angle: float):
         """Create the move servo command."""
-        try:
-            self._server_availability('MoveServo', self.move_servo_client)
-        except ServerError:
-            raise
+        self._server_availability('MoveServo', self.move_servo_client)
 
         request = MoveServo.Request()
         request.pin = pin
