@@ -6,8 +6,6 @@ command-handler interactions via the farmbot_command publisher.
 """
 from rclpy.node import Node
 
-# from std_msgs.msg import String
-
 from std_srvs.srv import Trigger
 
 
@@ -39,11 +37,6 @@ class State:
         self.end_stop_client = self.node.create_client(Trigger, 'end_stop')
         self.sw_version_client = self.node.create_client(Trigger, 'sw_version')
         self.curr_position_client = self.node.create_client(Trigger, 'curr_pos')
-
-        # # The state interface object
-        # self.state = String()
-        # # The publisher for the state commands
-        # self.state_pub = self.node.create_publisher(String, 'farmbot_command', 10)
 
     def _server_availability(self, cmd_name: str, client):
         if not client.wait_for_service(1.0):
@@ -100,47 +93,3 @@ class State:
 
         except Exception as e:
             self.node.get_logger().error('Service call failed %r' % (e, ))
-
-    # # State handling functions
-    # def estop(self):
-    #     """Impose the electronic stop, turning off all the motors."""
-    #     self.define_state(estop=True)
-
-    # def abort_movement(self):
-    #     """Abort the current movement command."""
-    #     self.define_state(abort_movement=True)
-
-    # def reset_estop(self):
-    #     """Reset the electronic stop."""
-    #     self.define_state(reset_estop=True)
-
-    # def request_end_stop(self):
-    #     """Request the end stops."""
-    #     self.define_state(rep_end_stop=True)
-
-    # def request_sw_version(self):
-    #     """Request the software version."""
-    #     self.define_state(rep_sw_ver=True)
-
-    # def request_curr_pos(self):
-    #     """Request the current position of the extruder."""
-    #     self.define_state(rep_curr_pos=True)
-
-    # def define_state(self, estop=False, abort_movement=False, reset_estop=False,
-    #                  rep_end_stop=False, rep_curr_pos=False, rep_sw_ver=False):
-    #     """
-    #     Create the state definition request.
-
-    #     Args:
-    #         estop {Bool}: Initializes the Electronic Stop, stopping all the motors
-    #         abort_movement {Bool}: Aborts the current movement command
-    #         reset_estop {Bool}: Resets the farmbot from the Electronic Stop state
-    #         rep_end_stop {Bool}: Requests the end stops
-    #         rep_curr_pos {Bool}: Requests the current position of the gantry
-    #         rep_sw_ver   {Bool}: Requests the software version
-    #     """
-    #     self.state.data = ('state_command ' + str(estop) + ' ' + str(abort_movement) + ' '
-    #                        + str(reset_estop) + ' ' + str(rep_end_stop) + ' ' + str(rep_curr_pos)
-    #                        + ' ' + str(rep_sw_ver))
-
-    #     self.state_pub.publish(self.state)

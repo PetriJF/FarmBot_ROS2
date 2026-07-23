@@ -11,7 +11,6 @@ from ament_index_python.packages import get_package_share_directory
 
 from farmbot_hardware_comm.fcode_encoder import EncodeError, Encoder
 
-# from farmbot_interfaces.action import FarmbotComms
 from farmbot_interfaces.action import HomeAxes, MoveGantry
 from farmbot_interfaces.srv import (ConfigurePin, LedPanelHandler, MoveServo,
                                     ReadI2C, ReadParameter, ReadPin, SetI2C,
@@ -21,7 +20,6 @@ from geometry_msgs.msg import PointStamped
 
 import rclpy
 from rclpy.action import ActionServer, GoalResponse
-# from rclpy.action import CancelResponse
 from rclpy.action.server import ServerGoalHandle
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
@@ -41,7 +39,7 @@ class SerialController(Node):
     """
     Farmbot ROS2 node that handles the Serial messages going to and from the Farmduino.
 
-    The Node receives commands through the FarmbotComms action and sends them to the
+    The Node receives commands through different actions and services, and sends them to the
     Farmduino.
 
     When the node receives feedback from the Farmduino through Serial, the message is
@@ -76,20 +74,6 @@ class SerialController(Node):
         # Initializing farmbot encoder module
         self.fcode_encoder = Encoder(config_path)
 
-        # # UART receive publisher
-        # self.fb_feedback_pub = self.create_publisher(String, 'farmbot_feedback', 10)
-
-        # # Initialize the Action Server
-        # self.farmbot_comm_server = ActionServer(
-        #     self,
-        #     FarmbotComms,
-        #     'farmbot_communication',
-        #     goal_callback=self.communication_goal_callback,
-        #     execute_callback=self.execute_callback,
-        #     cancel_callback=self.cancel_callback,
-        #     handle_accepted_callback=self.handle_callback,
-        # )
-
         # Initialize Serial Communication
         self.ser = serial.Serial(serial_port, serial_speed, timeout=1)
         self.ser.reset_input_buffer()
@@ -98,7 +82,6 @@ class SerialController(Node):
 
         # Used for setting the busy status on the ROS2 arch. while a command is running
         self.previous_cmd = ''
-        # self.status = ''
         self.code_response: Future = None
 
         self.mission = {
@@ -626,228 +609,6 @@ class SerialController(Node):
         if denominator != 0:
             return sum(axis_completion) / denominator
         return 1
-
-####################################################################################################
-
-    # Goal Callback
-    # def communication_goal_callback(self, goal_request):
-    #     """
-    #     Check whether the goal is valid.
-
-    #     If the command type is not among those accepted by Farmbot, the goal is rejected.
-    #     Otherwise, it is accepted.
-    #     """
-    #     self.get_logger().info('Received goal request')
-    #     command_id = (goal_request.command).split(' ')[0]
-
-    #     valid_commands = ['E', 'F09', '@', 'i2c_command', 'pin_command', 'water_command',
-    #                       'home_handler', 'move_gantry', 'move_servo', 'parameter_command',
-    #                       'state_command']
-
-    #     if (command_id not in valid_commands
-    #        or (self.previous_cmd == 'E' and command_id != 'F09')
-    #        or (self.previous_cmd == '@' and command_id not in ['E', '@'])
-    #        or (self.status == 'IS_RUNNING')):
-    #         return GoalResponse.REJECT
-
-    #     return GoalResponse.ACCEPT
-
-    # # Cancel callback
-    # def cancel_callback(self, goal_handle):
-    #     """Accept the cancel request."""
-    #     self.get_logger().info('Received cancel request')
-
-    #     return CancelResponse.ACCEPT
-
-    # Handle execute callback
-    # def handle_callback(self, goal_handle: ServerGoalHandle):
-    #     """Create a timer to track the command status."""
-    #     self.goal_handle = goal_handle
-    #     command = goal_handle.request.command
-
-    #     if self.previous_cmd == '@' and command == '@':
-    #         self.status = 'ABORT_ENDED'
-    #         self.previous_cmd = ''
-    #         goal_handle.execute()
-    #         return
-
-    #     self.mission['starting_position'] = self.mission['current_position'][:]
-
-    #     self.farmbot_command_sender(command)
-
-    #     self.get_logger().info('Executing goal...')
-    #     self.check_status_timer = self.create_timer(1.0 / self.check_uart_freq, self.check_status)
-    #     self.feedback_timer = self.create_timer(1.0 / 2, self.send_feedback)
-
-    # def check_status(self):
-    #     """
-    #     Check command execution status and handle completion or cancellation.
-
-    #     Publishes feedback, handles goal cancellation requests, and triggers
-    #     the next callback based on command completion state.
-    #     """
-    #     if not self.check_status_timer.is_canceled():
-    #         if self.goal_handle.is_cancel_requested:
-    #             self.get_logger().info('Goal canceled.')
-    #             self.status = 'CANCELED'
-    #             self.goal_handle.execute()
-
-    #         elif self.status == 'ABORTED':
-    #             self.get_logger().warn('Goal aborted.')
-    #             self.goal_handle.execute()
-
-    #         elif self.status == 'ERROR':
-    #             self.get_logger().warn('Goal finished with error.')
-    #             self.goal_handle.execute()
-
-    #         elif self.status == 'SUCCEED':
-    #             self.get_logger().info('Goal completed.')
-    #             self.goal_handle.execute()
-
-    # def send_feedback(self):
-    #     """Publish the feedback with the current position and the completion percentage."""
-    #     # Create Feedback object
-    #     feedback = FarmbotComms.Feedback()
-
-    #     if self.previous_cmd in self.non_immediate_cmds['long_term']:
-    #         self.mission['completion'] = float(self.percentage_calculation())
-
-    #     feedback.current_position = self.mission['current_position']
-    #     feedback.percentage = self.mission['completion']
-
-    #     self.goal_handle.publish_feedback(feedback)
-
-    # Execute callback
-    # def execute_callback(self, goal_handle: ServerGoalHandle):
-    #     """
-    #     Execute the FarmbotComms action goal.
-
-    #     Checks if the command has finished executing. If so, cancels the
-    #     status timer and returns the result. Otherwise, sends the command
-    #     to the Farmduino and logs execution status.
-    #     """
-    #     self.mission['starting_position'] = []
-    #     self.mission['final_position'] = []
-    #     self.mission['completion'] = 0.0
-    #     self.check_status_timer.cancel()
-    #     self.feedback_timer.cancel()
-
-    #     # Create Result object
-    #     result = FarmbotComms.Result()
-
-    #     if self.status == 'CANCELED':
-    #         goal_handle.canceled()
-    #         result.status = self.status
-    #         self.status = ''
-    #         return result
-
-    #     elif self.status == 'ABORTED':
-    #         goal_handle.abort()
-    #         result.status = self.status
-    #         self.status = ''
-    #         return result
-
-    #     else:
-    #         goal_handle.succeed()
-    #         result.status = self.status
-    #         self.status = ''
-    #         return result
-
-    # def farmbot_command_sender(self, cmd: str):
-    #     """
-    #     Handle the commands that are queued to be sent to the farmbot through UART.
-
-    #     Two cases:
-    #         a) the command has priority (e.g. electronic-stop):
-    #             The command bypasses the queue and the queue is reset
-    #         b) standard command:
-    #             The command is added at the end of the queue
-    #     """
-    #     command: list = cmd.split(' ')
-
-    #     match command[0]:
-
-    #         # Device Command Handler Cases
-    #         case 'E':
-    #             self.temp.data = 'E'
-
-    #         case 'F09':
-    #             self.temp.data = 'F09'
-
-    #         case '@':
-    #             self.temp.data = '@'
-
-    #         case 'i2c_command':
-    #             self.temp.data = self.device_cmd_handler.i2c_cmd(command[1:])
-
-    #         case 'pin_command':
-    #             self.temp.data = self.device_cmd_handler.pin_cmd(command[1:])
-
-    #         case 'water_command':
-    #             self.temp.data = self.device_cmd_handler.water_cmd(command[1:])
-
-    #         # Motor Command Handler Cases
-    #         case 'home_handler':
-    #             self.temp.data = self.motor_cmd_handler.home_cmd(command[1:])
-
-    #         case 'move_gantry':
-    #             self.temp.data = self.motor_cmd_handler.gantry_cmd(command[1:])
-
-    #         case 'move_servo':
-    #             self.temp.data = self.motor_cmd_handler.servo_cmd(command[1:])
-
-    #         # State Command Handler Cases
-    #         case 'parameter_command':
-    #             self.temp.data = self.state_cmd_handler.param_cmd(command[1:])
-
-    #         case 'state_command':
-    #             self.temp.data = self.state_cmd_handler.state_cmd(command[1:])
-
-    #         case _:
-    #             self.get_logger().warn(f'This command type is not recognized {cmd}'
-    #                                    "Ensure you don't have a typo!")
-    #             self.status = 'ERROR'
-    #             return
-
-    #     if not self.temp.data:
-    #         self.status = 'ERROR'
-    #         return
-
-    #     self.status = 'IS_RUNNING'
-    #     self.find_final_position(self.temp.data)
-
-    #     # Ensure the endline char at the end of the command
-    #     if self.temp.data[-1] != '\n':
-    #         self.temp.data += '\n'
-
-    #     # Record the transmitted command
-    #     self.previous_cmd = (
-    #         self.temp.data.split(' ')[0]
-    #         if ' ' in self.temp.data else self.temp.data.split('\n')[0])
-
-    #     self.get_logger().info(f'Sent message: {self.temp.data}')
-    #     #  Send through UART the command
-    #     self.ser.write(self.temp.data.encode('utf-8'))
-
-    # def find_final_position(self, cmd: str):
-    #     """Obtain the final position for motion command."""
-    #     self.mission['final_position'] = []
-
-    #     goal = cmd.split(' ')
-    #     match goal[0]:
-    #         case 'G00' | 'G01':
-    #             self.mission['final_position'] = [float(goal[1][1:]), float(goal[2][1:]),
-    #                                               float(goal[3][1:])]
-    #         case 'G28':
-    #             self.mission['final_position'] = [0.0, 0.0, 0.0]
-    #         case 'F11':
-    #             self.mission['final_position'] = [0.0] + self.mission['starting_position'][1:]
-    #         case 'F12':
-    #             self.mission['final_position'] = [self.mission['starting_position'][0], 0.0,
-    #                                               self.mission['starting_position'][2]]
-    #         case 'F13':
-    #             self.mission['final_position'] = self.mission['starting_position'][:2] + [0.0]
-####################################################################################################
 
     # Service Client
 

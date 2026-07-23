@@ -12,14 +12,6 @@ find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/GantryCommand.msg"
-  "msg/ServoCommand.msg"
-  "msg/HomeCommand.msg"
-  "msg/I2CCommand.msg"
-  "msg/PinCommand.msg"
-  "msg/ParameterCommand.msg"
-  "msg/StateCommand.msg"
-  "msg/StatusCommand.msg"
   "msg/PlantManage.msg"
   "msg/MapCommand.msg"
   "msg/ImageMessage.msg"
@@ -35,7 +27,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/Watering.srv"
   "srv/WriteParameter.srv"
   "srv/WritePin.srv"
-  "action/FarmbotComms.action"
   "action/HomeAxes.action"
   "action/MoveGantry.action"
   DEPENDENCIES sensor_msgs geometry_msgs

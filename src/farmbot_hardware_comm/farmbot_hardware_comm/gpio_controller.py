@@ -91,6 +91,7 @@ class GPIOController(Node):
         ]
 
         self.led_panel_server = self.create_service(LedPanelHandler, 'set_led', self.LED_server)
+        self.led_client = self.create_client(LedPanelHandler, 'set_led')
 
         # Log the initialization
         self.get_logger().info('GPIO Controller Initialized..')
@@ -141,15 +142,14 @@ class GPIOController(Node):
 
     def _LED_client(self, led_pin, state):
         """Service client for switching an LED on or off."""
-        client = self.create_client(LedPanelHandler, 'set_led')
-        while not client.wait_for_service(1.0):
+        while not self.led_client.wait_for_service(1.0):
             self.get_logger().warn('Waiting for LED Handling Server...')
 
         request = LedPanelHandler.Request()
         request.led_pin = led_pin
         request.state = state
 
-        future = client.call_async(request=request)
+        future = self.led_client.call_async(request=request)
         future.add_done_callback(self.LED_panel_callback)
 
     def LED_panel_callback(self, future):
