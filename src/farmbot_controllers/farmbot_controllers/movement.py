@@ -28,10 +28,6 @@ class Movement:
         """
         self.node = node
 
-        self.X_MAX_SPEED = 400.0
-        self.Y_MAX_SPEED = 400.0
-        self.Z_MAX_SPEED = 400.0
-
         self.move_gantry_client = ActionClient(self.node, MoveGantry, 'move_gantry')
         self.home_axes_client = ActionClient(self.node, HomeAxes, 'home_axes')
 
