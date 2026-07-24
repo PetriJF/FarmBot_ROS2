@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Device control utilities for ROS2 Farmbot.
 
@@ -18,10 +17,10 @@ class ServerError(Exception):
 
 
 class DeviceControl:
-    """Publish device commands (pin, water, I2C, servo) to the 'farmbot_command' topic."""
+    """Device module that extends the farmbot controller node."""
 
     def __init__(self, node: Node):
-        """Initialize DeviceControl with a ROS2 node and its publishers."""
+        """Initialize the device module and the ROS2 service clients."""
         self.node = node
 
         self.read_i2c_client = self.node.create_client(ReadI2C, 'read_i2c')
@@ -39,7 +38,15 @@ class DeviceControl:
 
     # I2C Control Handlers
     def i2c_read(self, element: int, parameter: int):
-        """Service client to read from an I2C device."""
+        """
+        Call the ReadI2C service.
+
+        Used to read the parameter of an i2c element.
+
+        Args:
+            element {int}: element in question
+            parameter {int}: parameter of the element
+        """
         self._server_availability('ReadI2C', self.read_i2c_client)
 
         request = ReadI2C.Request()
@@ -50,7 +57,16 @@ class DeviceControl:
         future.add_done_callback(self.client_callback)
 
     def i2c_set(self, element: int, parameter: int, value: int):
-        """Service client to set a value to an I2C device."""
+        """
+        Call the SetI2C service.
+
+        Used to set a value to an I2C device.
+
+        Args:
+            element {int}: element in question
+            parameter {int}: parameter of the element
+            value {int}: new value of the parameter
+        """
         self._server_availability('SetI2C', self.set_i2c_client)
 
         request = SetI2C.Request()
@@ -76,7 +92,7 @@ class DeviceControl:
             mode {bool}: False (or 1) for time based watering, True (or 2) for valume flow based
                          watering
             unit {int}: The amount of time (in time based watering) in millisec. or the pulse
-                        count of the flow meter.
+                        count of the flow meter
         """
         self._server_availability('Watering', self.watering_client)
 
@@ -101,6 +117,9 @@ class DeviceControl:
             pin {int}: The pin the value is set on
             value {int}: Value to set
             pin_mode {bool}: 0 for digital, 1 for analog
+            pulse {bool}: Whether to apply a second value after a delay
+            value2 {int}: Value to set after the delay
+            delay_ms {int}: Delay before applying the second value in milliseconds
         """
         self._server_availability('WritePin', self.write_pin_client)
 
@@ -140,7 +159,12 @@ class DeviceControl:
         future.add_done_callback(self.read_client_callback)
 
     def read_client_callback(self, future):
-        """Service client callback once the request is send."""
+        """
+        Handle the response of a pin read service request.
+
+        Processes the service response and logs the retrieved pin value
+        or the command status depending on the result of the request.
+        """
         try:
             response = future.result()
             if not response:
@@ -176,7 +200,16 @@ class DeviceControl:
         future.add_done_callback(self.client_callback)
 
     def move_servo(self, pin: int, angle: float):
-        """Create the move servo command."""
+        """
+        Call the FarmBot MoveServo service.
+
+        Creates and sends a request to move a servo connected to a Farmduino
+        pin to the specified angle.
+
+        Args:
+            pin {int}: Servo pin identifier
+            angle {float}: Target servo angle
+        """
         self._server_availability('MoveServo', self.move_servo_client)
 
         request = MoveServo.Request()
@@ -187,7 +220,12 @@ class DeviceControl:
         future.add_done_callback(self.client_callback)
 
     def client_callback(self, future):
-        """Service client callback once the request is send."""
+        """
+        Handle the response of a service request except pin read requests.
+
+        Processes the service response and logs the command status depending
+        on the result of the request.
+        """
         try:
             response = future.result()
             if not response:

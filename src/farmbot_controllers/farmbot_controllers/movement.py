@@ -1,7 +1,8 @@
 """
-Movement module for the FarmBot controller node.
+FarmBot movement module.
 
-Provides gantry motion, calibration, and homing command helpers.
+Provides helper methods for gantry movements, axis homing, and calibration
+through ROS2 action commands.
 """
 from farmbot_interfaces.action import HomeAxes, MoveGantry
 
@@ -20,12 +21,7 @@ class Movement:
     """Movement module that extends the farmbot controller node."""
 
     def __init__(self, node: Node):
-        """
-        Initialize the module.
-
-        Args:
-            node {Node}: the node the module extends
-        """
+        """Initialize the movement module and the ROS2 action clients."""
         self.node = node
 
         self.move_gantry_client = ActionClient(self.node, MoveGantry, 'move_gantry')
@@ -38,14 +34,18 @@ class Movement:
 
     # Calibration and Homing Functions
     def go_home(self):
-        """Go to the home position on each axis."""
+        """
+        Call the FarmBot HomeAxes action for homing.
+
+        Send a goal to have the Farmbot go home
+        """
         self.send_home_goal(op=HomeAxes.Goal.GO_HOME)
 
     def find_axis_home(self, x: bool, y: bool, z: bool):
         """
-        Home the selected axis on the farmbot.
+        Call the FarmBot HomeAxes action for homing a specific axis.
 
-        For example, for homing x and y you set them to True.
+        Home the selected axis on the farmbot. For example, for homing x and y you set them to True.
 
         Args:
             x {Bool}: True if the X-Axis should have it's home position found. Defaults to False
@@ -56,9 +56,10 @@ class Movement:
 
     def calibrate_axis(self, x: bool, y: bool, z: bool):
         """
-        Calibrate the selected axis on the farmbot.
+        Call the FarmBot HomeAxes action to calibrate a specific axis.
 
-        For example, for calibrating the length along the x and y axis, you set them to True.
+        Calibrate the selected axis on the farmbot. For example, for calibrating
+        the length along the x and y axis, you set them to True.
 
         Args:
             x {Bool}: True if the X-Axis is to be calibrated. Defaults to False
@@ -68,11 +69,27 @@ class Movement:
         self.send_home_goal(op=HomeAxes.Goal.CALIBRATE, x_axis=x, y_axis=y, z_axis=z)
 
     def set_curr_to_home(self):
-        """Set the current position of the extruder as the home position."""
+        """
+        Call the FarmBot HomeAxes action to set the current position as the new home.
+
+        Sends a goal to update the FarmBot home position using the current axis
+        coordinates.
+        """
         self.send_home_goal(op=HomeAxes.Goal.SET_HOME)
 
     def send_home_goal(self, op: int, x_axis=False, y_axis=False, z_axis=False):
-        """Send the home axes goal its action server."""
+        """
+        Send a HomeAxes goal to the FarmBot action server.
+
+        Creates and sends a HomeAxes goal containing the requested operation
+        and selected axes.
+
+        Args:
+            op {int}: HomeAxes operation type.
+            x_axis {bool}: Whether the X axis is selected.
+            y_axis {bool}: Whether the Y axis is selected.
+            z_axis {bool}: Whether the Z axis is selected.
+        """
         self._server_availability('HomeAxes', self.home_axes_client)
 
         goal = HomeAxes.Goal()
@@ -86,8 +103,12 @@ class Movement:
             feedback_callback=self.home_goal_feedback_callback
             ).add_done_callback(self.goal_response_callback)
 
-    def home_goal_feedback_callback(self, feedback_msg):
-        """Handle feedback messages from the HomeAxes action server."""
+    def home_goal_feedback_callback(self, feedback_msg: HomeAxes.Feedback):
+        """
+        Handle feedback messages from the HomeAxes action server.
+
+        Logs the current FarmBot position received during the homing process.
+        """
         curr_position = feedback_msg.feedback.position
 
         self.node.get_logger().info(f'Current postion : X{curr_position.x} '
@@ -121,7 +142,21 @@ class Movement:
 
     def send_move_gantry_goal(self, x_coord: float, y_coord: float, z_coord: float,
                               interpolated=True, x_speed=100.0, y_speed=100.0, z_speed=100.0):
-        """Send the move gantry goal its action server."""
+        """
+        Send a MoveGantry goal to the FarmBot action server.
+
+        Creates and sends a MoveGantry goal containing the target position,
+        movement type, and axis speed percentages.
+
+        Args:
+            x_coord {float}: Target X coordinate.
+            y_coord {float}: Target Y coordinate.
+            z_coord {float}: Target Z coordinate.
+            interpolated {bool}: Whether the movement should be interpolated.
+            x_speed {float}: X axis speed percentage.
+           y_speed {float}: Y axis speed percentage.
+            z_speed {float}: Z axis speed percentage.
+        """
         self._server_availability('MoveGantry', self.move_gantry_client)
 
         goal = MoveGantry.Goal()
@@ -138,8 +173,13 @@ class Movement:
             feedback_callback=self.move_gantry_goal_feedback_callback
             ).add_done_callback(self.goal_response_callback)
 
-    def move_gantry_goal_feedback_callback(self, feedback_msg):
-        """Handle feedback messages from the MoveGantry action server."""
+    def move_gantry_goal_feedback_callback(self, feedback_msg: MoveGantry.Feedback):
+        """
+        Handle feedback messages from the MoveGantry action server.
+
+        Logs the current FarmBot position received and the goal completion
+        during the movement process.
+        """
         curr_position = feedback_msg.feedback.position
         percentage = feedback_msg.feedback.progress
         self.node.get_logger().info(f'Current postion : X{curr_position.x} '
@@ -147,7 +187,12 @@ class Movement:
                                     f'Goal completion: {percentage:.2f} %')
 
     def goal_response_callback(self, future):
-        """Handle the action server's goal response."""
+        """
+        Handle the action server goal response.
+
+        Processes the goal response and retrieves the result asynchronously if
+        the goal has been accepted.
+        """
         self.goal_handle: ClientGoalHandle = future.result()
 
         if self.goal_handle.accepted:
@@ -162,7 +207,12 @@ class Movement:
             self.node.get_logger().warn('Goal rejected')
 
     def goal_result_callback(self, future):
-        """Handle the final result from the action server."""
+        """
+        Handle the final result from the action server.
+
+        Processes the action result and logs the command status returned by the
+        FarmBot action server.
+        """
         result = future.result().result
         cmd_status = result.code
 

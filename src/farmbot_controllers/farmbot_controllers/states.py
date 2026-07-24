@@ -1,8 +1,9 @@
 """
-ROS2 Farmbot state module.
+ROS2 FarmBot state module.
 
-Provides state command helpers for emergency stop, abort, reset, and other
-command-handler interactions via the farmbot_command publisher.
+Provides helper methods to interact with FarmBot state commands, including
+emergency stop, abort, reset, software version, current position and end stops
+requests through ROS2 services.
 """
 from rclpy.node import Node
 
@@ -16,19 +17,10 @@ class ServerError(Exception):
 
 
 class State:
-    """
-    ROS2 Farmbot State module.
-
-    Forms the commands that are sent to the command handling package
-    """
+    """State module that extends the farmbot controller node."""
 
     def __init__(self, node: Node):
-        """
-        ROS2 Farmbot State Module Constructor.
-
-        Args:
-            node {Node}: The node the module extends
-        """
+        """Initialize the state module and the ROS2 service clients."""
         self.node = node
 
         self.estop_client = self.node.create_client(Trigger, 'estop')
@@ -42,41 +34,70 @@ class State:
         if not client.wait_for_service(1.0):
             self.node.get_logger().fatal(f'{cmd_name} Server not available!')
             raise ServerError('States module failed: server unavailable')
-        self.send_request(client)
+        self._send_request(client)
 
-    def send_request(self, client):
-        """Send a Trigger service request asynchronously."""
+    def _send_request(self, client):
         request = Trigger.Request()
         future = client.call_async(request=request)
         future.add_done_callback(self.client_callback)
 
     # Service Client
     def estop(self):
-        """Service client for estop."""
+        """
+        Call the FarmBot estop service.
+
+        Send an estop request to the FarmBot in order to immediately halt all robot
+        operations.
+        """
         self._server_availability('Estop', self.estop_client)
 
     def abort_movement(self):
-        """Service client for abort."""
+        """
+        Call the FarmBot abort service.
+
+        Sends a request to abort the current robot movement.
+        """
         self._server_availability('Abort', self.abort_client)
 
     def reset_estop(self):
-        """Service client for abort."""
+        """
+        Call the FarmBot reset emergency stop service.
+
+        Sends a request to reset the emergency stop state.
+        """
         self._server_availability('Reset estop', self.resume_client)
 
     def request_end_stop(self):
-        """Service client to request the end stops."""
+        """
+        Call the FarmBot end stop request service.
+
+        Sends a request to retrieve the current end stop states.
+        """
         self._server_availability('End stop request', self.end_stop_client)
 
     def request_sw_version(self):
-        """Service client to request the software version."""
+        """
+        Call the FarmBot software version request service.
+
+        Sends a request to retrieve the current software version.
+        """
         self._server_availability('Software version request', self.sw_version_client)
 
     def request_curr_pos(self):
-        """Service client to request the current position."""
+        """
+        Call the FarmBot current position request service.
+
+        Sends a request to retrieve the current robot position.
+        """
         self._server_availability('Current position request', self.curr_position_client)
 
     def client_callback(self, future):
-        """Service client callback once the request is send."""
+        """
+        Handle the response of a service client request.
+
+        Processes the service response and logs the command status depending
+        on the result of the request.
+        """
         try:
             response = future.result()
             if not response:

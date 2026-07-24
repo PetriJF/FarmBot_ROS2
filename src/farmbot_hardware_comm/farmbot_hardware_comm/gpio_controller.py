@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-GPIO controller module for FarmBot panel interface.
+GPIO controller module for the FarmBot panel interface.
 
-Manages hardware GPIO pins for LEDs, buttons, and emergency stop functionality.
-Handles button press events and LED state control via ROS2 services and callbacks.
+Manages GPIO hardware components including LEDs, buttons, and the emergency
+stop input. Provides ROS 2 services and callbacks to handle button events,
+control LED states, and publish panel commands.
 """
 import os
 
@@ -98,11 +99,17 @@ class GPIOController(Node):
 
     # Service Server
 
-    def LED_server(self, request, response):
+    def LED_server(self, request: LedPanelHandler.Request,
+                   response: LedPanelHandler.Response) -> LedPanelHandler.Response:
         """
-        Service Server handling LED State manipulation.
+        Handle an LED panel service request.
 
-        It sets the LEDS to ON, OFF or FLASHING.
+        Validates the requested LED pin and state, then updates the LED to be
+        turned on, turned off, or set to flash.
+
+        Args:
+            request {LedPanelHandler.Request}: LED control request.
+            response {LedPanelHandler.Response}: Service response object.
         """
         # Check if the LED Pin is correct
         if request.led_pin not in self.led_pin_list:
@@ -128,20 +135,39 @@ class GPIOController(Node):
         response.success = True
         return response
 
-    def add_flashing_led(self, led_pin):
-        """Add a LED from the flashing LED list."""
+    def add_flashing_led(self, led_pin: int):
+        """
+        Add an LED to the flashing LED list.
+
+        Args:
+            led_pin {int}: GPIO pin of the LED to flash.
+        """
         if led_pin not in self.leds_to_flash:
             self.leds_to_flash.append(led_pin)
 
-    def remove_flashing_led(self, led_pin):
-        """Remove a LED from the flashing LED list."""
+    def remove_flashing_led(self, led_pin: int):
+        """
+        Remove an LED from the flashing LED list.
+
+        Args:
+            led_pin {int}: GPIO pin to stop flashing.
+        """
         if led_pin in self.leds_to_flash:
             self.leds_to_flash.remove(led_pin)
 
     # Service Client
 
-    def _LED_client(self, led_pin, state):
-        """Service client for switching an LED on or off."""
+    def _LED_client(self, led_pin: int, state: bool):
+        """
+        Send a request to switch an LED on or off.
+
+        The request is sent asynchronously. If the LED handling service is not
+        available, the request is ignored to avoid blocking the executor.
+
+        Args:
+            led_pin {int}: GPIO pin of the LED to control.
+            state {bool}: Desired LED state (True for on, False for off).
+        """
         while not self.led_client.wait_for_service(1.0):
             self.get_logger().warn('Waiting for LED Handling Server...')
 
@@ -153,7 +179,15 @@ class GPIOController(Node):
         future.add_done_callback(self.LED_panel_callback)
 
     def LED_panel_callback(self, future):
-        """Service client callback once the LED switching server ends."""
+        """
+        Handle the response from the LED handling service.
+
+        Logs a warning if the service reports a failure or an error if the service
+        call itself fails.
+
+        Args:
+            future: Future containing the service response.
+        """
         try:
             response = future.result()
             if not response:
@@ -164,13 +198,26 @@ class GPIOController(Node):
     # LED states for the panel
 
     def LED_flasher(self):
-        """Timer Callback that flashes the LEDs in the self.leds_to_flash list."""
+        """
+        Toggle the state of all flashing LEDs.
+
+        This timer callback alternates the output state of every LED registered
+        in the flashing LED list to produce a blinking effect.
+        """
         for led_pin in self.leds_to_flash:
             GPIO.output(led_pin, GPIO.HIGH if self.flash_state else GPIO.LOW)
         self.flash_state = not self.flash_state
 
     def estop_button_handler(self, channel):
-        """Estop Button Event Handler for the panel controller."""
+        """
+        Handle the emergency stop button event.
+
+        Checks the state of the emergency stop button and publishes an emergency
+        stop command when the button is pressed.
+
+        Args:
+            channel {int}: GPIO channel that triggered the event.
+        """
         current_state = GPIO.input(self.fb_panel['BUTTON_ESTOP'])
         if current_state == GPIO.LOW:
             self.cmd.data = 'E'
@@ -179,6 +226,15 @@ class GPIOController(Node):
             self.get_logger().info('ESTOP button pressed')
 
     def reset_button_handler(self, channel):
+        """
+        Handle the reset emergency stop button event.
+
+        Checks the state of the reset emergency stop  button and publishes an emergency
+        stop command when the button is pressed.
+
+        Args:
+            channel {int}: GPIO channel that triggered the event.
+        """
         """Reset Button Event Handler for the panel controller."""
         current_state = GPIO.input(self.fb_panel['BUTTON_UNLOCK'])
         if current_state == GPIO.LOW:
@@ -190,10 +246,13 @@ class GPIOController(Node):
 
     def buttonHandler(self, channel):
         """
-        Handle button press events for buttons A, B, and C.
+        Handle button press events for the panel buttons.
 
-        Reads the GPIO channel state and triggers the corresponding command
-        for the pressed button.
+        Reads the GPIO channel state and triggers the command associated with
+        the pressed button.
+
+        Args:
+            channel {int}: GPIO channel that triggered the callback.
         """
         current_state = GPIO.input(channel)
         if current_state == GPIO.LOW:
@@ -214,7 +273,16 @@ class GPIOController(Node):
                                             self.button['button_C']['command'])
 
     def process_button_command(self, level, cmd):
-        """Determine the topic to which the command should be sent based on the command level."""
+        """
+        Publish a button command to the appropriate ROS 2 topic.
+
+        The command is sent to the low-level or high-level command topic depending
+         on the specified command level.
+
+        Args:
+            level (str): Command level determining the target topic.
+            cmd (str): Command to publish.
+        """
         self.cmd.data = cmd
         if level == 'LOW_LEVEL':
             self.lowlevel_command_pub.publish(self.cmd)

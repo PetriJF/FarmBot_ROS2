@@ -1,8 +1,8 @@
 """
-Parameter command module for the FarmBot controller node.
+FarmBot parameter command module.
 
-Provides read, list, and write parameter operations using the ROS2
-farmbot_command publisher.
+Provides helper methods to read, list, and write FarmBot parameters
+through ROS2 service interactions.
 """
 from farmbot_interfaces.srv import ReadParameter, WriteParameter
 
@@ -18,10 +18,10 @@ class ServerError(Exception):
 
 
 class Parameters:
-    """Helper for FarmBot parameter commands via the ROS2 farmbot_command publisher."""
+    """Parameter module that extends the farmbot controller node."""
 
     def __init__(self, node: Node):
-        """Initialize the parameter module and the ROS2 farmbot_command publisher."""
+        """Initialize the parameter module and the ROS2 service clients."""
         self.node = node
 
         self.read_param_client = self.node.create_client(ReadParameter, 'read_parameter')
@@ -35,10 +35,12 @@ class Parameters:
 
     def readParam(self, param: int):
         """
-        Service client to read the value on parameter {param}.
+        Call the ReadParameter service.
+
+        Used to read the value on parameter {param}.
 
         Args:
-            param {Int}: Parameter in question
+            param {int}: Parameter in question
         """
         self._server_availability('ReadParameter', self.read_param_client)
 
@@ -49,7 +51,12 @@ class Parameters:
         future.add_done_callback(self.read_client_callback)
 
     def read_client_callback(self, future):
-        """Service client callback once the request is send."""
+        """
+        Handle the response of a parameter read service request.
+
+        Processes the service response and logs the retrieved parameter value
+        or the command status depending on the result of the request.
+        """
         try:
             response = future.result()
             if not response:
@@ -68,7 +75,11 @@ class Parameters:
             self.node.get_logger().error('Service call failed %r' % (e, ))
 
     def listAllParams(self):
-        """Service client to list all parameters."""
+        """
+        Call the ListAllParameters service.
+
+        Used to all the parameters on the Farmduino.
+        """
         self._server_availability('ListAllParameters', self.list_all_param_client)
 
         request = Trigger.Request()
@@ -78,11 +89,14 @@ class Parameters:
 
     def writeParam(self, param: int, value: int, during_calibration: bool):
         """
-        Service client to write {value} to parameter {param}.
+        Call the WriteParameter service.
+
+        Used  to write {value} to parameter {param}.
 
         Args:
-            param {Int}: Parameter in question
-            value {Int}: Value written to param if write or update modes are active
+            param {int}: Parameter in question
+            value {int}: Value written to param if write or update modes are active
+            during_calibration {bool}: Indicates whether Farmbot is currently calibrating or not
         """
         self._server_availability('WriteParameter', self.write_param_client)
 
@@ -95,7 +109,12 @@ class Parameters:
         future.add_done_callback(self.client_callback)
 
     def client_callback(self, future):
-        """Service client callback once the request is send."""
+        """
+        Handle the response of a service request except parameter read requests.
+
+        Processes the service response and logs the command status depending
+        on the result of the request.
+        """
         try:
             response = future.result()
             if not response:

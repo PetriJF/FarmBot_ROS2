@@ -1,7 +1,8 @@
 """
-Module that converts high-level commands into FCode commands that Farmbot can interpret.
+Module that converts ROS 2 service and action requests into FarmBot FCode commands.
 
-It includes the Device Command Handler, Motor Command Handler, and State Command Handler modules.
+This module provides encoders used to translate high-level commands received
+through services or actions into the FCode format understood by the FarmBot.
 """
 import os
 
@@ -40,10 +41,15 @@ class Encoder:
     # Water commands
     def encode_watering(self, req: Watering.Request) -> str:
         """
-        Watering style command.
+        Encode a watering command into a FarmBot FCode instruction.
 
-        Used to set the watering to be either time based (1) or
-        measured using a flow meter (2)
+        Converts a watering service request into the corresponding FCode command.
+        The watering mode can be time-based or flow-meter-based depending on the
+        selected command type.
+
+        Args:
+            req {Watering.Request}: Watering command request containing the
+                watering mode and dose value.
         """
         WATERING_VALID_COMMAND = self.cmd_validation['watering_valid_command']
 
@@ -59,9 +65,14 @@ class Encoder:
     # I2C commands (Not implemented on the Farmduino yet)
     def encode_read_i2c(self, req: ReadI2C.Request) -> str:
         """
-        Encode the ReadI2C request into a FCode command.
+        Encode a ReadI2C request into a FarmBot FCode command.
 
-        Used to read from the I2C devices connected to the farmduino.
+        Converts an I2C read request into the corresponding FCode instruction used
+        to retrieve data from an I2C device connected to the Farmduino.
+
+        Args:
+        req {ReadI2C.Request}: I2C read request containing the device element
+            identifier and parameter to read.
         """
         VALID_I2C_ELEMENTS = self.cmd_validation['valid_i2c_element']
 
@@ -72,9 +83,14 @@ class Encoder:
 
     def encode_set_i2c(self, req: SetI2C.Request) -> str:
         """
-        Encode the SetI2C request into a FCode command.
+        Encode a SetI2C request into a FarmBot FCode command.
 
-        Used to write to the I2C devices connected to the farmduino.
+        Converts an I2C write request into the corresponding FCode instruction used
+        to send data to an I2C device connected to the Farmduino.
+
+        Args:
+            req {SetI2C.Request}: I2C write request containing the device element,
+            parameter, and value to send.
         """
         VALID_I2C_ELEMENTS = self.cmd_validation['valid_i2c_element']
 
@@ -86,9 +102,14 @@ class Encoder:
     # Pin commands
     def encode_configure_pin(self, req: ConfigurePin.Request) -> str:
         """
-        Encode the ConfigurePin request into a FCode command.
+        Encode a ConfigurePin request into a FarmBot FCode command.
 
-        Used to change the input/output mode of a pin on the Farmduino.
+        Converts a pin configuration request into the corresponding FCode instruction
+        used to change the input/output mode of a pin on the Farmduino.
+
+        Args:
+            req {ConfigurePin.Request}: Pin configuration request containing the pin
+                identifier and the desired input/output mode.
         """
         VALID_PINS = (i for i in range(self.cmd_validation['valid_pins_bounds'][0],
                                        self.cmd_validation['valid_pins_bounds'][1]))
@@ -99,9 +120,14 @@ class Encoder:
 
     def encode_read_pin(self, req: ReadPin.Request) -> str:
         """
-        Encode the ReadPin request into a FCode command.
+        Encode a ReadPin request into a FarmBot FCode command.
 
-        Used to change the digital/analog mode of a pin on the Farmduino.
+        Converts a pin read request into the corresponding FCode instruction used
+        to read the digital or analog value of a pin on the Farmduino.
+
+        Args:
+            req {ReadPin.Request}: Pin read request containing the pin identifier
+            and the reading mode (digital or analog).
         """
         VALID_PINS = (i for i in range(self.cmd_validation['valid_pins_bounds'][0],
                                        self.cmd_validation['valid_pins_bounds'][1]))
@@ -112,9 +138,14 @@ class Encoder:
 
     def encode_write_pin(self, req: WritePin.Request) -> str:
         """
-        Encode the WritePin request into a FCode command.
+        Encode a WritePin request into a FarmBot FCode command.
 
-        Used to change the value of a pin on the Farmduino.
+        Converts a pin write request into the corresponding FCode instruction used to change the
+        value of a pin on the Farmduino.
+
+        Args:
+            req {ReadPin.Request}: Pin read request containing the pin identifier
+            and the reading mode (digital or analog).
         """
         VALID_PINS = (i for i in range(self.cmd_validation['valid_pins_bounds'][0],
                                        self.cmd_validation['valid_pins_bounds'][1]))
@@ -129,10 +160,16 @@ class Encoder:
     # Gantry commands
     def encode_move_gantry(self, req: MoveGantry.Goal) -> str:
         """
-        Handle gantry commands.
+        Encode a MoveGantry request into a FarmBot FCode command.
 
+        Converts a move gantry request into the corresponding FCode instruction
+        used to move the gantry to a target position at the requested speed.
         Note that homing and calibration must be done through the
         HomeAxes action
+
+        Args:
+            req {MoveGantry.Goal}: Gantry movement request containing the target
+                                   position, movement type, and axis speed percentages.
         """
         x_edge = self.active_map['map_reference']['x_len']
         y_edge = self.active_map['map_reference']['y_len']
@@ -154,7 +191,17 @@ class Encoder:
 
     # Home commands
     def encode_home_axes(self, req: HomeAxes.Goal) -> str:
-        """Handle homing and calibration commands."""
+        """
+        Encode a HomeAxes request into a FarmBot FCode command.
+
+        Converts a home axes request into the corresponding FCode
+        instruction used to run homing or calibration on the selected axes
+        for the robot.
+
+        Args:
+            req {HomeAxes.Goal}: Homing request containing the operation type
+            and the selected axis.
+        """
         HOMING_VALID_COMMAND = self.cmd_validation['homing_valid_command']
 
         if req.op in HOMING_VALID_COMMAND:
@@ -180,10 +227,14 @@ class Encoder:
     # Servo commands
     def encode_move_servo(self, req: MoveServo.Request) -> str:
         """
-        Handle servo command interpretation.
+        Encode a MoveServo request into a FarmBot FCode command.
 
-        Note that servos can be attached only on pins
-        4, 5, 6 and 11 on the Farmduino
+        Converts a MoveServo request into the corresponding FCode instruction
+        used to set the angle of a servo connected to a valid Farmduino pin.
+
+        Args:
+            req {MoveServo.Goal}: Servo movement request containing the servo
+                                  pin and the target angle.
         """
         VALID_SERVO_PINS = self.cmd_validation['valid_servo_pins']
 
@@ -194,9 +245,13 @@ class Encoder:
     # Parameter commands
     def encode_read_parameter(self, req: ReadParameter.Request) -> str:
         """
-        Encode the ReadParameter request into a FCode command.
+        Encode a ReadParameter request into a FarmBot FCode command.
 
-        Used to read the parameters from the Farmduino.
+        Converts an read parameter request into the corresponding FCode instruction
+        used to read the parameters from the Farmduino.
+
+        Args:
+            req {ReadParameter}.Goal}: parameter read request containing the parameter to read.
         """
         VALID_PARAMETERS = list(self.active_config.keys())        # TODO: Checks Parameters values
 
@@ -206,9 +261,14 @@ class Encoder:
 
     def encode_write_parameter(self, req: WriteParameter.Request) -> str:
         """
-        Encode the WriteParameter request into a FCode command.
+        Encode a WriteParameter request into a FCode command.
 
-        Used to write to the parameters on the Farmduino.
+        Converts a write parameter request into the corresponding FCode instruction
+        used to write a value to a Farmduino parameter.
+
+        Args:
+            req {WriteParameter}.Goal}: parameter write request containing the parameter
+                                        identifier and its new value.
         """
         VALID_PARAMETERS = list(self.active_config.keys())
 
