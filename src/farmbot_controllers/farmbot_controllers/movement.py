@@ -21,7 +21,7 @@ class Movement:
     """Movement module that extends the farmbot controller node."""
 
     def __init__(self, node: Node):
-        """Initialize the movement module and the ROS2 action clients."""
+        """Initialise the movement module and the ROS2 action clients."""
         self.node = node
 
         self.move_gantry_client = ActionClient(self.node, MoveGantry, 'move_gantry')

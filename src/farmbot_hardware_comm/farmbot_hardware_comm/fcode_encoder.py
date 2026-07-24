@@ -4,15 +4,11 @@ Module that converts ROS 2 service and action requests into FarmBot FCode comman
 This module provides encoders used to translate high-level commands received
 through services or actions into the FCode format understood by the FarmBot.
 """
-import os
-
-from ament_index_python.packages import get_package_share_directory
+from farmbot_hardware_comm.modules.yaml_loader import YAMLLoader
 
 from farmbot_interfaces.action import HomeAxes, MoveGantry
 from farmbot_interfaces.srv import (ConfigurePin, MoveServo, ReadI2C, ReadParameter, ReadPin,
                                     SetI2C, Watering, WriteParameter, WritePin)
-
-import yaml
 
 
 class EncodeError(Exception):
@@ -25,18 +21,13 @@ class Encoder:
     """Encode incoming FarmBot service/action requests into FCode commands."""
 
     def __init__(self, config_path):
-        """Initialize the encoder class."""
-        self.active_config = yaml.safe_load(open(os.path.join(config_path,
-                                                              'activeConfig.yaml'), 'r'))
-        self.active_map = yaml.safe_load(open(os.path.join(config_path,
-                                                           'active_map.yaml'), 'r'))
+        """Initialise the encoder class."""
+        self.active_config = YAMLLoader.load_yaml(config_path, 'activeConfig.yaml')
+        self.active_map = YAMLLoader.load_yaml(config_path, 'active_map.yaml')
 
-        self.directory = os.path.join(
-            get_package_share_directory('farmbot_hardware_comm'),
-            'config'
-        )
-        self.cmd_validation = yaml.safe_load(open(os.path.join(self.directory,
-                                                               'CommandValidation.yaml'), 'r'))
+        self.directory = YAMLLoader.get_directory_package('farmbot_hardware_comm', 'config')
+
+        self.cmd_validation = YAMLLoader.load_yaml(self.directory, 'CommandValidation.yaml')
 
     # Water commands
     def encode_watering(self, req: Watering.Request) -> str:
@@ -51,15 +42,15 @@ class Encoder:
             req {Watering.Request}: Watering command request containing the
                 watering mode and dose value.
         """
-        WATERING_VALID_COMMAND = self.cmd_validation['watering_valid_command']
+        valid_watering_commands = self.cmd_validation['valid_watering_commands']
 
-        if req.command in WATERING_VALID_COMMAND:
+        if req.command in valid_watering_commands:
             if req.dose <= 0:
                 raise EncodeError('The time constraint/volume constraint was not set!')
             return f'F0{req.command} {"T" if req.command == 1 else "N"}{req.dose}'
 
         raise EncodeError(f'command {req.command} is not a valid watering command type '
-                          f'{WATERING_VALID_COMMAND}. First element should be 1 '
+                          f'{valid_watering_commands}. First element should be 1 '
                           '(timed pulses msec) or 2 (volume pulses)!')
 
     # I2C commands (Not implemented on the Farmduino yet)
@@ -74,11 +65,11 @@ class Encoder:
         req {ReadI2C.Request}: I2C read request containing the device element
             identifier and parameter to read.
         """
-        VALID_I2C_ELEMENTS = self.cmd_validation['valid_i2c_element']
+        valid_i2c_elements = self.cmd_validation['valid_i2c_elements']
 
-        if req.element not in VALID_I2C_ELEMENTS:
+        if req.element not in valid_i2c_elements:
             raise EncodeError(f'element {req.element} is not a valid i2c element '
-                              f'{VALID_I2C_ELEMENTS}')
+                              f'{valid_i2c_elements}')
         return f'F52 E{req.element} P{req.parameter}'
 
     def encode_set_i2c(self, req: SetI2C.Request) -> str:
@@ -92,11 +83,11 @@ class Encoder:
             req {SetI2C.Request}: I2C write request containing the device element,
             parameter, and value to send.
         """
-        VALID_I2C_ELEMENTS = self.cmd_validation['valid_i2c_element']
+        valid_i2c_elements = self.cmd_validation['valid_i2c_element']
 
-        if req.element not in VALID_I2C_ELEMENTS:
+        if req.element not in valid_i2c_elements:
             raise EncodeError(f'element {req.element} is not a valid i2c element '
-                              f'{VALID_I2C_ELEMENTS}')
+                              f'{valid_i2c_elements}')
         return f'F51 E{req.element} P{req.parameter} V{req.value}'
 
     # Pin commands
@@ -111,10 +102,10 @@ class Encoder:
             req {ConfigurePin.Request}: Pin configuration request containing the pin
                 identifier and the desired input/output mode.
         """
-        VALID_PINS = (i for i in range(self.cmd_validation['valid_pins_bounds'][0],
-                                       self.cmd_validation['valid_pins_bounds'][1]))
+        valid_pins = (i for i in range(self.cmd_validation['valid_pin_bounds'][0],
+                                       self.cmd_validation['valid_pin_bounds'][1]))
 
-        if req.pin not in VALID_PINS:
+        if req.pin not in valid_pins:
             raise EncodeError(f'pin {req.pin} is not a configurable pin')
         return f'F43 P{req.pin} M{int(req.output)}'
 
@@ -129,10 +120,10 @@ class Encoder:
             req {ReadPin.Request}: Pin read request containing the pin identifier
             and the reading mode (digital or analog).
         """
-        VALID_PINS = (i for i in range(self.cmd_validation['valid_pins_bounds'][0],
-                                       self.cmd_validation['valid_pins_bounds'][1]))
+        valid_pins = (i for i in range(self.cmd_validation['valid_pin_bounds'][0],
+                                       self.cmd_validation['valid_pin_bounds'][1]))
 
-        if req.pin not in VALID_PINS:
+        if req.pin not in valid_pins:
             raise EncodeError(f'pin {req.pin} is not a readable pin')
         return f'F42 P{req.pin} M{int(req.mode)}'
 
@@ -144,13 +135,14 @@ class Encoder:
         value of a pin on the Farmduino.
 
         Args:
-            req {ReadPin.Request}: Pin read request containing the pin identifier
-            and the reading mode (digital or analog).
+            req {WritePin.Request}: Pin write request containing the pin identifier,
+                                    different values to set, and an optional delay
+                                    between two settings.
         """
-        VALID_PINS = (i for i in range(self.cmd_validation['valid_pins_bounds'][0],
-                                       self.cmd_validation['valid_pins_bounds'][1]))
+        valid_pins = (i for i in range(self.cmd_validation['valid_pin_bounds'][0],
+                                       self.cmd_validation['valid_pin_bounds'][1]))
 
-        if req.pin not in VALID_PINS:
+        if req.pin not in valid_pins:
             raise EncodeError(f'pin {req.pin} is not a writable pin')
         if req.pulse:
             return f'F44 P{req.pin} V{req.value} W{req.value2} T{req.delay_ms} M{int(req.mode)}'
@@ -202,9 +194,9 @@ class Encoder:
             req {HomeAxes.Goal}: Homing request containing the operation type
             and the selected axis.
         """
-        HOMING_VALID_COMMAND = self.cmd_validation['homing_valid_command']
+        valid_homing_commands = self.cmd_validation['valid_homing_commands']
 
-        if req.op in HOMING_VALID_COMMAND:
+        if req.op in valid_homing_commands:
             if req.op == 0:
                 return 'G28'
             elif req.op in [1, 2]:
@@ -222,7 +214,7 @@ class Encoder:
             return f'F84 X{int(req.x)} Y{int(req.y)} Z{int(req.z)}'  # Set Home
 
         raise EncodeError(f'command {req.op} is not a valid homing command type '
-                          f'{HOMING_VALID_COMMAND}.')
+                          f'{valid_homing_commands}.')
 
     # Servo commands
     def encode_move_servo(self, req: MoveServo.Request) -> str:
@@ -233,13 +225,13 @@ class Encoder:
         used to set the angle of a servo connected to a valid Farmduino pin.
 
         Args:
-            req {MoveServo.Goal}: Servo movement request containing the servo
+            req {MoveServo.Request}: Servo movement request containing the servo
                                   pin and the target angle.
         """
-        VALID_SERVO_PINS = self.cmd_validation['valid_servo_pins']
+        valid_servo_pins = self.cmd_validation['valid_servo_pins']
 
-        if req.pin not in VALID_SERVO_PINS:
-            raise EncodeError(f'pin {req.pin} is not a valid servo pin {VALID_SERVO_PINS}')
+        if req.pin not in valid_servo_pins:
+            raise EncodeError(f'pin {req.pin} is not a valid servo pin {valid_servo_pins}')
         return f'F61 P{req.pin} V{req.angle:.0f}'
 
     # Parameter commands
@@ -251,11 +243,11 @@ class Encoder:
         used to read the parameters from the Farmduino.
 
         Args:
-            req {ReadParameter}.Goal}: parameter read request containing the parameter to read.
+            req {ReadParameter.Request}: parameter read request containing the parameter to read.
         """
-        VALID_PARAMETERS = list(self.active_config.keys())        # TODO: Checks Parameters values
+        valid_parameters = list(self.active_config.keys())        # TODO: Checks Parameters values
 
-        if req.param not in VALID_PARAMETERS:
+        if req.param not in valid_parameters:
             raise EncodeError(f'parameter {req.param} is not a valid parameter')
         return f'F21 P{req.param}'
 
@@ -267,12 +259,12 @@ class Encoder:
         used to write a value to a Farmduino parameter.
 
         Args:
-            req {WriteParameter}.Goal}: parameter write request containing the parameter
+            req {WriteParameter.Request}: parameter write request containing the parameter
                                         identifier and its new value.
         """
-        VALID_PARAMETERS = list(self.active_config.keys())
+        valid_parameters = list(self.active_config.keys())
 
-        if req.param not in VALID_PARAMETERS:
+        if req.param not in valid_parameters:
             raise EncodeError(f'parameter {req.param} is not a valid parameter')
         if req.during_calibration:
             return f'F23 P{req.param} V{req.value}'

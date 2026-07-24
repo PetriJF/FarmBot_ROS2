@@ -20,7 +20,7 @@ class State:
     """State module that extends the farmbot controller node."""
 
     def __init__(self, node: Node):
-        """Initialize the state module and the ROS2 service clients."""
+        """Initialise the state module and the ROS2 service clients."""
         self.node = node
 
         self.estop_client = self.node.create_client(Trigger, 'estop')

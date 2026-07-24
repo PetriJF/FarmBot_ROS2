@@ -20,7 +20,7 @@ class DeviceControl:
     """Device module that extends the farmbot controller node."""
 
     def __init__(self, node: Node):
-        """Initialize the device module and the ROS2 service clients."""
+        """Initialise the device module and the ROS2 service clients."""
         self.node = node
 
         self.read_i2c_client = self.node.create_client(ReadI2C, 'read_i2c')

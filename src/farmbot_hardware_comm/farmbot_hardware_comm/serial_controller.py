@@ -7,11 +7,8 @@ controller. It handles service and action requests, converts commands into
 FCode, sends them to the Farmduino over the serial connection, and processes
 received messages to provide feedback and update the system state.
 """
-import os
-
-from ament_index_python.packages import get_package_share_directory
-
 from farmbot_hardware_comm.fcode_encoder import EncodeError, Encoder
+from farmbot_hardware_comm.modules.yaml_loader import YAMLLoader
 
 from farmbot_interfaces.action import HomeAxes, MoveGantry
 from farmbot_interfaces.srv import (ConfigurePin, LedPanelHandler, MoveServo,
@@ -34,8 +31,6 @@ from std_msgs.msg import Bool, String
 
 from std_srvs.srv import Trigger
 
-import yaml
-
 
 class SerialController(Node):
     """
@@ -53,34 +48,27 @@ class SerialController(Node):
         """Node Constructor."""
         super().__init__('SerialController')
 
-        # self.uart_cmd = String()
-        # self.temp = String()
         self.goal_handle = None
 
         self.declare_parameter('serial_port', rclpy.Parameter.Type.STRING)
         self.declare_parameter('serial_speed', rclpy.Parameter.Type.INTEGER)
-        self.declare_parameter('check_uart_freq', rclpy.Parameter.Type.INTEGER)
+        self.declare_parameter('check_serial_freq', rclpy.Parameter.Type.INTEGER)
         self.declare_parameter('ws_path', rclpy.Parameter.Type.STRING)
         self.declare_parameter('folder_config_name', rclpy.Parameter.Type.STRING)
 
         serial_port = self.get_parameter('serial_port').get_parameter_value().string_value
         serial_speed = self.get_parameter('serial_speed').get_parameter_value().integer_value
-        self.check_uart_freq = self.get_parameter(
-            'check_uart_freq').get_parameter_value().integer_value
+        self.check_serial_freq = self.get_parameter(
+            'check_serial_freq').get_parameter_value().integer_value
         ws_path = self.get_parameter('ws_path').get_parameter_value().string_value
         folder_config_name = self.get_parameter(
             'folder_config_name').get_parameter_value().string_value
 
-        config_path = os.path.join(ws_path, folder_config_name)
-
-        # Initializing farmbot encoder module
-        self.fcode_encoder = Encoder(config_path)
-
-        # Initialize Serial Communication
+        # Initialise Serial Communication
         self.ser = serial.Serial(serial_port, serial_speed, timeout=1)
         self.ser.reset_input_buffer()
         # Create a timer to periodically check for incoming serial messages
-        self.rx_timer = self.create_timer(1.0 / self.check_uart_freq, self.uart_receive)
+        self.rx_timer = self.create_timer(1.0 / self.check_serial_freq, self.serial_receive)
 
         # Used for setting the busy status on the ROS2 arch. while a command is running
         self.previous_cmd = ''
@@ -91,16 +79,18 @@ class SerialController(Node):
             'final_position': [],
         }
 
-        self.directory = os.path.join(
-            get_package_share_directory('farmbot_hardware_comm'),
-            'config'
-        )
-        self.non_immediate_cmds = yaml.safe_load(open(os.path.join(self.directory,
-                                                                   'CommandsResponses.yaml'), 'r'))
+        config_path = YAMLLoader.join_path(ws_path, folder_config_name)
 
-        self.fb_panel = yaml.safe_load(open(os.path.join(self.directory, 'FarmbotPanel.yaml'), 'r'))
+        # Initialising farmbot encoder module
+        self.fcode_encoder = Encoder(config_path)
+
+        self.directory = YAMLLoader.get_directory_package('farmbot_hardware_comm', 'config')
+
+        self.non_immediate_cmds = YAMLLoader.load_yaml(self.directory, 'CommandsResponses.yaml')
+        self.fb_panel = YAMLLoader.load_yaml(self.directory, 'FarmbotPanel.yaml')
+
         self.led_client = self.create_client(LedPanelHandler, 'set_led')
-        # Initialize the LED states
+        # Initialise the LED states
         self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_ON'])
         self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_ON'])
 
@@ -183,8 +173,8 @@ class SerialController(Node):
         self.serial_feedback = String()
         self.serial_feedback_pub = self.create_publisher(String, 'serial_feedback', 10)
 
-        # Log the initialization
-        self.get_logger().info('Serial Controller Initialized..')
+        # Log the Initialisation
+        self.get_logger().info('Serial Controller Initialised..')
 
     async def _run_command(self, fcode: str) -> tuple[bool, str, int]:
         if self.code_response is not None and not self.code_response.done():
@@ -664,7 +654,7 @@ class SerialController(Node):
         self.ser.write(cmd.encode('utf-8'))
 
     # Receiving messages from Farmbot
-    def uart_receive(self):
+    def serial_receive(self):
         """
         Read and process incoming messages from the FarmBot serial connection.
 
@@ -791,7 +781,7 @@ class SerialController(Node):
                 denominator += 1
         if denominator != 0:
             return sum(axis_completion) / denominator
-        return 1
+        return 1.0
 
     # Service Client
 
@@ -836,12 +826,13 @@ class SerialController(Node):
             self.get_logger().error('Service call failed %r' % (e, ))
 
     def destroy_node(self):
-        """Close the UART when the node is destroyed."""
+        """Close the serial when the node is destroyed."""
         self.ser.close()
+        super().destroy_node()
 
 
 def main(args=None):
-    """Initialize and run the Serial controller node."""
+    """Initialise and run the Serial controller node."""
     rclpy.init(args=args)
 
     serial_node = SerialController()

@@ -21,7 +21,7 @@ class Parameters:
     """Parameter module that extends the farmbot controller node."""
 
     def __init__(self, node: Node):
-        """Initialize the parameter module and the ROS2 service clients."""
+        """Initialise the parameter module and the ROS2 service clients."""
         self.node = node
 
         self.read_param_client = self.node.create_client(ReadParameter, 'read_parameter')

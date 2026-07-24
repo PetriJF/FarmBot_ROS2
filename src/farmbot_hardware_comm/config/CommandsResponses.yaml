@@ -20,16 +20,16 @@ configure_pin:
 
 read_pin:
   F42:
-    responses: ['R41','R03''R86','R87']
+    responses: ['R41','R03','R86','R87']
 
 write_pin:
-  F44: 
+  F44:
     responses: ['R02','R03','R86','R87']
   F41:
     responses: ['R08']
 
 move_gantry:
-  G00: 
+  G00:
     responses: ['R02','R03','R86','R87']
   G01: 
     responses: ['R02','R03','R86','R87']
