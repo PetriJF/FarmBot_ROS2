@@ -43,7 +43,7 @@ class SerialController(Node):
     decoded and carried on to the relevant nodes.
     """
 
-    # Node contructor
+    # Node constructor
     def __init__(self):
         """Node Constructor."""
         super().__init__('SerialController')

@@ -35,7 +35,7 @@ class GPIOController(Node):
     via ROS2 services.
     """
 
-    # Node contructor
+    # Node constructor
     def __init__(self):
         """Initialise the GPIO controller node and configure hardware pins."""
         super().__init__('GPIOController')
@@ -235,7 +235,7 @@ class GPIOController(Node):
                 self.node.get_logger().info(response.message)
 
             else:
-                self.node.get_logger().info('Command succesful')
+                self.node.get_logger().info('Command successful')
 
         except Exception as e:
             self.node.get_logger().error('Service call failed %r' % (e, ))
