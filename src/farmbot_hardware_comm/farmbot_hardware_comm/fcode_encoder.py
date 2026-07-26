@@ -83,7 +83,7 @@ class Encoder:
             req {SetI2C.Request}: I2C write request containing the device element,
             parameter, and value to send.
         """
-        valid_i2c_elements = self.cmd_validation['valid_i2c_element']
+        valid_i2c_elements = self.cmd_validation['valid_i2c_elements']
 
         if req.element not in valid_i2c_elements:
             raise EncodeError(f'element {req.element} is not a valid i2c element '

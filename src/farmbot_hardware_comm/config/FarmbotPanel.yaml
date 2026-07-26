@@ -5,16 +5,16 @@
 # Button Pins
 button_estop: 16
 button_unlock: 22
-button_A: 26
-button_B: 5
-button_C: 20
+button_a: 26
+button_b: 5
+button_c: 20
 
 # Button LEDs
 estop_led: 17
 unlock_led: 23
-button_led_A: 27
-button_led_B: 6
-button_led_C: 21
+button_led_a: 27
+button_led_b: 6
+button_led_c: 21
 
 # Standard LEDs
 led_1: 24

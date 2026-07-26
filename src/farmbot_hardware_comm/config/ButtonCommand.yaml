@@ -1,14 +1,13 @@
 # Used to change the functions associated with each button
 
-button_A:                        ### Button associated with the command
+button_a:                        ### Button associated with the command
   command_name: 'Homing'
   command: 'H_0'                 # Code of the command
 
-button_B:
+button_b:
   command_name: 'Calibration'
   command: 'C_0'
 
-button_C:
+button_c:
   command_name: 'Watering'
   command: 'P_4'
-
