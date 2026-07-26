@@ -19,36 +19,40 @@ class YAMLLoader:
     inside ROS2 packages and load YAML files safely.
     """
 
-    def join_path(self, parent_path: str, file: str) -> str:
+    @staticmethod
+    def join_path(directory_path: str, file: str) -> str:
         """
-        Get the path of a child directory.
+        Join the directory path and a file name into a single path.
 
         Args:
-            parent_path {str}: Path
-            file {str}: Child file name.
+            directory_path {str}: Base directory path.
+            file {str}: file name.
         """
-        return os.path.join(parent_path, file)
+        return os.path.join(directory_path, file)
 
-    def get_directory_package(self, package_folder: str, child_folder: str) -> str:
+    @staticmethod
+    def get_directory_package(package_name: str, file_rel_path: str) -> str:
         """
-        Get the path of a child directory inside a ROS2 package.
+        Get the path of a file directory inside a ROS2 package.
 
         Args:
-            package_folder {str}: Name of the ROS2 package.
-            child_folder {str}: Child directory path inside the package.
+            package_name {str}: Name of the ROS2 package.
+            file_rel_path {str}: File directory path inside the package.
         """
-        parent_path = get_package_share_directory(package_folder)
-        return self.join_path(parent_path, child_folder)
+        directory_path = get_package_share_directory(package_name)
+        return YAMLLoader.join_path(directory_path, file_rel_path)
 
-    def load_yaml(self, path: str, file) -> dict:
+    @staticmethod
+    def load_yaml(path: str, file: str) -> dict:
         """
         Load a YAML configuration file.
 
         Opens the YAML file and parses its content into a Python dictionary.
 
         Args:
-            file_name {str}: Path to the YAML configuration file.
+            path {str}: Directory containing the YAML file.
+            file {str}: Name of the YAML configuration file.
         """
-        file_path = self.join_path(path, file)
-        with open(file_path, 'r') as file:
-            return yaml.safe_load(file)
+        file_path = YAMLLoader.join_path(path, file)
+        with open(file_path, 'r') as config_file:
+            return yaml.safe_load(config_file)
