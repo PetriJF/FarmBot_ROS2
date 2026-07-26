@@ -3,26 +3,26 @@
 # LED pins and LED states
 
 # Button Pins
-BUTTON_ESTOP: 16
-BUTTON_UNLOCK: 22
-BUTTON_A: 26
-BUTTON_B: 5
-BUTTON_C: 20
+button_estop: 16
+button_unlock: 22
+button_a: 26
+button_b: 5
+button_c: 20
 
 # Button LEDs
-ESTOP_LED: 17
-UNLOCK_LED: 23
-BUTTON_LED_A: 27
-BUTTON_LED_B: 6
-BUTTON_LED_C: 21
+estop_led: 17
+unlock_led: 23
+button_led_a: 27
+button_led_b: 6
+button_led_c: 21
 
 # Standard LEDs
-LED1: 24
-LED2: 25
-LED3: 12
-LED4: 13
+led_1: 24
+led_2: 25
+led_3: 12
+led_4: 13
 
 # LED states
-LED_ON: 1
-LED_OFF: 0
-LED_FLASHING: 2
+led_on: 1
+led_off: 0
+led_flashing: 2

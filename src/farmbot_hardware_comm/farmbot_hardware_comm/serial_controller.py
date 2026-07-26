@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 """
-Farmbot serial communications node.
+FarmBot serial communication node.
 
-Handles ROS2 /farmbot_command input, forwards commands to the Farmduino over serial,
-and publishes feedback and busy state updates.
+This node acts as the communication bridge between ROS 2 and the FarmBot
+controller. It handles service and action requests, converts commands into
+FCode, sends them to the Farmduino over the serial connection, and processes
+received messages to provide feedback and update the system state.
 """
-import os
-
-from ament_index_python.packages import get_package_share_directory
-
 from farmbot_hardware_comm.fcode_encoder import EncodeError, Encoder
+from farmbot_hardware_comm.modules.yaml_loader import YAMLLoader
 
-# from farmbot_interfaces.action import FarmbotComms
 from farmbot_interfaces.action import HomeAxes, MoveGantry
 from farmbot_interfaces.srv import (ConfigurePin, LedPanelHandler, MoveServo,
                                     ReadI2C, ReadParameter, ReadPin, SetI2C,
@@ -21,7 +19,6 @@ from geometry_msgs.msg import PointStamped
 
 import rclpy
 from rclpy.action import ActionServer, GoalResponse
-# from rclpy.action import CancelResponse
 from rclpy.action.server import ServerGoalHandle
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
@@ -34,71 +31,47 @@ from std_msgs.msg import Bool, String
 
 from std_srvs.srv import Trigger
 
-import yaml
-
 
 class SerialController(Node):
     """
     Farmbot ROS2 node that handles the Serial messages going to and from the Farmduino.
 
-    The Node receives commands through the FarmbotComms action and sends them to the
+    The Node receives commands through different actions and services, and sends them to the
     Farmduino.
 
     When the node receives feedback from the Farmduino through Serial, the message is
     decoded and carried on to the relevant nodes.
     """
 
-    # Node contructor
+    # Node constructor
     def __init__(self):
         """Node Constructor."""
         super().__init__('SerialController')
 
-        # self.uart_cmd = String()
-        # self.temp = String()
         self.goal_handle = None
 
         self.declare_parameter('serial_port', rclpy.Parameter.Type.STRING)
         self.declare_parameter('serial_speed', rclpy.Parameter.Type.INTEGER)
-        self.declare_parameter('check_uart_freq', rclpy.Parameter.Type.INTEGER)
+        self.declare_parameter('check_serial_freq', rclpy.Parameter.Type.INTEGER)
         self.declare_parameter('ws_path', rclpy.Parameter.Type.STRING)
         self.declare_parameter('folder_config_name', rclpy.Parameter.Type.STRING)
 
         serial_port = self.get_parameter('serial_port').get_parameter_value().string_value
         serial_speed = self.get_parameter('serial_speed').get_parameter_value().integer_value
-        self.check_uart_freq = self.get_parameter(
-            'check_uart_freq').get_parameter_value().integer_value
+        self.check_serial_freq = self.get_parameter(
+            'check_serial_freq').get_parameter_value().integer_value
         ws_path = self.get_parameter('ws_path').get_parameter_value().string_value
         folder_config_name = self.get_parameter(
             'folder_config_name').get_parameter_value().string_value
 
-        config_path = os.path.join(ws_path, folder_config_name)
-
-        # Initializing farmbot encoder module
-        self.fcode_encoder = Encoder(config_path)
-
-        # # UART receive publisher
-        # self.fb_feedback_pub = self.create_publisher(String, 'farmbot_feedback', 10)
-
-        # # Initialize the Action Server
-        # self.farmbot_comm_server = ActionServer(
-        #     self,
-        #     FarmbotComms,
-        #     'farmbot_communication',
-        #     goal_callback=self.communication_goal_callback,
-        #     execute_callback=self.execute_callback,
-        #     cancel_callback=self.cancel_callback,
-        #     handle_accepted_callback=self.handle_callback,
-        # )
-
-        # Initialize Serial Communication
+        # Initialise Serial Communication
         self.ser = serial.Serial(serial_port, serial_speed, timeout=1)
         self.ser.reset_input_buffer()
         # Create a timer to periodically check for incoming serial messages
-        self.rx_timer = self.create_timer(1.0 / self.check_uart_freq, self.uart_receive)
+        self.rx_timer = self.create_timer(1.0 / self.check_serial_freq, self.serial_receive)
 
         # Used for setting the busy status on the ROS2 arch. while a command is running
         self.previous_cmd = ''
-        # self.status = ''
         self.code_response: Future = None
 
         self.mission = {
@@ -106,16 +79,18 @@ class SerialController(Node):
             'final_position': [],
         }
 
-        self.directory = os.path.join(
-            get_package_share_directory('farmbot_hardware_comm'),
-            'config'
-        )
-        self.non_immediate_cmds = yaml.safe_load(open(os.path.join(self.directory,
-                                                                   'CommandsResponses.yaml'), 'r'))
+        config_path = YAMLLoader.join_path(ws_path, folder_config_name)
 
-        self.fb_panel = yaml.safe_load(open(os.path.join(self.directory, 'FarmbotPanel.yaml'), 'r'))
+        # Initialising farmbot encoder module
+        self.fcode_encoder = Encoder(config_path)
+
+        self.directory = YAMLLoader.get_directory_package('farmbot_hardware_comm', 'config')
+
+        self.non_immediate_cmds = YAMLLoader.load_yaml(self.directory, 'CommandsResponses.yaml')
+        self.fb_panel = YAMLLoader.load_yaml(self.directory, 'FarmbotPanel.yaml')
+
         self.led_client = self.create_client(LedPanelHandler, 'set_led')
-        # Initialize the LED states
+        # Initialise the LED states
         self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_ON'])
         self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_ON'])
 
@@ -198,10 +173,10 @@ class SerialController(Node):
         self.serial_feedback = String()
         self.serial_feedback_pub = self.create_publisher(String, 'serial_feedback', 10)
 
-        # Log the initialization
-        self.get_logger().info('Serial Controller Initialized..')
+        # Log the Initialisation
+        self.get_logger().info('Serial Controller Initialised..')
 
-    async def _run_command(self, fcode: str):
+    async def _run_command(self, fcode: str) -> tuple[bool, str, int]:
         if self.code_response is not None and not self.code_response.done():
             return False, 'busy', -1
 
@@ -213,8 +188,18 @@ class SerialController(Node):
         return result[0], result[1], result[2]
 
     # Callbacks
-    async def watering_command_server(self, request, response):
-        """Handle the watering command service request."""
+    async def watering_command_server(self, request: Watering.Request,
+                                      response: Watering.Response) -> Watering.Response:
+        """
+        Handle a watering command service request.
+
+        Encodes the watering request into FCode and sends it
+        to the FarmBot command sender.
+
+        Args:
+            request {Watering.Request}: Watering command parameters.
+            response {Watering.Response}: Service response object.
+        """
         try:
             fcode = self.fcode_encoder.encode_watering(request)
         except EncodeError as e:
@@ -225,9 +210,18 @@ class SerialController(Node):
         response.success, response.message, _ = await self._run_command(fcode)
         return response
 
-    async def read_i2c_command_server(self, request, response):
-        """Handle the read I2C command service request."""
-        response = ReadI2C.Response()
+    async def read_i2c_command_server(self, request: ReadI2C.Request,
+                                      response: ReadI2C.Response) -> ReadI2C.Response:
+        """
+        Handle a i2c reading command service request.
+
+        Encodes the i2c reading request into FCode and sends it
+        to the FarmBot command sender.
+
+        Args:
+            request {ReadI2C.Request}: ReadI2C command parameters.
+            response {ReadI2C.Response}: Service response object.
+        """
         try:
             fcode = self.fcode_encoder.encode_read_i2c(request)
         except EncodeError as e:
@@ -239,9 +233,18 @@ class SerialController(Node):
         response.success, response.message, response.value = await self._run_command(fcode)
         return response
 
-    async def set_i2c_command_server(self, request, response):
-        """Handle the read I2C command service request."""
-        response = SetI2C.Response()
+    async def set_i2c_command_server(self, request: SetI2C.Request,
+                                     response: SetI2C.Response) -> SetI2C.Response:
+        """
+        Handle a i2c setting command service request.
+
+        Encodes the i2c setting request into FCode and sends it
+        to the FarmBot command sender.
+
+        Args:
+            request {SetI2C.Request}: SetI2C command parameters.
+            response {SetI2C.Response}: Service response object.
+        """
         try:
             fcode = self.fcode_encoder.encode_set_i2c(request)
         except EncodeError as e:
@@ -252,9 +255,19 @@ class SerialController(Node):
         response.success, response.message, _ = await self._run_command(fcode)
         return response
 
-    async def configure_pin_command_server(self, request, response):
-        """Handle the configure pin command service request."""
-        response = ConfigurePin.Response()
+    async def configure_pin_command_server(
+            self, request: ConfigurePin.Request,
+            response: ConfigurePin.Response) -> ConfigurePin.Response:
+        """
+        Handle a configure pin command service request.
+
+        Encodes the configure pin request into FCode and sends it
+        to the FarmBot command sender.
+
+        Args:
+            request {ConfigurePin.Request}: ConfigurePin command parameters.
+            response {ConfigurePin.Response}: Service response object.
+        """
         try:
             fcode = self.fcode_encoder.encode_configure_pin(request)
         except EncodeError as e:
@@ -265,9 +278,18 @@ class SerialController(Node):
         response.success, response.message, _ = await self._run_command(fcode)
         return response
 
-    async def read_pin_command_server(self, request, response):
-        """Handle the read pin command service request."""
-        response = ReadPin.Response()
+    async def read_pin_command_server(self, request: ReadPin.Request,
+                                      response: ReadPin.Response) -> ReadPin.Response:
+        """
+        Handle a read pin command service request.
+
+        Encodes the read pin request into FCode and sends it
+        to the FarmBot command sender.
+
+        Args:
+            request {ReadPin.Request}: ReadPin command parameters.
+            response {ReadPin.Response}: Service response object.
+        """
         try:
             fcode = self.fcode_encoder.encode_read_pin(request)
         except EncodeError as e:
@@ -279,9 +301,18 @@ class SerialController(Node):
         response.success, response.message, response.value = await self._run_command(fcode)
         return response
 
-    async def write_pin_command_server(self, request, response):
-        """Handle the write pin command service request."""
-        response = WritePin.Response()
+    async def write_pin_command_server(self, request: WritePin.Request,
+                                       response: WritePin.Response) -> WritePin.Response:
+        """
+        Handle a write pin command service request.
+
+        Encodes the write pin request into FCode and sends it
+        to the FarmBot command sender.
+
+        Args:
+            request {WritePin.Request}: WritePin command parameters.
+            response {WritePin.Response}: Service response object.
+        """
         try:
             fcode = self.fcode_encoder.encode_write_pin(request)
         except EncodeError as e:
@@ -292,11 +323,16 @@ class SerialController(Node):
         response.success, response.message, _ = await self._run_command(fcode)
         return response
 
-    def goal_callback(self, goal_request):
+    def goal_callback(self, goal_request) -> GoalResponse:
         """
-        Check whether the goal is valid.
+        Check whether an incoming action goal can be accepted.
 
-        If the estop is active, the goal is rejected. Otherwise, it is accepted.
+        A goal is rejected if an emergency stop or abort command is active,
+        or if another command is already being executed.
+        Otherwise, the goal is accepted.
+
+        Args:
+        goal_request: Incoming action goal request.
         """
         self.get_logger().info('Received goal request')
 
@@ -310,8 +346,16 @@ class SerialController(Node):
 
         return GoalResponse.ACCEPT
 
-    async def gantry_execute_callback(self, goal_handle: ServerGoalHandle):
-        """Handle the gantry execute callback action."""
+    async def gantry_execute_callback(self, goal_handle: ServerGoalHandle) -> MoveGantry.Result:
+        """
+        Execute a gantry movement action.
+
+        The goal is encoded into FCode and sent to the FarmBot.
+        The action result is updated according to the command execution status.
+
+        Args:
+            goal_handle {ServerGoalHandle}: Accepted action goal.
+        """
         self.goal_handle = goal_handle
         result = MoveGantry.Result()
 
@@ -354,8 +398,16 @@ class SerialController(Node):
 
         return result
 
-    async def home_execute_callback(self, goal_handle: ServerGoalHandle):
-        """Handle the home execute callback action."""
+    async def home_execute_callback(self, goal_handle: ServerGoalHandle) -> HomeAxes.Result:
+        """
+        Execute a home axes action.
+
+        The goal is encoded into FCode and sent to the FarmBot.
+        The action result is updated according to the command execution status.
+
+        Args:
+            goal_handle {ServerGoalHandle}: Accepted action goal.
+        """
         self.goal_handle = goal_handle
         result = HomeAxes.Result()
 
@@ -392,8 +444,18 @@ class SerialController(Node):
 
         return result
 
-    async def move_servo_command_server(self, request, response):
-        """Handle the move servo command service request."""
+    async def move_servo_command_server(self, request: MoveServo.Request,
+                                        response: MoveServo.Response) -> MoveServo.Response:
+        """
+        Handle a move servo command service request.
+
+        Encodes the move servo request into FCode and sends it
+        to the FarmBot command sender.
+
+        Args:
+            request {MoveServo.Request}: MoveServo command parameters.
+            response {MoveServo.Response}: Service response object.
+        """
         try:
             fcode = self.fcode_encoder.encode_move_servo(request)
         except EncodeError as e:
@@ -404,9 +466,19 @@ class SerialController(Node):
         response.success, response.message, _ = await self._run_command(fcode)
         return response
 
-    async def read_parameter_command_server(self, request, response):
-        """Handle the read parameter command service request."""
-        response = ReadParameter.Response()
+    async def read_parameter_command_server(
+            self, request: ReadParameter.Request,
+            response: ReadParameter.Response) -> ReadParameter.Response:
+        """
+        Handle a read parameter command service request.
+
+        Encodes the read parameter request into FCode and sends it
+        to the FarmBot command sender.
+
+        Args:
+            request {ReadParameter.Request}: ReadParameter command parameters.
+            response {ReadParameter.Response}: Service response object.
+        """
         try:
             fcode = self.fcode_encoder.encode_read_parameter(request)
         except EncodeError as e:
@@ -418,9 +490,19 @@ class SerialController(Node):
         response.success, response.message, response.value = await self._run_command(fcode)
         return response
 
-    async def write_parameter_command_server(self, request, response):
-        """Handle the write parameter command service request."""
-        response = WriteParameter.Response()
+    async def write_parameter_command_server(
+            self, request: WriteParameter.Request,
+            response: WriteParameter.Response) -> WriteParameter.Response:
+        """
+        Handle a write parameter command service request.
+
+        Encodes the write parameter request into FCode and sends it
+        to the FarmBot command sender.
+
+        Args:
+            request {WriteParameter.Request}: WriteParameter command parameters.
+            response {WriteParameter.Response}: Service response object.
+        """
         try:
             fcode = self.fcode_encoder.encode_write_parameter(request)
         except EncodeError as e:
@@ -431,17 +513,31 @@ class SerialController(Node):
         response.success, response.message, _ = await self._run_command(fcode)
         return response
 
-    async def list_all_command_server(self, request, response):
-        """Handle the list all parameter command service request."""
-        response = Trigger.Response()
+    async def list_all_command_server(self, request: Trigger.Request,
+                                      response: Trigger.Response) -> Trigger.Response:
+        """
+        Handle the list all parameter command service request.
 
+        Sends the F20 command to the FarmBot.
+
+        Args:
+            request {Trigger.Request}: Empty trigger request.
+            response {Trigger.Response}: Service response object.
+        """
         response.success, response.message, _ = await self._run_command('F20')
         return response
 
-    async def estop_command_server(self, request, response):
-        """Handle the estop command service request."""
-        response = Trigger.Response()
+    async def estop_command_server(self, request: Trigger.Request,
+                                   response: Trigger.Response) -> Trigger.Response:
+        """
+        Handle the emergency stop command service request.
 
+        Sends the emergency stop command to the FarmBot command sender.
+
+        Args:
+            request {Trigger.Request}: Empty trigger request.
+            response {Trigger.Response}: Service response object.
+        """
         self.farmbot_cmd_sender('E')
 
         self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_OFF'])
@@ -452,10 +548,17 @@ class SerialController(Node):
         response.success = True
         return response
 
-    async def resume_command_server(self, request, response):
-        """Handle the reset estop command service request."""
-        response = Trigger.Response()
+    async def resume_command_server(self, request: Trigger.Request,
+                                    response: Trigger.Response) -> Trigger.Response:
+        """
+        Handle the emergency stop reset command service request.
 
+        Sends the emergency stop reset command to the FarmBot command sender.
+
+        Args:
+            request {Trigger.Request}: Empty trigger request.
+            response {Trigger.Response}: Service response object.
+        """
         response.success, response.message, _ = await self._run_command('F09')
 
         if response.success:
@@ -466,10 +569,17 @@ class SerialController(Node):
 
         return response
 
-    async def abort_command_server(self, request, response):
-        """Handle the abort command service request."""
-        response = Trigger.Response()
+    async def abort_command_server(self, request: Trigger.Request,
+                                   response: Trigger.Response) -> Trigger.Response:
+        """
+        Handle the abort command service request.
 
+        Sends the abort command to the FarmBot command sender.
+
+        Args:
+            request {Trigger.Request}: Empty trigger request.
+            response {Trigger.Response}: Service response object.
+        """
         self.farmbot_cmd_sender('@')
         # Only latch when a command was actually interrupted (or unlatch a prior abort)
         if ((self.code_response is not None and not self.code_response.done())
@@ -480,29 +590,58 @@ class SerialController(Node):
         response.success = True
         return response
 
-    async def end_stop_command_server(self, request, response):
-        """Handle the end stops command service request."""
-        response = Trigger.Response()
+    async def end_stop_command_server(self, request: Trigger.Request,
+                                      response: Trigger.Response) -> Trigger.Response:
+        """
+        Handle the end stops command service request.
 
+        Sends the end stops command to the FarmBot command sender.
+
+        Args:
+            request {Trigger.Request}: Empty trigger request.
+            response {Trigger.Response}: Service response object.
+        """
         response.success, response.message, _ = await self._run_command('F81')
         return response
 
-    async def sw_version_command_server(self, request, response):
-        """Handle the software version command service request."""
-        response = Trigger.Response()
+    async def sw_version_command_server(self, request: Trigger.Request,
+                                        response: Trigger.Response) -> Trigger.Response:
+        """
+        Handle the software version command service request.
 
+        Sends the software version command to the FarmBot command sender.
+
+        Args:
+            request {Trigger.Request}: Empty trigger request.
+            response {Trigger.Response}: Service response object.
+        """
         response.success, response.message, _ = await self._run_command('F83')
         return response
 
-    async def curr_position_command_server(self, request, response):
-        """Handle the software version command service request."""
-        response = Trigger.Response()
+    async def curr_position_command_server(self, request: Trigger.Request,
+                                           response: Trigger.Response) -> Trigger.Response:
+        """
+        Handle the current position command service request.
 
+        Sends the current position command to the FarmBot command sender.
+
+        Args:
+            request {Trigger.Request}: Empty trigger request.
+            response {Trigger.Response}: Service response object.
+        """
         response.success, response.message, _ = await self._run_command('F82')
         return response
 
     def farmbot_cmd_sender(self, cmd: str):
-        """Send the commands to the farmbot through serial."""
+        """
+        Send an FCode command to the FarmBot over the serial connection.
+
+        Ensures that the command is newline-terminated, stores the command name
+        for response tracking, and writes the encoded command to the serial port.
+
+        Args:
+            cmd {str}: FCode command to send to the FarmBot.
+        """
         # Ensure the endline char at the end of the command
         if cmd[-1] != '\n':
             cmd += '\n'
@@ -515,8 +654,13 @@ class SerialController(Node):
         self.ser.write(cmd.encode('utf-8'))
 
     # Receiving messages from Farmbot
-    def uart_receive(self):
-        """Timer callback that reads from UART and handles the response codes and commands."""
+    def serial_receive(self):
+        """
+        Read and process incoming messages from the FarmBot serial connection.
+
+        This timer callback reads a line from the serial port. If a message is
+        received, it is logged and forwarded to the message handler.
+        """
         # Read from serial
         line = self.ser.readline().decode('utf-8').rstrip()
         # If a command is read, handle it
@@ -528,10 +672,14 @@ class SerialController(Node):
 
     def handle_message(self, message: str):
         """
-        Handle the command lines that are received through serial.
+        Process a message received from the FarmBot serial connection.
+
+        The received message is parsed to update the robot state, publish action
+        feedback, resolve pending command responses, and forward the raw message
+        to other ROS 2 nodes.
 
         Args:
-            message {str}: the command string
+            message {str}: Raw message received from the FarmBot.
         """
         # Record the message
         self.serial_feedback.data = message
@@ -611,8 +759,16 @@ class SerialController(Node):
         # Send the reporting message for further processing by other nodes
         self.serial_feedback_pub.publish(self.serial_feedback)
 
-    def percentage_calculation(self, current_position: list):
-        """Calculate the percentage of progress made in the movement."""
+    def percentage_calculation(self, current_position: list) -> float:
+        """
+        Calculate the progress of the current movement.
+
+        The progress is computed as the average normalized completion of all axes
+        that are moving. If no axis is moving, the function returns 1.0.
+
+        Args:
+            current_position {list}: Current [x, y, z] position of the FarmBot.
+        """
         axis_completion = [0.0, 0.0, 0.0]
         denominator = 0
 
@@ -625,234 +781,21 @@ class SerialController(Node):
                 denominator += 1
         if denominator != 0:
             return sum(axis_completion) / denominator
-        return 1
-
-####################################################################################################
-
-    # Goal Callback
-    # def communication_goal_callback(self, goal_request):
-    #     """
-    #     Check whether the goal is valid.
-
-    #     If the command type is not among those accepted by Farmbot, the goal is rejected.
-    #     Otherwise, it is accepted.
-    #     """
-    #     self.get_logger().info('Received goal request')
-    #     command_id = (goal_request.command).split(' ')[0]
-
-    #     valid_commands = ['E', 'F09', '@', 'i2c_command', 'pin_command', 'water_command',
-    #                       'home_handler', 'move_gantry', 'move_servo', 'parameter_command',
-    #                       'state_command']
-
-    #     if (command_id not in valid_commands
-    #        or (self.previous_cmd == 'E' and command_id != 'F09')
-    #        or (self.previous_cmd == '@' and command_id not in ['E', '@'])
-    #        or (self.status == 'IS_RUNNING')):
-    #         return GoalResponse.REJECT
-
-    #     return GoalResponse.ACCEPT
-
-    # # Cancel callback
-    # def cancel_callback(self, goal_handle):
-    #     """Accept the cancel request."""
-    #     self.get_logger().info('Received cancel request')
-
-    #     return CancelResponse.ACCEPT
-
-    # Handle execute callback
-    # def handle_callback(self, goal_handle: ServerGoalHandle):
-    #     """Create a timer to track the command status."""
-    #     self.goal_handle = goal_handle
-    #     command = goal_handle.request.command
-
-    #     if self.previous_cmd == '@' and command == '@':
-    #         self.status = 'ABORT_ENDED'
-    #         self.previous_cmd = ''
-    #         goal_handle.execute()
-    #         return
-
-    #     self.mission['starting_position'] = self.mission['current_position'][:]
-
-    #     self.farmbot_command_sender(command)
-
-    #     self.get_logger().info('Executing goal...')
-    #     self.check_status_timer = self.create_timer(1.0 / self.check_uart_freq, self.check_status)
-    #     self.feedback_timer = self.create_timer(1.0 / 2, self.send_feedback)
-
-    # def check_status(self):
-    #     """
-    #     Check command execution status and handle completion or cancellation.
-
-    #     Publishes feedback, handles goal cancellation requests, and triggers
-    #     the next callback based on command completion state.
-    #     """
-    #     if not self.check_status_timer.is_canceled():
-    #         if self.goal_handle.is_cancel_requested:
-    #             self.get_logger().info('Goal canceled.')
-    #             self.status = 'CANCELED'
-    #             self.goal_handle.execute()
-
-    #         elif self.status == 'ABORTED':
-    #             self.get_logger().warn('Goal aborted.')
-    #             self.goal_handle.execute()
-
-    #         elif self.status == 'ERROR':
-    #             self.get_logger().warn('Goal finished with error.')
-    #             self.goal_handle.execute()
-
-    #         elif self.status == 'SUCCEED':
-    #             self.get_logger().info('Goal completed.')
-    #             self.goal_handle.execute()
-
-    # def send_feedback(self):
-    #     """Publish the feedback with the current position and the completion percentage."""
-    #     # Create Feedback object
-    #     feedback = FarmbotComms.Feedback()
-
-    #     if self.previous_cmd in self.non_immediate_cmds['long_term']:
-    #         self.mission['completion'] = float(self.percentage_calculation())
-
-    #     feedback.current_position = self.mission['current_position']
-    #     feedback.percentage = self.mission['completion']
-
-    #     self.goal_handle.publish_feedback(feedback)
-
-    # Execute callback
-    # def execute_callback(self, goal_handle: ServerGoalHandle):
-    #     """
-    #     Execute the FarmbotComms action goal.
-
-    #     Checks if the command has finished executing. If so, cancels the
-    #     status timer and returns the result. Otherwise, sends the command
-    #     to the Farmduino and logs execution status.
-    #     """
-    #     self.mission['starting_position'] = []
-    #     self.mission['final_position'] = []
-    #     self.mission['completion'] = 0.0
-    #     self.check_status_timer.cancel()
-    #     self.feedback_timer.cancel()
-
-    #     # Create Result object
-    #     result = FarmbotComms.Result()
-
-    #     if self.status == 'CANCELED':
-    #         goal_handle.canceled()
-    #         result.status = self.status
-    #         self.status = ''
-    #         return result
-
-    #     elif self.status == 'ABORTED':
-    #         goal_handle.abort()
-    #         result.status = self.status
-    #         self.status = ''
-    #         return result
-
-    #     else:
-    #         goal_handle.succeed()
-    #         result.status = self.status
-    #         self.status = ''
-    #         return result
-
-    # def farmbot_command_sender(self, cmd: str):
-    #     """
-    #     Handle the commands that are queued to be sent to the farmbot through UART.
-
-    #     Two cases:
-    #         a) the command has priority (e.g. electronic-stop):
-    #             The command bypasses the queue and the queue is reset
-    #         b) standard command:
-    #             The command is added at the end of the queue
-    #     """
-    #     command: list = cmd.split(' ')
-
-    #     match command[0]:
-
-    #         # Device Command Handler Cases
-    #         case 'E':
-    #             self.temp.data = 'E'
-
-    #         case 'F09':
-    #             self.temp.data = 'F09'
-
-    #         case '@':
-    #             self.temp.data = '@'
-
-    #         case 'i2c_command':
-    #             self.temp.data = self.device_cmd_handler.i2c_cmd(command[1:])
-
-    #         case 'pin_command':
-    #             self.temp.data = self.device_cmd_handler.pin_cmd(command[1:])
-
-    #         case 'water_command':
-    #             self.temp.data = self.device_cmd_handler.water_cmd(command[1:])
-
-    #         # Motor Command Handler Cases
-    #         case 'home_handler':
-    #             self.temp.data = self.motor_cmd_handler.home_cmd(command[1:])
-
-    #         case 'move_gantry':
-    #             self.temp.data = self.motor_cmd_handler.gantry_cmd(command[1:])
-
-    #         case 'move_servo':
-    #             self.temp.data = self.motor_cmd_handler.servo_cmd(command[1:])
-
-    #         # State Command Handler Cases
-    #         case 'parameter_command':
-    #             self.temp.data = self.state_cmd_handler.param_cmd(command[1:])
-
-    #         case 'state_command':
-    #             self.temp.data = self.state_cmd_handler.state_cmd(command[1:])
-
-    #         case _:
-    #             self.get_logger().warn(f'This command type is not recognized {cmd}'
-    #                                    "Ensure you don't have a typo!")
-    #             self.status = 'ERROR'
-    #             return
-
-    #     if not self.temp.data:
-    #         self.status = 'ERROR'
-    #         return
-
-    #     self.status = 'IS_RUNNING'
-    #     self.find_final_position(self.temp.data)
-
-    #     # Ensure the endline char at the end of the command
-    #     if self.temp.data[-1] != '\n':
-    #         self.temp.data += '\n'
-
-    #     # Record the transmitted command
-    #     self.previous_cmd = (
-    #         self.temp.data.split(' ')[0]
-    #         if ' ' in self.temp.data else self.temp.data.split('\n')[0])
-
-    #     self.get_logger().info(f'Sent message: {self.temp.data}')
-    #     #  Send through UART the command
-    #     self.ser.write(self.temp.data.encode('utf-8'))
-
-    # def find_final_position(self, cmd: str):
-    #     """Obtain the final position for motion command."""
-    #     self.mission['final_position'] = []
-
-    #     goal = cmd.split(' ')
-    #     match goal[0]:
-    #         case 'G00' | 'G01':
-    #             self.mission['final_position'] = [float(goal[1][1:]), float(goal[2][1:]),
-    #                                               float(goal[3][1:])]
-    #         case 'G28':
-    #             self.mission['final_position'] = [0.0, 0.0, 0.0]
-    #         case 'F11':
-    #             self.mission['final_position'] = [0.0] + self.mission['starting_position'][1:]
-    #         case 'F12':
-    #             self.mission['final_position'] = [self.mission['starting_position'][0], 0.0,
-    #                                               self.mission['starting_position'][2]]
-    #         case 'F13':
-    #             self.mission['final_position'] = self.mission['starting_position'][:2] + [0.0]
-####################################################################################################
+        return 1.0
 
     # Service Client
 
-    def LED_client(self, led_pin, state):
-        """Service client for switching an LED on or off."""
+    def LED_client(self, led_pin: int, state: bool):
+        """
+        Send a request to switch an LED on or off.
+
+        The request is sent asynchronously. If the LED handling service is not
+        available, the request is ignored to avoid blocking the executor.
+
+        Args:
+            led_pin {int}: GPIO pin of the LED to control.
+            state {bool}: Desired LED state (True for on, False for off).
+        """
         # Never block the executor waiting for the LED server (estop path!)
         if not self.led_client.service_is_ready():
             self.get_logger().warn('LED Handling Server not available!')
@@ -866,7 +809,15 @@ class SerialController(Node):
         future.add_done_callback(self.LED_panel_callback)
 
     def LED_panel_callback(self, future):
-        """Service client callback once the LED switching server ends."""
+        """
+        Handle the response from the LED handling service.
+
+        Logs a warning if the service reports a failure or an error if the service
+        call itself fails.
+
+        Args:
+            future: Future containing the service response.
+        """
         try:
             response = future.result()
             if not response:
@@ -875,12 +826,13 @@ class SerialController(Node):
             self.get_logger().error('Service call failed %r' % (e, ))
 
     def destroy_node(self):
-        """Close the UART when the node is destroyed."""
+        """Close the serial when the node is destroyed."""
         self.ser.close()
+        super().destroy_node()
 
 
 def main(args=None):
-    """Initialize and run the Serial controller node."""
+    """Initialise and run the Serial controller node."""
     rclpy.init(args=args)
 
     serial_node = SerialController()
