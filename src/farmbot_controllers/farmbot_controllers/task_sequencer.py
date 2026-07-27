@@ -5,14 +5,14 @@ It wires together 3 separable pieces:
 - the existing client modules (movement.py, ...)
 - the 'sequence_runner' engine
 - the 'sequences' definitions
-
-TODO(B4): RunSequence is a transitional dispatcher API. It becomes the typed
-    task actions (one per command family) once the HRI grammar parser lands.
 """
 from farmbot_controllers import sequences  # noqa: F401  (registers every sequence)
+from farmbot_controllers.devices import DeviceControl
 from farmbot_controllers.movement import Movement
+from farmbot_controllers.parameters import Parameters
 from farmbot_controllers.sequence_runner import engine, registry
 from farmbot_controllers.sequence_runner.steps import Outcome, StepResult
+from farmbot_controllers.states import State
 
 from farmbot_interfaces.action import RunSequence
 from farmbot_interfaces.msg import SequenceStatus
@@ -51,13 +51,17 @@ class Hardware:
     """
     The handle a step runs against, i.e. the node's client modules + result mapping.
 
-    Holds references to the EXISTING modules (creates no clients) and the helper
-    steps use to turn an action result into a StepResult.
+    Holds references to the existing modules and the helpers steps use to turn an 
+    action result or a service response into a StepResult.
     """
 
-    def __init__(self, movement: Movement):
+    def __init__(self, movement: Movement, devices: DeviceControl,
+                 states: State, parameters: Parameters):
         """Bundle the client modules the steps use."""
         self.movement = movement
+        self.devices = devices
+        self.states = states
+        self.parameters = parameters
 
     @staticmethod
     def result_to_outcome(result) -> StepResult:
@@ -65,6 +69,14 @@ class Hardware:
         if result is None:
             return StepResult(Outcome.FAILED, 'goal rejected by bridge')
         return StepResult(_ACTION_OUTCOMES.get(result.code, Outcome.FAILED), result.message)
+
+    @staticmethod
+    def service_to_outcome(response) -> StepResult:
+        """Map a service response (success/message; None = failed) to a StepResult."""
+        if response is None:
+            return StepResult(Outcome.FAILED, 'service call failed')
+        return StepResult(Outcome.OK if response.success else Outcome.FAILED,
+                          getattr(response, 'message', ''))
 
 
 class TaskSequencer(Node):
@@ -76,8 +88,11 @@ class TaskSequencer(Node):
 
         # Register the client modules with the engine.
         self.movement = Movement(self)
+        self.devices = DeviceControl(self)
+        self.states = State(self)
+        self.parameters = Parameters(self)
         self._engine = engine.SequenceEngine(
-            hardware=Hardware(self.movement),
+            hardware=Hardware(self.movement, self.devices, self.states, self.parameters),
             on_status=self._publish_status,
             log=lambda message: self.get_logger().warn(message),
         )
