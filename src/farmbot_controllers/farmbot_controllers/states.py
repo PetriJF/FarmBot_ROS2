@@ -34,83 +34,77 @@ class State:
         if not client.wait_for_service(1.0):
             self.node.get_logger().fatal(f'{cmd_name} Server not available!')
             raise ServerError('States module failed: server unavailable')
-        self._send_request(client)
 
-    def _send_request(self, client):
-        request = Trigger.Request()
-        future = client.call_async(request=request)
-        future.add_done_callback(self.client_callback)
+    def _send(self, cmd_name: str, client, on_done=None):
+        """Check the server, send a Trigger request and complete via _complete."""
+        self._server_availability(cmd_name, client)
+        client.call_async(Trigger.Request()).add_done_callback(
+            lambda future: self._complete(future, on_done))
+
+    def _complete(self, future, on_done=None):
+        """Log the outcome and forward the response (or None on failure) to on_done."""
+        try:
+            response = future.result()
+        except Exception as error:  # call failed - report, never leave on_done hanging
+            self.node.get_logger().error('Service call failed %r' % (error, ))
+            response = None
+        if response is None:
+            self.node.get_logger().warn('Command failure!')
+        elif not response.success:
+            self.node.get_logger().warn(f'Command failed: {response.message}')
+        elif response.message:
+            self.node.get_logger().info(response.message)
+        else:
+            self.node.get_logger().info('Command successful')
+        if on_done is not None:
+            on_done(response)
 
     # Service Client
-    def estop(self):
+    def estop(self, on_done=None):
         """
         Call the FarmBot estop service.
 
         Send an estop request to the FarmBot in order to immediately halt all robot
         operations.
         """
-        self._server_availability('Estop', self.estop_client)
+        self._send('Estop', self.estop_client, on_done)
 
-    def abort_movement(self):
+    def abort_movement(self, on_done=None):
         """
         Call the FarmBot abort service.
 
         Sends a request to abort the current robot movement.
         """
-        self._server_availability('Abort', self.abort_client)
+        self._send('Abort', self.abort_client, on_done)
 
-    def reset_estop(self):
+    def reset_estop(self, on_done=None):
         """
         Call the FarmBot reset emergency stop service.
 
         Sends a request to reset the emergency stop state.
         """
-        self._server_availability('Reset estop', self.resume_client)
+        self._send('Reset estop', self.resume_client, on_done)
 
-    def request_end_stop(self):
+    def request_end_stop(self, on_done=None):
         """
         Call the FarmBot end stop request service.
 
         Sends a request to retrieve the current end stop states.
         """
-        self._server_availability('End stop request', self.end_stop_client)
+        self._send('End stop request', self.end_stop_client, on_done)
 
-    def request_sw_version(self):
+    def request_sw_version(self, on_done=None):
         """
         Call the FarmBot software version request service.
 
         Sends a request to retrieve the current software version.
         """
-        self._server_availability('Software version request', self.sw_version_client)
+        self._send('Software version request', self.sw_version_client, on_done)
 
-    def request_curr_pos(self):
+    def request_curr_pos(self, on_done=None):
         """
         Call the FarmBot current position request service.
 
         Sends a request to retrieve the current robot position.
         """
-        self._server_availability('Current position request', self.curr_position_client)
-
-    def client_callback(self, future):
-        """
-        Handle the response of a service client request.
-
-        Processes the service response and logs the command status depending
-        on the result of the request.
-        """
-        try:
-            response = future.result()
-            if not response:
-                self.node.get_logger().warn('Command Failure!')
-
-            elif not response.success:
-                self.node.get_logger().warn(f'Command {response.message}!')
-
-            elif response.message:
-                self.node.get_logger().info(response.message)
-
-            else:
-                self.node.get_logger().info('Command succesful')
-
-        except Exception as e:
-            self.node.get_logger().error('Service call failed %r' % (e, ))
+        self._send('Current position request', self.curr_position_client, on_done)
