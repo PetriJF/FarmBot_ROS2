@@ -45,7 +45,7 @@ class Movement:
         """
         Call the FarmBot HomeAxes action for homing a specific axis.
 
-        Home the selected axis on the farmbot. For example, for homing x and y you set them to True.
+        Home the selected axis. For example, for homing x and y you set both to True.
 
         Args:
             x {Bool}: True if the X-Axis should have it's home position found. Defaults to False
@@ -195,22 +195,26 @@ class Movement:
         """
         Handle the action server goal response.
 
-        Processes the goal response and retrieves the result asynchronously if
-        the goal has been accepted.
+        Retrieves the result asynchronously when the goal is accepted; otherwise
+        signals completion with None (rejected or send failed) so a chained
+        caller (on_done) is never left waiting.
         """
-        self.goal_handle: ClientGoalHandle = future.result()
+        try:
+            goal_handle: ClientGoalHandle = future.result()
+        except Exception as error:  # send failed - report, never leave on_done hanging
+            self.node.get_logger().error(f'Goal send failed: {error}')
+            if on_done is not None:
+                on_done(None)
+            return
 
-        if self.goal_handle.accepted:
+        if goal_handle.accepted:
             self.node.get_logger().info('Goal accepted')
-
-            self.goal_handle.get_result_async().add_done_callback(
+            goal_handle.get_result_async().add_done_callback(
                 lambda result_future: self.goal_result_callback(result_future, on_done)
             )
-
         else:
-            self.busy_state = False
             self.node.get_logger().warn('Goal rejected')
-            # A rejected goal never produces a result so break the sequence caller
+            # A rejected goal never produces a result so signal it so on_done resolves.
             if on_done is not None:
                 on_done(None)
 
@@ -218,10 +222,17 @@ class Movement:
         """
         Handle the final result from the action server.
 
-        Processes the action result and logs the command status returned by the
-        FarmBot action server.
+        Logs the returned status and forwards the result (or None on failure) to
+        the completion callback so a chained caller always resolves.
         """
-        result = future.result().result
+        try:
+            result = future.result().result
+        except Exception as error:  # result failed - report, never leave on_done hanging
+            self.node.get_logger().error(f'Result retrieval failed: {error}')
+            if on_done is not None:
+                on_done(None)
+            return
+
         cmd_status = result.code
 
         if cmd_status == result.ESTOPPED:
