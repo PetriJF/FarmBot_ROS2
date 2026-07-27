@@ -33,15 +33,15 @@ class Movement:
             raise ServerError('Movement module failed: server unavailable')
 
     # Calibration and Homing Functions
-    def go_home(self):
+    def go_home(self, on_done=None):
         """
         Call the FarmBot HomeAxes action for homing.
 
         Send a goal to have the Farmbot go home
         """
-        self.send_home_goal(op=HomeAxes.Goal.GO_HOME)
+        self.send_home_goal(op=HomeAxes.Goal.GO_HOME, on_done=on_done)
 
-    def find_axis_home(self, x: bool, y: bool, z: bool):
+    def find_axis_home(self, x: bool, y: bool, z: bool, on_done=None):
         """
         Call the FarmBot HomeAxes action for homing a specific axis.
 
@@ -51,8 +51,10 @@ class Movement:
             x {Bool}: True if the X-Axis should have it's home position found. Defaults to False
             y {Bool}: True if the X-Axis should have it's home position found. Defaults to False
             z {Bool}: True if the X-Axis should have it's home position found. Defaults to False
+            on_done {callable}: Optional completion callback.
         """
-        self.send_home_goal(op=HomeAxes.Goal.FIND_HOME, x_axis=x, y_axis=y, z_axis=z)
+        self.send_home_goal(op=HomeAxes.Goal.FIND_HOME, x_axis=x, y_axis=y, z_axis=z,
+                            on_done=on_done)
 
     def calibrate_axis(self, x: bool, y: bool, z: bool, on_done=None):
         """
@@ -70,14 +72,21 @@ class Movement:
         self.send_home_goal(op=HomeAxes.Goal.CALIBRATE, x_axis=x, y_axis=y, z_axis=z,
                             on_done=on_done)
 
-    def set_curr_to_home(self, x: bool, y: bool, z: bool):
+    def set_curr_to_home(self, x: bool, y: bool, z: bool, on_done=None):
         """
         Call the FarmBot HomeAxes action to set the current position as the new home.
 
         Sends a goal to update the FarmBot home position using the current axis
         coordinates.
+
+        Args:
+            x {bool}: Whether to set the X axis home to the current position.
+            y {bool}: Whether to set the Y axis home to the current position.
+            z {bool}: Whether to set the Z axis home to the current position.
+            on_done {callable}: Optional completion callback.
         """
-        self.send_home_goal(op=HomeAxes.Goal.SET_HOME, x_axis=x, y_axis=y, z_axis=z)
+        self.send_home_goal(op=HomeAxes.Goal.SET_HOME, x_axis=x, y_axis=y, z_axis=z,
+                            on_done=on_done)
 
     def send_home_goal(self, op: int, x_axis=False, y_axis=False, z_axis=False, on_done=None):
         """
@@ -118,7 +127,7 @@ class Movement:
                                     f'Y{curr_position.y} Z{curr_position.z}')
 
     # Gantry Movement Functions
-    def move_gantry_abs(self, x_coord: float, y_coord: float, z_coord: float):
+    def move_gantry_abs(self, x_coord: float, y_coord: float, z_coord: float, on_done=None):
         """
         Move the Gantry at max speed to the desired coordinates.
 
@@ -126,10 +135,13 @@ class Movement:
             x_coord {float}: Desired X-Coordinate to move to
             y_coord {float}: Desired Y-Coordinate to move to.
             z_coord {float}: Desired Z-Coordinate to move to.
+            on_done {callable}: Optional completion callback.
         """
-        self.send_move_gantry_goal(x_coord=x_coord, y_coord=y_coord, z_coord=z_coord)
+        self.send_move_gantry_goal(x_coord=x_coord, y_coord=y_coord, z_coord=z_coord,
+                                   on_done=on_done)
 
-    def move_gantry_s(self, x_coord: float, y_coord: float, z_coord: float, speed: float):
+    def move_gantry_s(self, x_coord: float, y_coord: float, z_coord: float, speed: float,
+                      on_done=None):
         """
         Move the Gantry to the desired coordinates at the the speed specified.
 
@@ -139,9 +151,11 @@ class Movement:
             z_coord {float}: Desired Z-Coordinate to move to.
             speed {float}: Desired Speed for all the axis in percent format (0 - lowest speed,
                                                                              100 - highest speed)
+            on_done {callable}: Optional completion callback.
         """
         self.send_move_gantry_goal(x_coord=x_coord, y_coord=y_coord, z_coord=z_coord,
-                                   x_speed=speed, y_speed=speed, z_speed=speed, interpolated=False)
+                                   x_speed=speed, y_speed=speed, z_speed=speed, interpolated=False,
+                                   on_done=on_done)
 
     def send_move_gantry_goal(self, x_coord: float, y_coord: float, z_coord: float,
                               interpolated=True, x_speed=100.0, y_speed=100.0, z_speed=100.0,
