@@ -11,10 +11,10 @@ import cv2
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
 
 from sensor_msgs.msg import Image
-
+from std_srvs.srv import SetBool, Trigger
 
 CAMERA = 'USB'  # Set your camera type here
 
@@ -50,8 +50,19 @@ class StandardCameraNode(Node):
         self.auto_exposure = self.declare_parameter('auto_exposure', False).value
         self.exposure = self.declare_parameter('exposure', 156.0).value
 
+        self.camera_active = False
+
         self.rgb_publisher = self.create_publisher(
             Image, 'camera/image_raw', qos_profile_sensor_data)
+        
+        self.capture_publisher = self.create_publisher(
+            Image, 'camera/image_raw_capture', qos_profile_system_default)
+        
+        self.enable_service = self.create_service(
+            SetBool, 'camera/enable', self.enable_camera_callback)
+
+        self.capture_service = self.create_service(
+            Trigger, 'camera/capture', self.capture_callback)
 
         self.camera = None
 
@@ -63,6 +74,35 @@ class StandardCameraNode(Node):
         self.capture_timer = self.create_timer(period, self.capture_frame)
 
         self.get_logger().info('Standard Camera Node initialized...')
+    
+    def enable_camera_callback(self, request, response):
+        """Turn continous streaming on (data=true) or off (data=false)."""
+        self.camera_active = request.data
+
+        if self.camera_active:
+            self.get_logger().info('Camera enabled')
+            response.message = 'Camera enabled'
+        else:
+            self.get_logger().info('Camera disabled')
+            response.message = 'Camera disabled'
+        
+        response.success = True
+        return response
+
+    def capture_callback(self, request, response):
+        """Capture and publish a single frame."""
+        ret, image = self.camera.read()
+        if not ret:
+            self.get_logger().warn('Single capture failed.')
+            response.success = False
+            response.message = 'Failed to capture frame'
+            return response
+        
+        self.capture_publisher.publish(self.to_image_msg(image))
+        self.get_logger().info('Single frame captured and published.')
+        response.success = True
+        response.message = 'Frame captured and published'
+        return response
 
     def init_camera(self):
         """Open and configure the camera. Return True on success."""
@@ -114,6 +154,9 @@ class StandardCameraNode(Node):
 
     def capture_frame(self):
         """Read one frame and publish it to camera/image_raw (called by the timer)."""
+        if not self.camera_active:
+            return
+        
         ret, image = self.camera.read()
         if not ret:
             self.get_logger().warn('Problem getting image.', throttle_duration_sec=2.0)
