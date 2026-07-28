@@ -100,8 +100,8 @@ class SerialController(Node):
 
         self.led_client = self.create_client(LedPanelHandler, 'set_led')
         # Initialise the LED states
-        self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_ON'])
-        self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_ON'])
+        self.switch_led(self.fb_panel['estop_led'], self.fb_panel['led_on'])
+        self.switch_led(self.fb_panel['unlock_led'], self.fb_panel['led_on'])
 
         self.cmd_callback_group = ReentrantCallbackGroup()
 
@@ -153,6 +153,7 @@ class SerialController(Node):
                                                execute_callback=self.load_params_execute_callback,
                                                handle_accepted_callback=self.handle_load_callback,
                                                callback_group=self.cmd_callback_group)
+        self.result_loading = LoadingParameters.Result()
         self.estop_trigger_server = self.create_service(Trigger, 'estop',
                                                         self.estop_command_server,
                                                         callback_group=self.cmd_callback_group)
@@ -564,6 +565,7 @@ class SerialController(Node):
         completes the action when all parameters have been processed or if a loading
         error occurs.
         """
+        self.get_logger().info("LOAD TIMER CALLED")
         feedback = LoadingParameters.Feedback()
         if self.goal_handle.request.params and not self.load_param_timer.is_canceled():
             if not self.write_param_client.wait_for_service(1.0):
@@ -573,12 +575,15 @@ class SerialController(Node):
             request = WriteParameter.Request()
             request.param = self.goal_handle.request.params.pop(0)
             request.value = self.goal_handle.request.values.pop(0)
+            self.get_logger().info(
+            f"Loading {request.param}, remaining={len(self.goal_handle.request.params)}"
+            )
             request.during_calibration = True
 
             future = self.write_param_client.call_async(request=request)
             service_response = await future
             if not service_response.success:
-                result = self.goal_handle.result
+                result = self.result_loading
                 if service_response.message == 'firmware error':
                     result.code = LoadingParameters.Result.FIRMWARE_ERROR
                     result.message = (f'{service_response.message} triggered by the parameter'
@@ -596,8 +601,9 @@ class SerialController(Node):
 
             feedback.progress = (1-len(self.goal_handle.request.params)/self.nb_params)
             self.goal_handle.publish_feedback(feedback)
-        elif not self.load_timer.is_canceled():
-            result = self.goal_handle.result
+            self.get_logger().info("SETTING ACTION RESULT")
+        elif not self.load_param_timer.is_canceled():
+            result = self.result_loading
             result.code = LoadingParameters.Result.OK
             result.message = ''
             self.goal_handle.execute()
@@ -614,12 +620,9 @@ class SerialController(Node):
             goal_handle {ServerGoalHandle}: Accepted action goal.
         """
         self.load_param_timer.cancel()
-        result = LoadingParameters.Result()
-        result.code = self.goal_handle.result.code
-        result.message = self.goal_handle.result.message
-        if result.code == LoadingParameters.Result.OK:
+        if self.result_loading.code == LoadingParameters.Result.OK:
             goal_handle.succeed()
-            return result
+            return self.result_loading
 
         goal_handle.abort()
         return result
@@ -637,8 +640,8 @@ class SerialController(Node):
         """
         self.farmbot_cmd_sender('E')
 
-        self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_OFF'])
-        self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_FLASHING'])
+        self.switch_led(self.fb_panel['estop_led'], self.fb_panel['LED_OFF'])
+        self.switch_led(self.fb_panel['unlock_led'], self.fb_panel['LED_FLASHING'])
         self.estop_active.data = True
         self.estop_active_pub.publish(self.estop_active)
 
@@ -659,8 +662,8 @@ class SerialController(Node):
         response.success, response.message, _ = await self._run_command('F09')
 
         if response.success:
-            self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_ON'])
-            self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_ON'])
+            self.switch_led(self.fb_panel['estop_led'], self.fb_panel['led_on'])
+            self.switch_led(self.fb_panel['unlock_led'], self.fb_panel['led_on'])
             self.estop_active.data = False
             self.estop_active_pub.publish(self.estop_active)
 
@@ -787,6 +790,11 @@ class SerialController(Node):
         # Extract the command code
         rep_code = (message).split(' ')[0]
 
+        if rep_code == 'R21' or rep_code == 'R23':
+            code = message.split(' ')
+            self.get_logger().info(f'Updated parameter {code[1][1:]} to {code[2][1:]}')
+            self.config_server.set_value(int(float(code[1][1:])), int(float(code[2][1:])))
+
         if rep_code == 'R82':
             code_position = (message).split(' ')
             self.fb_position.point.x = float(code_position[1][1:])
@@ -890,46 +898,46 @@ class SerialController(Node):
             return sum(axis_completion) / denominator
         return 1.0
 
-    # # Service Client
-    # def LED_client(self, led_pin: int, state: bool):
-    #     """
-    #     Send a request to switch an LED on or off.
+    # Service Client
+    def switch_led(self, led_pin: int, state: bool):
+        """
+        Send a request to switch an LED on or off.
 
-    #     The request is sent asynchronously. If the LED handling service is not
-    #     available, the request is ignored to avoid blocking the executor.
+        The request is sent asynchronously. If the LED handling service is not
+        available, the request is ignored to avoid blocking the executor.
 
-    #     Args:
-    #         led_pin {int}: GPIO pin of the LED to control.
-    #         state {bool}: Desired LED state (True for on, False for off).
-    #     """
-    #     # Never block the executor waiting for the LED server (estop path!)
-    #     if not self.led_client.service_is_ready():
-    #         self.get_logger().warn('LED Handling Server not available!')
-    #         return
+        Args:
+            led_pin {int}: GPIO pin of the LED to control.
+            state {bool}: Desired LED state (True for on, False for off).
+        """
+        # Never block the executor waiting for the LED server (estop path!)
+        if not self.led_client.service_is_ready():
+            self.get_logger().warn('LED Handling Server not available!')
+            return
 
-    #     request = LedPanelHandler.Request()
-    #     request.led_pin = led_pin
-    #     request.state = state
+        request = LedPanelHandler.Request()
+        request.led_pin = led_pin
+        request.state = state
 
-    #     future = self.led_client.call_async(request=request)
-    #     future.add_done_callback(self.LED_panel_callback)
+        future = self.led_client.call_async(request=request)
+        future.add_done_callback(self.led_panel_callback)
 
-    # def LED_panel_callback(self, future):
-    #     """
-    #     Handle the response from the LED handling service.
+    def led_panel_callback(self, future):
+        """
+        Handle the response from the LED handling service.
 
-    #     Logs a warning if the service reports a failure or an error if the service
-    #     call itself fails.
+        Logs a warning if the service reports a failure or an error if the service
+        call itself fails.
 
-    #     Args:
-    #         future: Future containing the service response.
-    #     """
-    #     try:
-    #         response = future.result()
-    #         if not response:
-    #             self.get_logger().warn('Failure in LED Panel Handling!')
-    #     except Exception as e:
-    #         self.get_logger().error('Service call failed %r' % (e, ))
+        Args:
+            future: Future containing the service response.
+        """
+        try:
+            response = future.result()
+            if not response:
+                self.get_logger().warn('Failure in LED Panel Handling!')
+        except Exception as e:
+            self.get_logger().error('Service call failed %r' % (e, ))
 
     def destroy_node(self):
         """Close the serial when the node is destroyed."""
