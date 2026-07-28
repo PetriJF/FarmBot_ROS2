@@ -578,7 +578,7 @@ class SerialController(Node):
             self.get_logger().info(
             f"Loading {request.param}, remaining={len(self.goal_handle.request.params)}"
             )
-            request.during_calibration = True
+            request.during_calibration = False
 
             future = self.write_param_client.call_async(request=request)
             service_response = await future
@@ -625,7 +625,7 @@ class SerialController(Node):
             return self.result_loading
 
         goal_handle.abort()
-        return result
+        return self.result_loading
 
     async def estop_command_server(self, request: Trigger.Request,
                                    response: Trigger.Response) -> Trigger.Response:

@@ -49,8 +49,9 @@ class ConfigServer:
         self.genesis_config = 'Genesis.yaml'       # farmbot genesis config
         self.express_config = 'Express.yaml'       # farmbot express config
         self.active_config = 'activeConfig.yaml'   # configuration loaded from previous run
-
-        YAMLHandler.save_to_yaml({}, config_path, self.active_config)
+        
+        if not YAMLHandler.existing_path(YAMLHandler.join_path(config_path, self.active_config)):
+            YAMLHandler.save_to_yaml({}, config_path, self.active_config)
 
         # TODO: Add more default configurations other than the labFB one
 
@@ -97,18 +98,18 @@ class ConfigServer:
         try:
             if request.data in ['Genesis', 'genesis', 'Gen', 'gen']:
                 self.param_vals = YAMLHandler.load_yaml(path=self.default_path,
-                                                        file_name=self.genesis_config)
+                                                        file=self.genesis_config)
                 self.node.get_logger().info('Loading the genesis configuration')
                 self.load_params()
             elif request.data in ['Express', 'express', 'exp', 'Exp']:
                 self.param_vals = YAMLHandler.load_yaml(path=self.default_path,
-                                                        file_name=self.express_config)
+                                                        file=self.express_config)
                 self.node.get_logger().info('Loading the express configuration')
                 self.load_params()
             # A configuration more specific to the model you are running
             elif request.data in ['Custom', 'custom']:
                 self.param_vals = YAMLHandler.load_yaml(path=self.default_path,
-                                                        file_name=self.custom1_config)
+                                                        file=self.custom1_config)
                 self.node.get_logger().info('Loading the custom configuration')
                 self.load_params()
             else:
