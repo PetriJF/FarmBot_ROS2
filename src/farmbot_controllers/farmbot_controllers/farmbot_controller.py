@@ -147,7 +147,7 @@ class FarmbotControl(Node):
                                        (2 if code[1] == 'Y' else 0) +
                                        (3 if code[1] == 'Z' else 0))
                         self.param_config_client('F22 P' + str(param) + ' V1')
-                        self.params.writeParam(param, 1)
+                        self.params.write_param(param, 1)
                     else:
                         self.get_logger().warning('C_2: Invalid option selected. Choose: X, Y, Z')
             # Tool commands

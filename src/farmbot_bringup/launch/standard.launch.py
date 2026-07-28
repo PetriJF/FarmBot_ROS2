@@ -46,16 +46,6 @@ def generate_launch_description():
         ),
         Node(
             package='farmbot_controllers',
-            executable='param_conf_server',
-            name='param_conf_server',
-            output='screen',
-            parameters=[
-                {'ws_path': ws_path},
-                {'folder_config_name': 'local_config'},
-            ]
-        ),
-        Node(
-            package='farmbot_controllers',
             executable='farmbot_controller',
             name='controller',
             output='screen'

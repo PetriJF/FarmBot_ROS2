@@ -1,0 +1,12 @@
+uint16[] params                   # list of parameter to load
+int64[] values
+---
+uint8 OK=0
+uint8 FIRMWARE_ERROR=1            # firmware replied R03
+uint8 ESTOPPED=2                  # e-stop fired while moving
+uint8 ABORTED=3                   # '@' abort while moving
+uint8 REJECTED=4                  # goal were rejected
+uint8 code
+string message
+---
+float32 progress                  # 0.0 .. 1.0

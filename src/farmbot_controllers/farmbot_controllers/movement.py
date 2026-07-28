@@ -184,7 +184,7 @@ class Movement:
         percentage = feedback_msg.feedback.progress
         self.node.get_logger().info(f'Current postion : X{curr_position.x} '
                                     f'Y{curr_position.y} Z{curr_position.z} \n'
-                                    f'Goal completion: {percentage:.2f} %')
+                                    f'Goal completion: {percentage*100:.2f} %')
 
     def goal_response_callback(self, future):
         """

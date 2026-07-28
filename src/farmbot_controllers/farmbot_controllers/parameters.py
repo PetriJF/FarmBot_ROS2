@@ -33,7 +33,7 @@ class Parameters:
             self.node.get_logger().fatal(f'{cmd_name} Server not available!')
             raise ServerError('Parameter module failed: server unavailable')
 
-    def readParam(self, param: int):
+    def read_param(self, param: int):
         """
         Call the ReadParameter service.
 
@@ -74,7 +74,7 @@ class Parameters:
         except Exception as e:
             self.node.get_logger().error('Service call failed %r' % (e, ))
 
-    def listAllParams(self):
+    def list_all_params(self):
         """
         Call the ListAllParameters service.
 
@@ -87,7 +87,7 @@ class Parameters:
         future = self.list_all_param_client.call_async(request=request)
         future.add_done_callback(self.client_callback)
 
-    def writeParam(self, param: int, value: int, during_calibration: bool):
+    def write_param(self, param: int, value: int, during_calibration: bool):
         """
         Call the WriteParameter service.
 

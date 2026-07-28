@@ -8,7 +8,8 @@ control LED states, and publish panel commands.
 """
 import RPi.GPIO as GPIO
 
-from farmbot_hardware_comm.modules.yaml_loader import YAMLLoader
+from farmbot_hardware_comm.modules.exceptions import ServerError, YAMLError
+from farmbot_hardware_comm.modules.yaml_handler import YAMLHandler
 
 from farmbot_interfaces.srv import LedPanelHandler
 
@@ -18,12 +19,6 @@ from rclpy.node import Node
 from std_msgs.msg import String
 
 from std_srvs.srv import Trigger
-
-
-class ServerError(Exception):
-    """Raised when a server is not available."""
-
-    pass
 
 
 class GPIOController(Node):
@@ -42,10 +37,14 @@ class GPIOController(Node):
 
         GPIO.setmode(GPIO.BCM)
 
-        self.directory = YAMLLoader.get_directory_package('farmbot_hardware_comm', 'config')
+        self.directory = YAMLHandler.get_directory_package('farmbot_hardware_comm', 'config')
 
-        self.button = YAMLLoader.load_yaml(self.directory, 'ButtonCommand.yaml')
-        self.fb_panel = YAMLLoader.load_yaml(self.directory, 'FarmbotPanel.yaml')
+        try:
+            self.button = YAMLHandler.load_yaml(self.directory, 'ButtonCommand.yaml')
+            self.fb_panel = YAMLHandler.load_yaml(self.directory, 'FarmbotPanel.yaml')
+        except YAMLError as e:
+            self.get_logger().warn(f'yaml error: {e}')
+            return
 
         # LED Initialising
         GPIO.setup(self.fb_panel['estop_led'], GPIO.OUT)

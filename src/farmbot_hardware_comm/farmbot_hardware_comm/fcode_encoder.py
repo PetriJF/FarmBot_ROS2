@@ -4,17 +4,12 @@ Module that converts ROS 2 service and action requests into FarmBot FCode comman
 This module provides encoders used to translate high-level commands received
 through services or actions into the FCode format understood by the FarmBot.
 """
-from farmbot_hardware_comm.modules.yaml_loader import YAMLLoader
+from farmbot_hardware_comm.modules.exceptions import EncodeError, YAMLError
+from farmbot_hardware_comm.modules.yaml_handler import YAMLHandler
 
 from farmbot_interfaces.action import HomeAxes, MoveGantry
 from farmbot_interfaces.srv import (ConfigurePin, MoveServo, ReadI2C, ReadParameter, ReadPin,
                                     SetI2C, Watering, WriteParameter, WritePin)
-
-
-class EncodeError(Exception):
-    """Raised when a request cannot be encoded into a valid FCode command."""
-
-    pass
 
 
 class Encoder:
@@ -22,12 +17,15 @@ class Encoder:
 
     def __init__(self, config_path):
         """Initialise the encoder class."""
-        self.active_config = YAMLLoader.load_yaml(config_path, 'activeConfig.yaml')
-        self.active_map = YAMLLoader.load_yaml(config_path, 'active_map.yaml')
+        self.directory = YAMLHandler.get_directory_package('farmbot_hardware_comm', 'config')
 
-        self.directory = YAMLLoader.get_directory_package('farmbot_hardware_comm', 'config')
-
-        self.cmd_validation = YAMLLoader.load_yaml(self.directory, 'CommandValidation.yaml')
+        try:
+            self.active_config = YAMLHandler.load_yaml(config_path, 'activeConfig.yaml')
+            self.active_map = YAMLHandler.load_yaml(config_path, 'active_map.yaml')
+            self.cmd_validation = YAMLHandler.load_yaml(self.directory, 'CommandValidation.yaml')
+        except YAMLError as e:
+            self.get_logger().warn(f'yaml error: {e}')
+            return
 
     # Water commands
     def encode_watering(self, req: Watering.Request) -> str:

@@ -62,7 +62,7 @@ read_parameter:
 
 write_parameter:
   F23:
-    responses: ['R08']
+    responses: ['R23','R03','R86','R87']
   F22:
     responses: ['R08']
 
