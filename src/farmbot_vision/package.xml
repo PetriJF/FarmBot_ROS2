@@ -15,7 +15,7 @@
   <depend>rclpy</depend>
   <depend>sensor_msgs</depend>
   <depend>cv_bridge</depend>
-  <depend>std_srvs</depend>
+  <depend>farmbot_interfaces</depend>
 
   <export>
     <build_type>ament_python</build_type>
