@@ -1,8 +1,9 @@
 """
-Config server node for ROS2 Farmbot.
+Configuration parameter management module for the FarmBot SerialController.
 
-Handles parameter recording, loading, and publishing for Farmbot firmware
-configuration management, including parameter service interfaces.
+Handles loading, writing and storing FarmBot firmware parameters on YAML file.
+Provides the parameter management logic used by the SerialController to
+synchronize configuration values with the firmware.
 """
 from farmbot_hardware_comm.modules.exceptions import ServerError, YAMLError
 from farmbot_hardware_comm.modules.param_info import ParameterList
