@@ -99,10 +99,12 @@ class StandardCameraNode(Node):
             response.message = 'Failed to capture frame'
             return response
 
-        self.capture_publisher.publish(self.to_image_msg(image))
+        image_msg = self.to_image_msg(image)
+        self.capture_publisher.publish(image_msg)
         self.get_logger().debug('Single frame captured and published.')
         response.success = True
         response.message = 'Frame captured and published'
+        response.image = image_msg
         return response
 
     def init_camera(self):
