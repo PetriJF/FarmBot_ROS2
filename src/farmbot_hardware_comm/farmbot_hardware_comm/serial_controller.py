@@ -211,6 +211,9 @@ class SerialController(Node):
         self.serial_feedback = String()
         self.serial_feedback_pub = self.create_publisher(String, 'serial_feedback', 10)
 
+        self.input_sub = self.create_subscription(String,
+                                                  'input_test', self.send_message, 10)
+
         # Log the Initialisation
         self.get_logger().info('Serial Controller Initialised..')
 
@@ -586,7 +589,6 @@ class SerialController(Node):
         completes the action when all parameters have been processed or if a loading
         error occurs.
         """
-        self.get_logger().info('LOAD TIMER CALLED')
         feedback = LoadingParameters.Feedback()
         if self.goal_handle.request.params and not self.load_param_timer.is_canceled():
             if not self.write_param_client.wait_for_service(1.0):
@@ -596,9 +598,6 @@ class SerialController(Node):
             request = WriteParameter.Request()
             request.param = self.goal_handle.request.params.pop(0)
             request.value = self.goal_handle.request.values.pop(0)
-
-            self.get_logger().info(f'Loading {request.param}, '
-                                   f'remaining={len(self.goal_handle.request.params)}')
 
             request.during_calibration = False
 
@@ -623,8 +622,6 @@ class SerialController(Node):
 
             feedback.progress = (1-len(self.goal_handle.request.params)/self.nb_params)
             self.goal_handle.publish_feedback(feedback)
-
-            self.get_logger().info('SETTING ACTION RESULT')
 
         elif not self.load_param_timer.is_canceled():
             result = self.result_loading
@@ -664,8 +661,8 @@ class SerialController(Node):
         """
         self.farmbot_cmd_sender('E')
 
-        self.switch_led(self.fb_panel['estop_led'], self.fb_panel['LED_OFF'])
-        self.switch_led(self.fb_panel['unlock_led'], self.fb_panel['LED_FLASHING'])
+        self.switch_led(self.fb_panel['estop_led'], self.fb_panel['led_off'])
+        self.switch_led(self.fb_panel['unlock_led'], self.fb_panel['led_flashing'])
         self.estop_active.data = True
         self.estop_active_pub.publish(self.estop_active)
 
@@ -781,6 +778,32 @@ class SerialController(Node):
         #  Send through serial the command
         self.ser.write(cmd.encode('utf-8'))
 
+    def send_message(self, message: String):
+        """
+        Send an FCode command to the FarmBot over the serial connection.
+
+        Ensures that the command is newline-terminated, stores the command name
+        for response tracking, and writes the encoded command to the serial port.
+
+        Args:
+            cmd {str}: FCode command to send to the FarmBot.
+        """
+        cmd = message.data
+        # Ensure the endline char at the end of the command
+        if cmd[-1] != '\n':
+            cmd += '\n'
+
+        # Record the transmitted command
+        self.previous_cmd = (cmd.split(' ')[0] if ' ' in cmd else cmd.split('\n')[0])
+        for cmd_type in self.non_immediate_cmds:
+            if self.previous_cmd in self.non_immediate_cmds[cmd_type]:
+                self.command_type = cmd_type
+                break
+
+        self.get_logger().info(f'Sent message: {cmd}')
+        #  Send through serial the command
+        self.ser.write(cmd.encode('utf-8'))
+
     # Receiving messages from Farmbot
     def serial_receive(self):
         """
@@ -810,6 +833,8 @@ class SerialController(Node):
         """
         # Record the message
         self.serial_feedback.data = message
+        if message == 'R99 ARDUINO STARTUP COMPLETE':
+            self.config_server.retrieve_config()
 
         code = (message).split(' ')
 
@@ -850,9 +875,6 @@ class SerialController(Node):
                 self.get_logger().warn('No configuration files were found in'
                                        '/farmbot_data/local_config. Use the C_1 '
                                        'command to create these files (see the documentation).')
-            case 'R99':
-                if f'{code[1]} {code[2]} {code[3]}' == 'ARDUINO STARTUP COMPLETE':
-                    self.config_server.retrieve_config()
 
     def handle_command_response(self, code: list):
         """

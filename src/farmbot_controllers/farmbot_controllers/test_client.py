@@ -14,6 +14,8 @@ from farmbot_controllers.states import State
 import rclpy
 from rclpy.node import Node
 
+from farmbot_interfaces.srv import ParameterConfig
+
 from std_msgs.msg import String
 
 
@@ -42,7 +44,7 @@ class TestClient(Node):
         # Temporary Keyboard subscriber
         self.cur_increment = 10.0
         self.input_sub = self.create_subscription(String,
-                                                  'input_test', self.cmd_interp_callback, 10)
+                                                  'input_topic', self.cmd_interp_callback, 10)
 
         # Log the initialization
         self.get_logger().info('Test Farmbot Controller Initialized..')
@@ -93,6 +95,16 @@ class TestClient(Node):
                 self.mvm.calibrate_axis(x=True if code[1] == 'X' else False,
                                         y=True if code[1] == 'Y' else False,
                                         z=True if code[1] == 'Z' else False)
+            # Parameter configuration commands
+            case 'CONF':
+                if len(code) == 1:
+                    self.param_config_client(cmd='SAVE')
+                    self.param_config_client(cmd='MAP')
+                else:
+                    if code[1] == 'S':
+                        self.param_config_client(cmd='SAVE')
+                    elif code[1] == 'M':
+                        self.param_config_client(cmd='MAP')
 
             # DEVICE
             case 'I2C_READ':
@@ -131,6 +143,18 @@ class TestClient(Node):
             case 'UPDATE_PARAM':
                 self.params.writeParam(code[1], code[2], True)
 
+    def param_config_client(self, cmd: String):
+        """
+        Parameter Configuration Client.
+
+        Requests a response from the Parameter Manager Server
+        """
+        client = self.create_client(ParameterConfig, 'manage_param_config')
+        while not client.wait_for_service(1.0):
+            self.get_logger().warn('Waiting for Parameter Config Server...')
+
+        request = ParameterConfig.Request()
+        request.data = cmd
 
 def main(args=None):
     """Initialize ROS2 and run the Test FarmbotControl node until shutdown."""
