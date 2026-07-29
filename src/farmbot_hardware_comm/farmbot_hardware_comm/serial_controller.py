@@ -74,6 +74,7 @@ class SerialController(Node):
 
         # Used for setting the busy status on the ROS2 arch. while a command is running
         self.previous_cmd = ''
+        self.command_type = ''
         self.code_response: Future = None
 
         self.mission = {
@@ -81,8 +82,27 @@ class SerialController(Node):
             'final_position': [],
         }
 
+        self.request_result = {
+            'R03': [False, 'firmware error', -1],
+            'R86': [False, 'aborted', -1],
+            'R02': [True, '', -1],
+            'R87': [False, 'estopped', -1],
+            'R08': [True, '', -1],
+            'R41': [True, '', -1],
+            'R21': [True, '', -1],
+            'R23': [True, '', -1],
+            'R81': [True, '', -1],
+            'R82': [True, '', -1],
+            'R83': [True, '', -1],
+        }
+
         config_path = YAMLHandler.join_path(ws_path, folder_config_name)
         YAMLHandler.make_dir(config_path)
+
+        if not YAMLHandler.existing_path(YAMLHandler.join_path(config_path, 'activeConfig.yaml')):
+            self.get_logger().warn('The activeConfig.yaml file was not found. An activeConfig'
+                                   f' file must be present at the following path: {config_path}'
+                                   ' Please use the C_1 command (see the documentation).')
 
         # Initialising modules
         self.config_server = ConfigServer(self, config_path)
@@ -203,6 +223,7 @@ class SerialController(Node):
         result = await self.code_response
         self.code_response = None
         self.previous_cmd = ''
+        self.command_type = ''
         return result[0], result[1], result[2]
 
     # Callbacks
@@ -565,7 +586,7 @@ class SerialController(Node):
         completes the action when all parameters have been processed or if a loading
         error occurs.
         """
-        self.get_logger().info("LOAD TIMER CALLED")
+        self.get_logger().info('LOAD TIMER CALLED')
         feedback = LoadingParameters.Feedback()
         if self.goal_handle.request.params and not self.load_param_timer.is_canceled():
             if not self.write_param_client.wait_for_service(1.0):
@@ -575,9 +596,10 @@ class SerialController(Node):
             request = WriteParameter.Request()
             request.param = self.goal_handle.request.params.pop(0)
             request.value = self.goal_handle.request.values.pop(0)
-            self.get_logger().info(
-            f"Loading {request.param}, remaining={len(self.goal_handle.request.params)}"
-            )
+
+            self.get_logger().info(f'Loading {request.param}, '
+                                   f'remaining={len(self.goal_handle.request.params)}')
+
             request.during_calibration = False
 
             future = self.write_param_client.call_async(request=request)
@@ -601,7 +623,9 @@ class SerialController(Node):
 
             feedback.progress = (1-len(self.goal_handle.request.params)/self.nb_params)
             self.goal_handle.publish_feedback(feedback)
-            self.get_logger().info("SETTING ACTION RESULT")
+
+            self.get_logger().info('SETTING ACTION RESULT')
+
         elif not self.load_param_timer.is_canceled():
             result = self.result_loading
             result.code = LoadingParameters.Result.OK
@@ -748,6 +772,10 @@ class SerialController(Node):
 
         # Record the transmitted command
         self.previous_cmd = (cmd.split(' ')[0] if ' ' in cmd else cmd.split('\n')[0])
+        for cmd_type in self.non_immediate_cmds:
+            if self.previous_cmd in self.non_immediate_cmds[cmd_type]:
+                self.command_type = cmd_type
+                break
 
         self.get_logger().info(f'Sent message: {cmd}')
         #  Send through serial the command
@@ -772,6 +800,29 @@ class SerialController(Node):
 
     def handle_message(self, message: str):
         """
+        Process a message received from the FarmBot firmware.
+
+        Handles unsolicited reports, publishes the raw message, and processes
+        responses for active commands.
+
+        Args:
+            message {str}: Raw message received from the FarmBot.
+        """
+        # Record the message
+        self.serial_feedback.data = message
+
+        code = (message).split(' ')
+
+        self.handle_unsolicited_reports(code)
+
+        # Send the reporting message for further processing by other nodes
+        self.serial_feedback_pub.publish(self.serial_feedback)
+
+        if self.command_type:
+            self.handle_command_response(code)
+
+    def handle_unsolicited_reports(self, code: list):
+        """
         Process a message received from the FarmBot serial connection.
 
         The received message is parsed to update the robot state, publish action
@@ -781,98 +832,75 @@ class SerialController(Node):
         Args:
             message {str}: Raw message received from the FarmBot.
         """
-        # Record the message
-        self.serial_feedback.data = message
+        match code[0]:
+            case 'R21' | 'R23':
+                self.get_logger().info(f'Updated parameter {code[1][1:]} to {code[2][1:]}')
+                self.config_server.set_value(int(float(code[1][1:])), int(float(code[2][1:])))
+            case 'R87':
+                if not self.estop_active.data:
+                    self.estop_active.data = True
+                    self.estop_active_pub.publish(self.estop_active)
+            case 'R82':
+                self.fb_position.point.x = float(code[1][1:])
+                self.fb_position.point.y = float(code[2][1:])
+                self.fb_position.point.z = float(code[3][1:])
+                self.fb_position.header.stamp = self.get_clock().now().to_msg()
+                self.fb_position_pub.publish(self.fb_position)
+            case 'R88':
+                self.get_logger().warn('No configuration files were found in'
+                                       '/farmbot_data/local_config. Use the C_1 '
+                                       'command to create these files (see the documentation).')
+            case 'R99':
+                if f'{code[1]} {code[2]} {code[3]}' == 'ARDUINO STARTUP COMPLETE':
+                    self.config_server.retrieve_config()
 
-        if message == 'R99 ARDUINO STARTUP COMPLETE':
-            self.config_server.retrieve_config()
+    def handle_command_response(self, code: list):
+        """
+        Handle firmware responses for active commands.
 
-        # Extract the command code
-        rep_code = (message).split(' ')[0]
+        Publishes action feedback and resolves pending command responses.
 
-        if rep_code == 'R21' or rep_code == 'R23':
-            code = message.split(' ')
-            self.get_logger().info(f'Updated parameter {code[1][1:]} to {code[2][1:]}')
-            self.config_server.set_value(int(float(code[1][1:])), int(float(code[2][1:])))
-
-        if rep_code == 'R82':
-            code_position = (message).split(' ')
-            self.fb_position.point.x = float(code_position[1][1:])
-            self.fb_position.point.y = float(code_position[2][1:])
-            self.fb_position.point.z = float(code_position[3][1:])
-            self.fb_position.header.stamp = self.get_clock().now().to_msg()
-            self.fb_position_pub.publish(self.fb_position)
-
-        # E-Stop pressed on the robot
-        if rep_code == 'R87' and not self.estop_active.data:
-            self.estop_active.data = True
-            self.estop_active_pub.publish(self.estop_active)
-
-        # If a running command has finished OR the response for a request was retrieved
-        # OR the sent command was acknowledged by the farmbot
-        command_type = ''
-        for cmd_type in self.non_immediate_cmds:
-            if self.previous_cmd in self.non_immediate_cmds[cmd_type]:
-                command_type = cmd_type
-                break
-
+        Args:
+            code {list}: Parsed firmware response.
+        """
         if self.goal_handle is None or not self.goal_handle.is_active:
             pass
 
-        elif command_type == 'home_axes':
-            feedback = HomeAxes.Feedback()
-            feedback.position.x = self.fb_position.point.x
-            feedback.position.y = self.fb_position.point.y
-            feedback.position.z = self.fb_position.point.z
-            self.goal_handle.publish_feedback(feedback)
+        if self.command_type in ['home_axes', 'move_gantry']:
+            self.action_feedback_publisher(self.command_type)
 
-        elif command_type == 'move_gantry':
-            feedback = MoveGantry.Feedback()
-            feedback.position.x = self.fb_position.point.x
-            feedback.position.y = self.fb_position.point.y
-            feedback.position.z = self.fb_position.point.z
-            feedback.progress = float(self.percentage_calculation([feedback.position.x,
-                                                                  feedback.position.y,
-                                                                  feedback.position.z]))
-            self.goal_handle.publish_feedback(feedback)
-
-        if (command_type
-           and rep_code in self.non_immediate_cmds[command_type][self.previous_cmd]['responses']
+        if (code[0] in self.non_immediate_cmds[self.command_type][self.previous_cmd]['responses']
            and self.code_response and not self.code_response.done()):
-            match rep_code:
-                case 'R03':
-                    result = [False, 'firmware error', -1]
-                    self.code_response.set_result(result)
-                case 'R86':
-                    result = [False, 'aborted', -1]
-                    self.code_response.set_result(result)
-                case 'R02':
-                    result = [True, '', -1]
-                    self.code_response.set_result(result)
-                case 'R87':
-                    result = [False, 'estopped', -1]
-                    self.code_response.set_result(result)
-                case 'R08':
-                    result = [True, '', -1]
-                    self.code_response.set_result(result)
-                case 'R41':
-                    code = (message).split(' ')
-                    value = int(code[2][1:])
-                    result = [True, '', value]
-                    self.code_response.set_result(result)
-                case 'R21' | 'R23':
-                    code = (message).split(' ')
-                    value = int(code[2][1:])
-                    self.get_logger().info(f'Updated parameter {code[1][1:]} to {code[2][1:]}')
-                    self.config_server.set_value(int(float(code[1][1:])), int(float(code[2][1:])))
-                    result = [True, '', value]
-                    self.code_response.set_result(result)
-                case 'R81' | 'R82' | 'R83':
-                    result = [True, message[4:], -1]
-                    self.code_response.set_result(result)
+            if code[0] in self.request_result.keys():
+                rep_code = code[0]
+                if rep_code in ['R41', 'R21', 'R23']:
+                    self.request_result[rep_code][2] = int(code[2][1:])
+                elif rep_code in ['R81', 'R82', 'R83']:
+                    self.request_result[rep_code][1] = code[1]
+                self.code_response.set_result(self.request_result[rep_code])
 
-        # Send the reporting message for further processing by other nodes
-        self.serial_feedback_pub.publish(self.serial_feedback)
+    def action_feedback_publisher(self, cmd_type: str):
+        """
+        Publish feedback for the active ROS 2 action.
+
+        Updates the action feedback with the current FarmBot position and, for
+        gantry movements, the current execution progress.
+
+        Args:
+            cmd_type {str}: Type of the active command.
+        """
+        x_pos = self.fb_position.point.x
+        y_pos = self.fb_position.point.y
+        z_pos = self.fb_position.point.z
+        if cmd_type == 'home_axes':
+            feedback = HomeAxes.Feedback()
+        else:
+            feedback = MoveGantry.Feedback()
+            feedback.progress = float(self.percentage_calculation([x_pos, y_pos, z_pos]))
+        feedback.position.x = x_pos
+        feedback.position.y = y_pos
+        feedback.position.z = z_pos
+        self.goal_handle.publish_feedback(feedback)
 
     def percentage_calculation(self, current_position: list) -> float:
         """
@@ -948,9 +976,7 @@ class SerialController(Node):
 def main(args=None):
     """Initialise and run the Serial controller node."""
     rclpy.init(args=args)
-
     serial_node = SerialController()
-
     try:
         rclpy.spin(serial_node)
     except KeyboardInterrupt:

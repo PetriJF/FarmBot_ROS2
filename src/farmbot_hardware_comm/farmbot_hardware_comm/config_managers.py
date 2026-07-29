@@ -49,9 +49,6 @@ class ConfigServer:
         self.genesis_config = 'Genesis.yaml'       # farmbot genesis config
         self.express_config = 'Express.yaml'       # farmbot express config
         self.active_config = 'activeConfig.yaml'   # configuration loaded from previous run
-        
-        if not YAMLHandler.existing_path(YAMLHandler.join_path(config_path, self.active_config)):
-            YAMLHandler.save_to_yaml({}, config_path, self.active_config)
 
         # TODO: Add more default configurations other than the labFB one
 
@@ -164,7 +161,7 @@ class ConfigServer:
         goal.params = params
         goal.values = values
 
-        self.node.get_logger().info(f"Parameters to load: {len(params)}")
+        self.node.get_logger().info(f'Parameters to load: {len(params)}')
         self.load_params_client.send_goal_async(
             goal,
             feedback_callback=self.loading_goal_feedback_callback
