@@ -1,0 +1,4 @@
+bool enable                       # true = start streaming, false = stop
+---
+bool success
+string message

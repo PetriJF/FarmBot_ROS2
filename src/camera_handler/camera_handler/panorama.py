@@ -4,6 +4,10 @@ Panorama stitching module for FarmBot.
 Captures RGB and depth images from the camera and stitches them into
 panoramas representing map information.
 """
+# DEPRECATED: camera_handler is being replaced by farmbot_vision. The camera
+# driver has already moved there; stitching logic like this will follow.
+# Kept here for reference only -- do not build new work on top of this file.
+
 import os
 
 from ament_index_python.packages import get_package_share_directory

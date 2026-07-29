@@ -4,6 +4,10 @@ Standard camera Node.
 Provide a ROS2 node that captures frames from the standard FarmBot USB camera and publishes RGB
 images on the `rgb_img` topic.
 """
+# DEPRECATED: camera_handler is being replaced by farmbot_vision. This node
+# has already moved there (see farmbot_vision/standard_camera.py). Kept here
+# for reference only -- do not build new work on top of this file.
+
 from time import sleep
 
 import cv2

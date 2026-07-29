@@ -3,9 +3,11 @@ Module for Luxonis DepthAI camera streaming.
 
 Publishes RGB and depth images to ROS2 topics using CvBridge.
 """
-# DEPRECATED: camera_handler is being replaced by farmbot_vision. This node
-# has already moved there (see farmbot_vision/luxonis_camera.py). Kept here
-# for reference only -- do not build new work on top of this file.
+# NOT CURRENTLY IN USE. This node is written against the DepthAI v2 pipeline
+# API, which is deprecated and unavailable on newer Ubuntu releases. Needs
+# updating to the current DepthAI API before it can be run. The console
+# script entry point for this node is commented out in setup.py to avoid
+# confusion until that update happens.
 
 import os
 import threading
@@ -79,7 +81,7 @@ class LuxonisCameraNode(Node):
     def load_config(self):
         """Load the camera configuration from the calibration file."""
         # Load configuration from YAML file
-        self.config_directory_ = os.path.join(get_package_share_directory('camera_handler'),
+        self.config_directory_ = os.path.join(get_package_share_directory('farmbot_vision'),
                                               'config')
         config_file = 'luxonis_camera_config.yaml'
         self.config_data = self.load_from_yaml(self.config_directory_, config_file)
@@ -183,28 +185,6 @@ class LuxonisCameraNode(Node):
             depth_msg = self.bridge.cv2_to_imgmsg(depth_frame, encoding='mono8')
             self.depth_publisher.publish(depth_msg)
 
-    # def run(self):
-    #     # Retrieve and publish RGB and depth frames from the camera
-    #     latestPacket = {"rgb": None, "stereo": None}
-    #     queueEvents = self.device.getQueueEvents(("rgb", "stereo"))
-    #     for queueName in queueEvents:
-    #         packets = self.device.getOutputQueue(queueName).tryGetAll()
-    #         if len(packets) > 0:
-    #             latestPacket[queueName] = packets[-1]
-
-    #     if latestPacket["rgb"] is not None:
-    #         self.rgb_image_ = latestPacket["rgb"].getCvFrame()
-    #         #self.rgb_image_ = cv2.rotate(self.rgb_image_, cv2.ROTATE_180)
-    #         #self.rgb_image_ = cv2.flip(self.rgb_image_, 1)
-    #         self.publish_images(rgb_frame=self.rgb_image_)
-    #         self.save_images(rgb=True)
-    #     if latestPacket["stereo"] is not None:
-    #         self.depth_image_ = self.process_depth_frame(latestPacket["stereo"].getFrame())
-    #         #self.depth_image_ = cv2.rotate(self.depth_image_, cv2.ROTATE_180)
-    #         #self.depth_image_ = cv2.flip(self.depth_image_, 1)
-    #         self.publish_images(depth_frame=self.depth_image_ )
-    #         self.save_images(depth=True)
-
     def process_depth_frame(self, disparity_frame):
         """Process disparity frame to generate a depth frame for publishing."""
         disparity_frame[disparity_frame == 0] = 0.01  # Handle zero disparity
@@ -228,29 +208,6 @@ class LuxonisCameraNode(Node):
             except yaml.YAMLError as e:
                 self.get_logger().warn(f'Error reading YAML file: {e}')
                 return None
-
-    # def save_images(self):
-    #     if self.rgb_image_ is not None and self.depth_image_ is not None:
-    #         cv2.imwrite(os.path.join(self.config_directory_,"saved_rgb_image.png"),
-    #                     self.rgb_image_)
-    #         self.get_logger().info('RGB image saved successfully.')
-    #         cv2.imwrite(os.path.join(self.config_directory_,"saved_depth_image.png"),
-    #                     self.depth_image_)
-    #         self.get_logger().info('Depth image saved successfully.')
-    #     else:
-    #         self.get_logger().info('No images to save.')
-
-    # def save_images(self, rgb = False, depth = False):
-    #     if self.rgb_image_ is not None and rgb == True:
-    #         cv2.imwrite(os.path.join(self.config_directory_,"saved_rgb_image.png"),
-    #                     self.rgb_image_)
-    #         self.get_logger().info('RGB image saved successfully.')
-    #     elif self.depth_image_ is not None and depth == True:
-    #         cv2.imwrite(os.path.join(self.config_directory_,"saved_depth_image.png"),
-    #                     self.depth_image_)
-    #         self.get_logger().info('Depth image saved successfully.')
-    #     else:
-    #         self.get_logger().info('No images to save.')
 
 
 def main(args=None):

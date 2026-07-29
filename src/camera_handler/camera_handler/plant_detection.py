@@ -4,6 +4,10 @@ Provide plant detection image capture and processing utilities.
 Capture RGB and depth frames from the FarmBot camera and expose helpers to
 load calibration and map configuration for downstream plant detection tasks.
 """
+# DEPRECATED: camera_handler is being replaced by farmbot_vision. The camera
+# driver has already moved there; detection logic like this will follow.
+# Kept here for reference only -- do not build new work on top of this file.
+
 import os
 
 from ament_index_python.packages import get_package_share_directory
