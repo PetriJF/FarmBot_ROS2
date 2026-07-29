@@ -9,18 +9,18 @@ from time import sleep
 
 import cv2
 
+from farmbot_interfaces.srv import CaptureImage, EnableCamera
+
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
-
-from farmbot_interfaces.srv import CaptureImage, EnableCamera
+from rclpy.qos import qos_profile_sensor_data
 
 from sensor_msgs.msg import Image
 
 CAMERA = 'USB'  # Set your camera type here
 
 
-def fourcc_code(fmt):
+def fourcc_code(fmt: str) -> int:
     """Return the OpenCV FOURCC integer for a 4-character format string (e.g. 'MJPG')."""
     try:
         return cv2.VideoWriter_fourcc(*fmt)
@@ -28,7 +28,7 @@ def fourcc_code(fmt):
         return cv2.VideoWriter.fourcc(*fmt)
 
 
-def fourcc_to_str(value):
+def fourcc_to_str(value: float) -> str:
     """Convert an OpenCV FOURCC integer back into its 4-character string form."""
     value = int(value)
     return ''.join(chr((value >> (8 * i)) & 0xFF) for i in range(4))
@@ -55,10 +55,7 @@ class StandardCameraNode(Node):
 
         self.rgb_publisher = self.create_publisher(
             Image, 'camera/image_raw', qos_profile_sensor_data)
-        
-        self.capture_publisher = self.create_publisher(
-            Image, 'camera/image_raw_capture', qos_profile_system_default)
-        
+
         self.enable_service = self.create_service(
             EnableCamera, 'camera/enable', self.enable_camera_callback)
 
@@ -75,39 +72,8 @@ class StandardCameraNode(Node):
         self.capture_timer = self.create_timer(period, self.capture_frame)
 
         self.get_logger().info('Standard Camera Node initialized...')
-    
-    def enable_camera_callback(self, request, response):
-        """Turn continous streaming on (enable=true) or off (enable=false)."""
-        self.camera_active = request.enable
 
-        if self.camera_active:
-            self.get_logger().debug('Camera enabled')
-            response.message = 'Camera enabled'
-        else:
-            self.get_logger().debug('Camera disabled')
-            response.message = 'Camera disabled'
-
-        response.success = True
-        return response
-
-    def capture_callback(self, request, response):
-        """Capture and publish a single frame."""
-        ret, image = self.camera.read()
-        if not ret:
-            self.get_logger().warn('Single capture failed.')
-            response.success = False
-            response.message = 'Failed to capture frame'
-            return response
-
-        image_msg = self.to_image_msg(image)
-        self.capture_publisher.publish(image_msg)
-        self.get_logger().debug('Single frame captured and published.')
-        response.success = True
-        response.message = 'Frame captured and published'
-        response.image = image_msg
-        return response
-
-    def init_camera(self):
+    def init_camera(self) -> bool:
         """Open and configure the camera. Return True on success."""
         self.discard_frames = 5  # Warm-up frames to flush before publishing
 
@@ -159,7 +125,7 @@ class StandardCameraNode(Node):
         """Read one frame and publish it to camera/image_raw (called by the timer)."""
         if not self.camera_active:
             return
-        
+
         ret, image = self.camera.read()
         if not ret:
             self.get_logger().warn('Problem getting image.', throttle_duration_sec=2.0)
@@ -167,7 +133,38 @@ class StandardCameraNode(Node):
 
         self.rgb_publisher.publish(self.to_image_msg(image))
 
-    def to_image_msg(self, image):
+    def enable_camera_callback(self, request: EnableCamera.Request,
+                               response: EnableCamera.Response) -> EnableCamera.Response:
+        """Turn continous streaming on (enable=true) or off (enable=false)."""
+        self.camera_active = request.enable
+
+        if self.camera_active:
+            self.get_logger().debug('Camera enabled')
+            response.message = 'Camera enabled'
+        else:
+            self.get_logger().debug('Camera disabled')
+            response.message = 'Camera disabled'
+
+        response.success = True
+        return response
+
+    def capture_callback(self, request: CaptureImage.Request,
+                         response: CaptureImage.Response) -> CaptureImage.Response:
+        """Capture a single frame and return it in the response."""
+        ret, image = self.camera.read()
+        if not ret:
+            self.get_logger().warn('Single capture failed.')
+            response.success = False
+            response.message = 'Failed to capture frame'
+            return response
+
+        self.get_logger().debug('Single frame captured and published.')
+        response.success = True
+        response.message = 'Frame captured and published'
+        response.image = self.to_image_msg(image)
+        return response
+
+    def to_image_msg(self, image) -> Image:
         """Build a bgr8 sensor_msgs/Image from an OpenCV frame without cv_bridge."""
         msg = Image()
         msg.header.stamp = self.get_clock().now().to_msg()
