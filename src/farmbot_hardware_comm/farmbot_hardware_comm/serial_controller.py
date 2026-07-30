@@ -211,9 +211,6 @@ class SerialController(Node):
         self.serial_feedback = String()
         self.serial_feedback_pub = self.create_publisher(String, 'serial_feedback', 10)
 
-        self.input_sub = self.create_subscription(String,
-                                                  'input_test', self.send_message, 10)
-
         # Log the Initialisation
         self.get_logger().info('Serial Controller Initialised..')
 

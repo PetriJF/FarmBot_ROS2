@@ -30,7 +30,6 @@ setup(
     entry_points={
         'console_scripts': [
             'farmbot_controller = farmbot_controllers.farmbot_controller:main',
-            'test_client = farmbot_controllers.test_client:main',
         ],
     },
 )
