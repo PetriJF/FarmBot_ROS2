@@ -684,6 +684,8 @@ class SerialController(Node):
             self.switch_led(self.fb_panel['unlock_led'], self.fb_panel['led_on'])
             self.estop_active.data = False
             self.estop_active_pub.publish(self.estop_active)
+            self.abort_active.data = False
+            self.abort_active_pub.publish(self.abort_active)
 
         return response
 
@@ -760,32 +762,6 @@ class SerialController(Node):
         Args:
             cmd {str}: FCode command to send to the FarmBot.
         """
-        # Ensure the endline char at the end of the command
-        if cmd[-1] != '\n':
-            cmd += '\n'
-
-        # Record the transmitted command
-        self.previous_cmd = (cmd.split(' ')[0] if ' ' in cmd else cmd.split('\n')[0])
-        for cmd_type in self.non_immediate_cmds:
-            if self.previous_cmd in self.non_immediate_cmds[cmd_type]:
-                self.command_type = cmd_type
-                break
-
-        self.get_logger().info(f'Sent message: {cmd}')
-        #  Send through serial the command
-        self.ser.write(cmd.encode('utf-8'))
-
-    def send_message(self, message: String):
-        """
-        Send an FCode command to the FarmBot over the serial connection.
-
-        Ensures that the command is newline-terminated, stores the command name
-        for response tracking, and writes the encoded command to the serial port.
-
-        Args:
-            cmd {str}: FCode command to send to the FarmBot.
-        """
-        cmd = message.data
         # Ensure the endline char at the end of the command
         if cmd[-1] != '\n':
             cmd += '\n'

@@ -93,5 +93,5 @@ estop:
 
 abort:
   '@':
-    responses: ['R86', 'R02']
+    responses: ['R86', 'R08']
 
