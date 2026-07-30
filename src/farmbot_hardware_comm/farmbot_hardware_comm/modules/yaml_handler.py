@@ -83,6 +83,9 @@ class YAMLHandler:
             raise YAMLError(f'Invalid YAML directory path: {path}')
 
         file_path = YAMLHandler.join_path(path, file)
+        if not YAMLHandler.existing_path(file_path):
+            raise YAMLError(f'YAML file not found: {file_path}')
+
         with open(file_path, 'r') as config_file:
             loaded_data = yaml.safe_load(config_file)
             if isinstance(loaded_data, dict):
