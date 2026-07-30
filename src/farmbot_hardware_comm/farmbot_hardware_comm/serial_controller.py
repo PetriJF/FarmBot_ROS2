@@ -897,8 +897,10 @@ class SerialController(Node):
                 rep_code = code[0]
                 if rep_code in ['R41', 'R21', 'R23']:
                     self.request_result[rep_code][2] = int(code[2][1:])
-                elif rep_code in ['R81', 'R82', 'R83']:
+                elif rep_code == 'R83':
                     self.request_result[rep_code][1] = code[1]
+                elif rep_code in ['R81', 'R82', 'R83']:
+                    self.request_result[rep_code][1] = f'{code[1]} {code[2]} {code[3]}'
                 self.code_response.set_result(self.request_result[rep_code])
 
     def action_feedback_publisher(self, cmd_type: str):

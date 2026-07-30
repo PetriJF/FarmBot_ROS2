@@ -240,6 +240,9 @@ class GPIOController(Node):
         except Exception as e:
             self.get_logger().error('Service call failed %r' % (e, ))
 
+    # For now, buttons other than “estop” and “reset estop” do not work because they have not been
+    # implemented. If we want to maintain flexibility and be able to modify only the YAML file, we
+    # cannot simply place the client services within this function.
     def button_handler(self, channel):
         """
         Handle button press events for the panel buttons.
