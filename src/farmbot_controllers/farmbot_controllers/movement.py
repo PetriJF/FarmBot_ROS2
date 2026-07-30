@@ -68,14 +68,14 @@ class Movement:
         """
         self.send_home_goal(op=HomeAxes.Goal.CALIBRATE, x_axis=x, y_axis=y, z_axis=z)
 
-    def set_curr_to_home(self):
+    def set_curr_to_home(self, x: bool, y: bool, z: bool):
         """
         Call the FarmBot HomeAxes action to set the current position as the new home.
 
         Sends a goal to update the FarmBot home position using the current axis
         coordinates.
         """
-        self.send_home_goal(op=HomeAxes.Goal.SET_HOME)
+        self.send_home_goal(op=HomeAxes.Goal.SET_HOME, x_axis=x, y_axis=y, z_axis=z)
 
     def send_home_goal(self, op: int, x_axis=False, y_axis=False, z_axis=False):
         """

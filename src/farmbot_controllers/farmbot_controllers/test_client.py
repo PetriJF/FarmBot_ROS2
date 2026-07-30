@@ -84,7 +84,9 @@ class TestClient(Node):
                     self.mvm.move_gantry_s(x_coord=float(code[1]), y_coord=float(code[2]),
                                            z_coord=float(code[3]), speed=float(code[4]))
             case 'HOME':
-                self.mvm.set_curr_to_home()
+                self.mvm.set_curr_to_home(x=True if code[1] == 'X' else False,
+                                          y=True if code[1] == 'Y' else False,
+                                          z=True if code[1] == 'Z' else False)
             case 'H_0':
                 self.mvm.go_home()
             case 'FIND_AXIS':
@@ -116,7 +118,7 @@ class TestClient(Node):
             case 'D_C':
                 self.devices.read_pin(63, False)
             case 'D_set':
-                self.devices.set_pin_value(63, 1, False, True, 0, 1000)
+                self.devices.set_pin_value(63, int(float(code[1])), False, False)
             case 'D_configure':
                 self.devices.set_pin_io(63, False)
             case 'M_SV':
@@ -125,9 +127,9 @@ class TestClient(Node):
 
             # PARAMETER
             case 'READ_PARAM':
-                self.params.readParam(code[1])
+                self.params.read_param(int(float(code[1])))
             case 'LIST_ALL':
-                self.params.listAllParams()
+                self.params.list_all_params()
             case 'C_2':
                 if len(code) == 1:
                     self.get_logger().warning('You have not selected the axis encoder you want to '
@@ -137,7 +139,7 @@ class TestClient(Node):
                         param = 130 + ((1 if code[1] == 'X' else 0) +
                                        (2 if code[1] == 'Y' else 0) +
                                        (3 if code[1] == 'Z' else 0))
-                        self.params.writeParam(param, 1, False)
+                        self.params.write_param(param, int(float(code[1])), False)
                     else:
                         self.get_logger().warning('C_2: Invalid option selected. Choose: X, Y, Z')
             case 'UPDATE_PARAM':
