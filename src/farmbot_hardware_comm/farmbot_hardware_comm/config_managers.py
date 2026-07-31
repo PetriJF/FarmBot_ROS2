@@ -5,7 +5,7 @@ Handles loading, writing and storing FarmBot firmware parameters on YAML file.
 Provides the parameter management logic used by the SerialController to
 synchronize configuration values with the firmware.
 """
-from farmbot_hardware_comm.modules.exceptions import ServerError, YAMLError
+from farmbot_hardware_comm.modules.exceptions import YAMLError
 from farmbot_hardware_comm.modules.param_info import ParameterList
 from farmbot_hardware_comm.modules.yaml_handler import YAMLHandler
 
@@ -16,13 +16,14 @@ from farmbot_interfaces.srv import ParameterConfig, StringRepReq
 from rclpy.action import ActionClient
 from rclpy.action.client import ClientGoalHandle
 from rclpy.node import Node
+from rclpy.task import Future
 
 
 class ConfigServer:
     """Handle the parameter recording and loading onto the farmduino."""
 
     # Node contructor
-    def __init__(self, node: Node, config_path):
+    def __init__(self, node: Node, config_path: str):
         """
         Config Handling Node Constructor.
 
@@ -30,27 +31,20 @@ class ConfigServer:
         """
         self.node = node
 
-        # Flag waiting for initialization to be done before the config is loaded
-        self.firmware_init_done = False
-
-        # The dictionary containing all of the parameters for the farmbot
+        # The parameter identifiers used to index the table below
         self.params = ParameterList()
-        param_names = vars(self.params)
-        self.param_vals = {
-            param_names[name]: 0
-            for name in param_names
-        }
 
         self.default_path = YAMLHandler.get_directory_package('farmbot_hardware_comm', 'config')
         self.config_path = config_path
 
         self.base_config = 'firmwareDefault.yaml'  # default config loaded by the firmware
-        self.custom1_config = 'Custom1.yaml'       # custom configuration,modify in source and build
+        self.custom1_config = 'Custom1.yaml'       # custom config, modify in source and build
         self.genesis_config = 'Genesis.yaml'       # farmbot genesis config
         self.express_config = 'Express.yaml'       # farmbot express config
         self.active_config = 'activeConfig.yaml'   # configuration loaded from previous run
 
-        # TODO: Add more default configurations other than the labFB one
+        # The dictionary containing all of the parameters for the farmbot
+        self.param_vals = self._initial_params()
 
         # Config Service Servers
         self.config_server = self.node.create_service(ParameterConfig,
@@ -70,27 +64,48 @@ class ConfigServer:
         # Log the initialization
         self.node.get_logger().info('Config Server Initialized..')
 
-    def _server_availability(self, cmd_name: str, client):
-        if not client.wait_for_server(1.0):
-            self.node.get_logger().fatal(f'{cmd_name} Server not available!')
-            raise ServerError('ConfigParameter node failed: server unavailable')
+    def _initial_params(self) -> dict:
+        """Return the parameter table the node starts from.
+
+        Prefers the configuration saved by the previous run (active config) and falls back
+        to the values the firmware boots with.
+        """
+        try:
+            return YAMLHandler.load_yaml(self.config_path, self.active_config)
+        except YAMLError as e:
+            self.node.get_logger().warn(f'{e}. Falling back to the firmware defaults.')
+
+        try:
+            return YAMLHandler.load_yaml(self.default_path, self.base_config)
+        except YAMLError as e:
+            self.node.get_logger().error(f'Could not load the firmware defaults either: {e}')
+            return {}
+
+    def _server_availability(self, cmd_name: str, client: ActionClient) -> bool:
+        """Check if an action server is ready to accept a goal.
+
+        Args:
+            cmd_name {str}: Name of the server, used for logging.
+            client {ActionClient}: Action client whose server is being checked.
+        """
+        if not client.server_is_ready():
+            self.node.get_logger().error(f'{cmd_name} server not available!')
+            return False
+        return True
 
     def retrieve_config(self):
         """Load the active configuration file, if it exists, and write it to the Farmduino."""
-        if not self.firmware_init_done:
-            self.firmware_init_done = True
-            active_config_path = YAMLHandler.join_path(self.config_path, self.active_config)
-            if YAMLHandler.existing_path(active_config_path):
-                self.param_vals = YAMLHandler.load_yaml(self.config_path, self.active_config)
-                self.load_params()
-                self.node.get_logger().info('Initialized with active config from previous run')
-            else:
-                self.node.get_logger().warn(
-                    'Previous config could not be found! You '
-                    'will need to initialize the appropriate parameter config'
-                )
+        try:
+            self.param_vals = YAMLHandler.load_yaml(self.config_path, self.active_config)
+        except YAMLError as e:
+            self.node.get_logger().warn(f'{e}. Previous config could not be found!')
+            return
 
-    def param_loading_server(self, request, response):
+        self.node.get_logger().info('Initializing with the active config from the previous run')
+        self.load_params()
+
+    def param_loading_server(self, request: StringRepReq.Request,
+                             response: StringRepReq.Response) -> StringRepReq.Response:
         """Service Server that loads the default parameter configurations onto the Farmduino."""
         try:
             if request.data in ['Genesis', 'genesis', 'Gen', 'gen']:
@@ -144,7 +159,7 @@ class ConfigServer:
 
         self.send_loading_params_goal(params, param_values)
 
-    def send_loading_params_goal(self, params: list, values: list):
+    def send_loading_params_goal(self, params: list[int], values: list[int]):
         """
         Send a LoadingParameters goal to the FarmBot action server.
 
@@ -152,10 +167,11 @@ class ConfigServer:
             to load and their associated values.
 
         Args:
-            params (list): List of parameter names to load.
-            values (list): List of values associated with each parameter.
+            params (list[int]): List of parameter identifiers to load.
+            values (list[int]): List of values associated with each parameter.
         """
-        self._server_availability('LoadingParameters', self.load_params_client)
+        if not self._server_availability('LoadingParameters', self.load_params_client):
+            return
 
         goal = LoadingParameters.Goal()
         goal.params = params
@@ -167,7 +183,7 @@ class ConfigServer:
             feedback_callback=self.loading_goal_feedback_callback
             ).add_done_callback(self.goal_response_callback)
 
-    def loading_goal_feedback_callback(self, feedback_msg: LoadingParameters.Feedback):
+    def loading_goal_feedback_callback(self, feedback_msg: LoadingParameters.Impl.FeedbackMessage):
         """
         Handle feedback messages from the LoadingParameters action server.
 
@@ -177,7 +193,7 @@ class ConfigServer:
 
         self.node.get_logger().info(f'Loading parameter progression: {progress*100:.2f} %')
 
-    def goal_response_callback(self, future):
+    def goal_response_callback(self, future: Future):
         """
         Handle the action server goal response.
 
@@ -197,7 +213,7 @@ class ConfigServer:
             self.busy_state = False
             self.node.get_logger().warn('Goal rejected')
 
-    def goal_result_callback(self, future):
+    def goal_result_callback(self, future: Future):
         """
         Handle the final result from the action server.
 
@@ -222,29 +238,38 @@ class ConfigServer:
         elif cmd_status == result.OK:
             self.node.get_logger().info('Parameter loading complete!')
 
-    def config_request_server(self, request, response):
+    def config_request_server(self, request: ParameterConfig.Request,
+                              response: ParameterConfig.Response) -> ParameterConfig.Response:
         """Service server that receives commands, returns responses, and executes instructions."""
         response.success = True    # success until proven otherwise
         response.cmd = request.data
         msg_split = (request.data).split(' ')
         code = msg_split[0]
-        # Using both command and report codes so that the commands themselves
-        # can be just fed into it with ease
-        if code == 'R21' or code == 'R23' or code == 'F22' or code == 'F23':
-            self.set_value(int(msg_split[1][1:]), int(msg_split[2][1:]))
+
+        try:
+            # Using both command and report codes so that the commands themselves
+            # can be just fed into it with ease
+            if code == 'R21' or code == 'R23' or code == 'F22' or code == 'F23':
+                self.set_value(int(msg_split[1][1:]), int(msg_split[2][1:]))
+                response.value = 0
+                return response
+            if code == 'F21':
+                response.value = self.get_value(int(msg_split[1][1:]))
+                return response
+
+            # Requests with non farmbot commands
+            if code == 'S':  # Format S PARAM_INDEX PARAM_VALUE. e.g. S 2 1
+                self.set_value(int(msg_split[1]), int(msg_split[2]))
+
+                return response
+            if code == 'G':
+                response.value = self.get_value(int(msg_split[1]))
+                return response
+        except (IndexError, ValueError, KeyError) as e:
+            self.node.get_logger().warn(f'Could not process parameter request '
+                                        f'"{request.data}": {e!r}')
+            response.success = False
             response.value = 0
-            return response
-        if code == 'F21':
-            response.value = self.__get_value(msg_split[1][1:])
-            return response
-
-        # Requests with non farmbot commands
-        if code == 'S':  # Format S PARAM_INDEX PARAM_VALUE. e.g. S 2 1
-            self.set_value(msg_split[1], msg_split[2])
-
-            return response
-        if code == 'G':
-            response.value = self.__get_value(msg_split[1])
             return response
         if code == 'MAP':
             response.value = 0
@@ -288,11 +313,11 @@ class ConfigServer:
         response.value = 0
         return response
 
-    def set_value(self, param, value):
+    def set_value(self, param: int, value: int):
         """Set the selected parameter to the parsed value."""
         self.node.get_logger().info(f'Set parameter {param} to {value}')
         self.param_vals[param] = value
 
-    def __get_value(self, param):
+    def get_value(self, param: int) -> int:
         """Return a value of a selected parameter."""
         return self.param_vals[param]
