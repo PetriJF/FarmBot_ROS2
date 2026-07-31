@@ -15,14 +15,13 @@ from farmbot_interfaces.srv import (ConfigurePin, MoveServo, ReadI2C, ReadParame
 class Encoder:
     """Encode incoming FarmBot service/action requests into FCode commands."""
 
-    def __init__(self, config_path):
+    def __init__(self, config_path: str):
         """Initialise the encoder class."""
         self.directory = YAMLHandler.get_directory_package('farmbot_hardware_comm', 'config')
+        self.cmd_validation = YAMLHandler.load_yaml(self.directory, 'CommandValidation.yaml')
 
         try:
-            self.active_config = YAMLHandler.load_yaml(config_path, 'activeConfig.yaml')
             self.active_map = YAMLHandler.load_yaml(config_path, 'active_map.yaml')
-            self.cmd_validation = YAMLHandler.load_yaml(self.directory, 'CommandValidation.yaml')
         except YAMLError as e:
             self.get_logger().warn(f'yaml error: {e}')
             return
@@ -148,7 +147,7 @@ class Encoder:
         return f'F41 P{req.pin} V{req.value} M{int(req.mode)}'
 
     # Gantry commands
-    def encode_move_gantry(self, req: MoveGantry.Goal) -> str:
+    def encode_move_gantry(self, req: MoveGantry.Goal, params: dict) -> str:
         """
         Encode a MoveGantry request into a FarmBot FCode command.
 
@@ -160,6 +159,7 @@ class Encoder:
         Args:
             req {MoveGantry.Goal}: Gantry movement request containing the target
                                    position, movement type, and axis speed percentages.
+            params {dict}: Parameter table currently loaded on the Farmduino.
         """
         x_edge = self.active_map['map_reference']['x_len']
         y_edge = self.active_map['map_reference']['y_len']
@@ -175,9 +175,9 @@ class Encoder:
         if req.interpolated:
             return f'G01 X{req.target.x} Y{req.target.y} Z{req.target.z}'
         return (f'G00 X{req.target.x} Y{req.target.y} Z{req.target.z} '
-                f'A{req.speed_percent_x / 100 * self.active_config[71]:.0f} '
-                f'B{req.speed_percent_y / 100 * self.active_config[72]:.0f} '
-                f'C{req.speed_percent_z / 100 * self.active_config[73]:.0f}')
+                f'A{req.speed_percent_x / 100 * params[71]:.0f} '
+                f'B{req.speed_percent_y / 100 * params[72]:.0f} '
+                f'C{req.speed_percent_z / 100 * params[73]:.0f}')
 
     # Home commands
     def encode_home_axes(self, req: HomeAxes.Goal) -> str:
@@ -233,7 +233,7 @@ class Encoder:
         return f'F61 P{req.pin} V{req.angle:.0f}'
 
     # Parameter commands
-    def encode_read_parameter(self, req: ReadParameter.Request) -> str:
+    def encode_read_parameter(self, req: ReadParameter.Request, params: dict) -> str:
         """
         Encode a ReadParameter request into a FarmBot FCode command.
 
@@ -242,14 +242,15 @@ class Encoder:
 
         Args:
             req {ReadParameter.Request}: parameter read request containing the parameter to read.
+            params {dict}: Parameter table currently loaded on the Farmduino.
         """
-        valid_parameters = list(self.active_config.keys())        # TODO: Checks Parameters values
+        valid_parameters = list(params.keys())        # TODO: Checks Parameters values
 
         if req.param not in valid_parameters:
             raise EncodeError(f'parameter {req.param} is not a valid parameter')
         return f'F21 P{req.param}'
 
-    def encode_write_parameter(self, req: WriteParameter.Request) -> str:
+    def encode_write_parameter(self, req: WriteParameter.Request, params: dict) -> str:
         """
         Encode a WriteParameter request into a FCode command.
 
@@ -259,8 +260,9 @@ class Encoder:
         Args:
             req {WriteParameter.Request}: parameter write request containing the parameter
                                         identifier and its new value.
+            params {dict}: Parameter table currently loaded on the Farmduino.
         """
-        valid_parameters = list(self.active_config.keys())
+        valid_parameters = list(params.keys())
 
         if req.param not in valid_parameters:
             raise EncodeError(f'parameter {req.param} is not a valid parameter')
