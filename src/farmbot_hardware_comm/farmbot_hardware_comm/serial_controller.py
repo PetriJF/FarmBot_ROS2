@@ -9,7 +9,7 @@ received messages to provide feedback and update the system state.
 """
 from farmbot_hardware_comm.config_managers import ConfigServer
 from farmbot_hardware_comm.fcode_encoder import Encoder
-from farmbot_hardware_comm.modules.exceptions import EncodeError, ServerError, YAMLError
+from farmbot_hardware_comm.modules.exceptions import EncodeError, YAMLError
 from farmbot_hardware_comm.modules.yaml_handler import YAMLHandler
 
 from farmbot_interfaces.action import HomeAxes, LoadingParameters, MoveGantry
@@ -51,6 +51,7 @@ class SerialController(Node):
         super().__init__('SerialController')
 
         self.goal_handle = None
+        self.load_goal_handle = None
 
         self.declare_parameter('serial_port', rclpy.Parameter.Type.STRING)
         self.declare_parameter('serial_speed', rclpy.Parameter.Type.INTEGER)
@@ -65,12 +66,6 @@ class SerialController(Node):
         ws_path = self.get_parameter('ws_path').get_parameter_value().string_value
         folder_config_name = self.get_parameter(
             'folder_config_name').get_parameter_value().string_value
-
-        # Initialise Serial Communication
-        self.ser = serial.Serial(serial_port, serial_speed, timeout=1)
-        self.ser.reset_input_buffer()
-        # Create a timer to periodically check for incoming serial messages
-        self.rx_timer = self.create_timer(1.0 / self.check_serial_freq, self.serial_receive)
 
         # Used for setting the busy status on the ROS2 arch. while a command is running
         self.previous_cmd = ''
@@ -103,6 +98,11 @@ class SerialController(Node):
             self.get_logger().warn('The activeConfig.yaml file was not found. An activeConfig'
                                    f' file must be present at the following path: {config_path}'
                                    ' Please use the C_1 command (see the documentation).')
+
+        if not YAMLHandler.existing_path(YAMLHandler.join_path(config_path, 'active_map.yaml')):
+            self.get_logger().warn('The active_map.yaml file was not found at '
+                                   f'{config_path}. Gantry boundary checking stays disabled '
+                                   'until the map is set up.')
 
         # Initialising modules
         self.config_server = ConfigServer(self, config_path)
@@ -165,11 +165,11 @@ class SerialController(Node):
         self.write_parameter_server = self.create_service(WriteParameter, 'write_parameter',
                                                           self.write_parameter_command_server,
                                                           callback_group=self.cmd_callback_group)
-        self.list_all_parameter_server = self.create_service(Trigger, 'list_all_parameters',
-                                                             self.list_all_command_server,
-                                                             callback_group=self.cmd_callback_group)
+        self.list_all_parameter_server = self.create_service(
+            Trigger, 'list_all_parameters', self.list_all_command_server,
+            callback_group=self.cmd_callback_group)
         self.load_params_server = ActionServer(self, LoadingParameters, 'loading_params',
-                                               goal_callback=self.goal_callback,
+                                               goal_callback=self.load_goal_callback,
                                                execute_callback=self.load_params_execute_callback,
                                                handle_accepted_callback=self.handle_load_callback,
                                                callback_group=self.cmd_callback_group)
@@ -186,9 +186,9 @@ class SerialController(Node):
         self.end_stop_trigger_server = self.create_service(Trigger, 'end_stop',
                                                            self.end_stop_command_server,
                                                            callback_group=self.cmd_callback_group)
-        self.sw_version_trigger_server = self.create_service(Trigger, 'sw_version',
-                                                             self.sw_version_command_server,
-                                                             callback_group=self.cmd_callback_group)
+        self.sw_version_trigger_server = self.create_service(
+            Trigger, 'sw_version', self.sw_version_command_server,
+            callback_group=self.cmd_callback_group)
         self.curr_pos_trigger_server = self.create_service(Trigger, 'curr_pos',
                                                            self.curr_position_command_server,
                                                            callback_group=self.cmd_callback_group)
@@ -210,6 +210,12 @@ class SerialController(Node):
         self.abort_active_pub.publish(self.abort_active)
         self.serial_feedback = String()
         self.serial_feedback_pub = self.create_publisher(String, 'serial_feedback', 10)
+
+        # Initialise Serial Communication
+        self.ser = serial.Serial(serial_port, serial_speed, timeout=1)
+        self.ser.reset_input_buffer()
+        # Create a timer to periodically check for incoming serial messages
+        self.rx_timer = self.create_timer(1.0 / self.check_serial_freq, self.serial_receive)
 
         # Log the Initialisation
         self.get_logger().info('Serial Controller Initialised..')
@@ -399,7 +405,8 @@ class SerialController(Node):
         result = MoveGantry.Result()
 
         try:
-            fcode = self.fcode_encoder.encode_move_gantry(goal_handle.request)
+            fcode = self.fcode_encoder.encode_move_gantry(goal_handle.request,
+                                                          self.config_server.param_vals)
             self.mission['starting_position'] = [self.fb_position.point.x,
                                                  self.fb_position.point.y,
                                                  self.fb_position.point.z]
@@ -519,7 +526,8 @@ class SerialController(Node):
             response {ReadParameter.Response}: Service response object.
         """
         try:
-            fcode = self.fcode_encoder.encode_read_parameter(request)
+            fcode = self.fcode_encoder.encode_read_parameter(request,
+                                                             self.config_server.param_vals)
         except EncodeError as e:
             response.success = False
             response.message = str(e)
@@ -543,7 +551,8 @@ class SerialController(Node):
             response {WriteParameter.Response}: Service response object.
         """
         try:
-            fcode = self.fcode_encoder.encode_write_parameter(request)
+            fcode = self.fcode_encoder.encode_write_parameter(request,
+                                                              self.config_server.param_vals)
         except EncodeError as e:
             response.success = False
             response.message = str(e)
@@ -566,6 +575,19 @@ class SerialController(Node):
         response.success, response.message, _ = await self._run_command('F20')
         return response
 
+    def load_goal_callback(self, goal_request) -> GoalResponse:
+        """
+        Check whether an incoming parameter loading goal can be accepted.
+
+        Args:
+            goal_request: Incoming action goal request.
+        """
+        if self.load_goal_handle is not None and self.load_goal_handle.is_active:
+            self.get_logger().info('Goal rejected: a parameter load is already running')
+            return GoalResponse.REJECT
+
+        return self.goal_callback(goal_request)
+
     async def handle_load_callback(self, goal_handle: ServerGoalHandle):
         """
         Handle an accepted calibration parameter loading goal.
@@ -573,10 +595,27 @@ class SerialController(Node):
         Initialises the loading context and starts the timer that processes the
         pending parameters.
         """
-        self.goal_handle = goal_handle
-        self.nb_params = len(self.goal_handle.request.params)
+        self.load_goal_handle = goal_handle
+        self.nb_params = len(goal_handle.request.params)
+
+        self.result_loading = LoadingParameters.Result()
+        self.result_loading.code = LoadingParameters.Result.REJECTED
+        self.result_loading.message = 'parameter loading did not complete'
         self.load_param_timer = self.create_timer(1.0 / self.check_serial_freq, self.load_timer,
                                                   callback_group=MutuallyExclusiveCallbackGroup())
+
+    def finish_load(self, code: int, message: str):
+        """
+        Record the outcome of a parameter load and hand it to the execute callback.
+
+        Args:
+            code {int}: LoadingParameters result code describing the outcome.
+            message {str}: Human readable detail attached to the result.
+        """
+        self.load_param_timer.cancel()
+        self.result_loading.code = code
+        self.result_loading.message = message
+        self.load_goal_handle.execute()
 
     async def load_timer(self):
         """
@@ -586,53 +625,54 @@ class SerialController(Node):
         completes the action when all parameters have been processed or if a loading
         error occurs.
         """
+        if self.load_param_timer.is_canceled():
+            return
+
+        goal_handle = self.load_goal_handle
+
+        if not goal_handle.request.params:
+            self.finish_load(LoadingParameters.Result.OK, '')
+            return
+
+        if not self.write_param_client.service_is_ready():
+            self.get_logger().error('WriteParameter server not available! '
+                                    'Parameter loading aborted.')
+            self.finish_load(LoadingParameters.Result.REJECTED,
+                             'write_parameter server unavailable')
+            return
+
+        request = WriteParameter.Request()
+        request.param = goal_handle.request.params.pop(0)
+        request.value = goal_handle.request.values.pop(0)
+
+        request.during_calibration = False
+
+        future = self.write_param_client.call_async(request=request)
+        service_response = await future
+        if not service_response.success:
+            if service_response.message == 'firmware error':
+                self.finish_load(LoadingParameters.Result.FIRMWARE_ERROR,
+                                 f'{service_response.message} triggered by the parameter '
+                                 f'{request.param} and its value {request.value}')
+            elif service_response.message == 'aborted':
+                self.finish_load(LoadingParameters.Result.ABORTED, service_response.message)
+            elif service_response.message == 'estopped':
+                self.finish_load(LoadingParameters.Result.ESTOPPED, service_response.message)
+            else:
+                self.finish_load(LoadingParameters.Result.REJECTED, service_response.message)
+            return
+
         feedback = LoadingParameters.Feedback()
-        if self.goal_handle.request.params and not self.load_param_timer.is_canceled():
-            if not self.write_param_client.wait_for_service(1.0):
-                self.node.get_logger().fatal('WriteParam Server not available!')
-                raise ServerError('Parameter module failed: server unavailable')
-
-            request = WriteParameter.Request()
-            request.param = self.goal_handle.request.params.pop(0)
-            request.value = self.goal_handle.request.values.pop(0)
-
-            request.during_calibration = False
-
-            future = self.write_param_client.call_async(request=request)
-            service_response = await future
-            if not service_response.success:
-                result = self.result_loading
-                if service_response.message == 'firmware error':
-                    result.code = LoadingParameters.Result.FIRMWARE_ERROR
-                    result.message = (f'{service_response.message} triggered by the parameter'
-                                      f'{request.param} and its value {request.value}')
-                elif service_response.message == 'aborted':
-                    result.code = LoadingParameters.Result.ABORTED
-                    result.message = service_response.message
-                elif service_response.message == 'estopped':
-                    result.code = LoadingParameters.Result.ESTOPPED
-                    result.message = service_response.message
-                else:
-                    result.code = LoadingParameters.Result.REJECTED
-                    result.message = service_response.message
-                self.goal_handle.execute()
-
-            feedback.progress = (1-len(self.goal_handle.request.params)/self.nb_params)
-            self.goal_handle.publish_feedback(feedback)
-
-        elif not self.load_param_timer.is_canceled():
-            result = self.result_loading
-            result.code = LoadingParameters.Result.OK
-            result.message = ''
-            self.goal_handle.execute()
+        feedback.progress = (1 - (len(goal_handle.request.params) / self.nb_params))
+        goal_handle.publish_feedback(feedback)
 
     async def load_params_execute_callback(
             self, goal_handle: ServerGoalHandle) -> LoadingParameters.Result:
         """
         Execute a loading parameters action.
 
-        The goal is encoded into FCode and sent to the FarmBot.
-        The action result is updated according to the command execution status.
+        Reports the outcome recorded by the loading timer, which owns the actual
+        parameter writing.
 
         Args:
             goal_handle {ServerGoalHandle}: Accepted action goal.
@@ -858,10 +898,8 @@ class SerialController(Node):
         Args:
             code {list}: Parsed firmware response.
         """
-        if self.goal_handle is None or not self.goal_handle.is_active:
-            pass
-
-        if self.command_type in ['home_axes', 'move_gantry']:
+        if (self.command_type in ['home_axes', 'move_gantry']
+                and self.goal_handle is not None and self.goal_handle.is_active):
             self.action_feedback_publisher(self.command_type)
 
         if (code[0] in self.non_immediate_cmds[self.command_type][self.previous_cmd]['responses']
