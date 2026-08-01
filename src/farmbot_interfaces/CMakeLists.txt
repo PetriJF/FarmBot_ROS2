@@ -30,6 +30,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/WriteParameter.srv"
   "srv/WritePin.srv"
   "action/HomeAxes.action"
+  "action/LoadingParameters.action"
   "action/MoveGantry.action"
   DEPENDENCIES sensor_msgs geometry_msgs
 )

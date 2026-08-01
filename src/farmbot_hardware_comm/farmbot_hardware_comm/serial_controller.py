@@ -7,10 +7,12 @@ controller. It handles service and action requests, converts commands into
 FCode, sends them to the Farmduino over the serial connection, and processes
 received messages to provide feedback and update the system state.
 """
-from farmbot_hardware_comm.fcode_encoder import EncodeError, Encoder
-from farmbot_hardware_comm.modules.yaml_loader import YAMLLoader
+from farmbot_hardware_comm.config_managers import ConfigServer
+from farmbot_hardware_comm.fcode_encoder import Encoder
+from farmbot_hardware_comm.modules.exceptions import EncodeError, YAMLError
+from farmbot_hardware_comm.modules.yaml_handler import YAMLHandler
 
-from farmbot_interfaces.action import HomeAxes, MoveGantry
+from farmbot_interfaces.action import HomeAxes, LoadingParameters, MoveGantry
 from farmbot_interfaces.srv import (ConfigurePin, LedPanelHandler, MoveServo,
                                     ReadI2C, ReadParameter, ReadPin, SetI2C,
                                     Watering, WriteParameter, WritePin)
@@ -20,7 +22,7 @@ from geometry_msgs.msg import PointStamped
 import rclpy
 from rclpy.action import ActionServer, GoalResponse
 from rclpy.action.server import ServerGoalHandle
-from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup, ReentrantCallbackGroup
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
 from rclpy.task import Future
@@ -49,6 +51,7 @@ class SerialController(Node):
         super().__init__('SerialController')
 
         self.goal_handle = None
+        self.load_goal_handle = None
 
         self.declare_parameter('serial_port', rclpy.Parameter.Type.STRING)
         self.declare_parameter('serial_speed', rclpy.Parameter.Type.INTEGER)
@@ -64,14 +67,9 @@ class SerialController(Node):
         folder_config_name = self.get_parameter(
             'folder_config_name').get_parameter_value().string_value
 
-        # Initialise Serial Communication
-        self.ser = serial.Serial(serial_port, serial_speed, timeout=1)
-        self.ser.reset_input_buffer()
-        # Create a timer to periodically check for incoming serial messages
-        self.rx_timer = self.create_timer(1.0 / self.check_serial_freq, self.serial_receive)
-
         # Used for setting the busy status on the ROS2 arch. while a command is running
         self.previous_cmd = ''
+        self.command_type = ''
         self.code_response: Future = None
 
         self.mission = {
@@ -79,20 +77,51 @@ class SerialController(Node):
             'final_position': [],
         }
 
-        config_path = YAMLLoader.join_path(ws_path, folder_config_name)
+        self.request_result = {
+            'R03': [False, 'firmware error', -1],
+            'R86': [False, 'aborted', -1],
+            'R02': [True, '', -1],
+            'R87': [False, 'estopped', -1],
+            'R08': [True, '', -1],
+            'R41': [True, '', -1],
+            'R21': [True, '', -1],
+            'R23': [True, '', -1],
+            'R81': [True, '', -1],
+            'R82': [True, '', -1],
+            'R83': [True, '', -1],
+        }
 
-        # Initialising farmbot encoder module
+        config_path = YAMLHandler.join_path(ws_path, folder_config_name)
+        YAMLHandler.make_dir(config_path)
+
+        if not YAMLHandler.existing_path(YAMLHandler.join_path(config_path, 'activeConfig.yaml')):
+            self.get_logger().warn('The activeConfig.yaml file was not found. An activeConfig'
+                                   f' file must be present at the following path: {config_path}'
+                                   ' Please use the C_1 command (see the documentation).')
+
+        if not YAMLHandler.existing_path(YAMLHandler.join_path(config_path, 'active_map.yaml')):
+            self.get_logger().warn('The active_map.yaml file was not found at '
+                                   f'{config_path}. Gantry boundary checking stays disabled '
+                                   'until the map is set up.')
+
+        # Initialising modules
+        self.config_server = ConfigServer(self, config_path)
         self.fcode_encoder = Encoder(config_path)
 
-        self.directory = YAMLLoader.get_directory_package('farmbot_hardware_comm', 'config')
+        self.directory = YAMLHandler.get_directory_package('farmbot_hardware_comm', 'config')
 
-        self.non_immediate_cmds = YAMLLoader.load_yaml(self.directory, 'CommandsResponses.yaml')
-        self.fb_panel = YAMLLoader.load_yaml(self.directory, 'FarmbotPanel.yaml')
+        try:
+            self.non_immediate_cmds = YAMLHandler.load_yaml(self.directory,
+                                                            'CommandsResponses.yaml')
+            self.fb_panel = YAMLHandler.load_yaml(self.directory, 'FarmbotPanel.yaml')
+        except YAMLError as e:
+            self.get_logger().warn(f'yaml error: {e}')
+            return
 
         self.led_client = self.create_client(LedPanelHandler, 'set_led')
         # Initialise the LED states
-        self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_ON'])
-        self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_ON'])
+        self.switch_led(self.fb_panel['estop_led'], self.fb_panel['led_on'])
+        self.switch_led(self.fb_panel['unlock_led'], self.fb_panel['led_on'])
 
         self.cmd_callback_group = ReentrantCallbackGroup()
 
@@ -136,9 +165,15 @@ class SerialController(Node):
         self.write_parameter_server = self.create_service(WriteParameter, 'write_parameter',
                                                           self.write_parameter_command_server,
                                                           callback_group=self.cmd_callback_group)
-        self.list_all_parameter_server = self.create_service(Trigger, 'list_all_parameters',
-                                                             self.list_all_command_server,
-                                                             callback_group=self.cmd_callback_group)
+        self.list_all_parameter_server = self.create_service(
+            Trigger, 'list_all_parameters', self.list_all_command_server,
+            callback_group=self.cmd_callback_group)
+        self.load_params_server = ActionServer(self, LoadingParameters, 'loading_params',
+                                               goal_callback=self.load_goal_callback,
+                                               execute_callback=self.load_params_execute_callback,
+                                               handle_accepted_callback=self.handle_load_callback,
+                                               callback_group=self.cmd_callback_group)
+        self.result_loading = LoadingParameters.Result()
         self.estop_trigger_server = self.create_service(Trigger, 'estop',
                                                         self.estop_command_server,
                                                         callback_group=self.cmd_callback_group)
@@ -151,12 +186,15 @@ class SerialController(Node):
         self.end_stop_trigger_server = self.create_service(Trigger, 'end_stop',
                                                            self.end_stop_command_server,
                                                            callback_group=self.cmd_callback_group)
-        self.sw_version_trigger_server = self.create_service(Trigger, 'sw_version',
-                                                             self.sw_version_command_server,
-                                                             callback_group=self.cmd_callback_group)
+        self.sw_version_trigger_server = self.create_service(
+            Trigger, 'sw_version', self.sw_version_command_server,
+            callback_group=self.cmd_callback_group)
         self.curr_pos_trigger_server = self.create_service(Trigger, 'curr_pos',
                                                            self.curr_position_command_server,
                                                            callback_group=self.cmd_callback_group)
+
+        # Initialise WriteParameter client
+        self.write_param_client = self.create_client(WriteParameter, 'write_parameter')
 
         # Initialise publishers
         self.fb_position = PointStamped()
@@ -173,6 +211,12 @@ class SerialController(Node):
         self.serial_feedback = String()
         self.serial_feedback_pub = self.create_publisher(String, 'serial_feedback', 10)
 
+        # Initialise Serial Communication
+        self.ser = serial.Serial(serial_port, serial_speed, timeout=1)
+        self.ser.reset_input_buffer()
+        # Create a timer to periodically check for incoming serial messages
+        self.rx_timer = self.create_timer(1.0 / self.check_serial_freq, self.serial_receive)
+
         # Log the Initialisation
         self.get_logger().info('Serial Controller Initialised..')
 
@@ -185,6 +229,7 @@ class SerialController(Node):
         result = await self.code_response
         self.code_response = None
         self.previous_cmd = ''
+        self.command_type = ''
         return result[0], result[1], result[2]
 
     # Callbacks
@@ -360,7 +405,8 @@ class SerialController(Node):
         result = MoveGantry.Result()
 
         try:
-            fcode = self.fcode_encoder.encode_move_gantry(goal_handle.request)
+            fcode = self.fcode_encoder.encode_move_gantry(goal_handle.request,
+                                                          self.config_server.param_vals)
             self.mission['starting_position'] = [self.fb_position.point.x,
                                                  self.fb_position.point.y,
                                                  self.fb_position.point.z]
@@ -480,7 +526,8 @@ class SerialController(Node):
             response {ReadParameter.Response}: Service response object.
         """
         try:
-            fcode = self.fcode_encoder.encode_read_parameter(request)
+            fcode = self.fcode_encoder.encode_read_parameter(request,
+                                                             self.config_server.param_vals)
         except EncodeError as e:
             response.success = False
             response.message = str(e)
@@ -504,7 +551,8 @@ class SerialController(Node):
             response {WriteParameter.Response}: Service response object.
         """
         try:
-            fcode = self.fcode_encoder.encode_write_parameter(request)
+            fcode = self.fcode_encoder.encode_write_parameter(request,
+                                                              self.config_server.param_vals)
         except EncodeError as e:
             response.success = False
             response.message = str(e)
@@ -527,6 +575,116 @@ class SerialController(Node):
         response.success, response.message, _ = await self._run_command('F20')
         return response
 
+    def load_goal_callback(self, goal_request) -> GoalResponse:
+        """
+        Check whether an incoming parameter loading goal can be accepted.
+
+        Args:
+            goal_request: Incoming action goal request.
+        """
+        if self.load_goal_handle is not None and self.load_goal_handle.is_active:
+            self.get_logger().info('Goal rejected: a parameter load is already running')
+            return GoalResponse.REJECT
+
+        return self.goal_callback(goal_request)
+
+    async def handle_load_callback(self, goal_handle: ServerGoalHandle):
+        """
+        Handle an accepted calibration parameter loading goal.
+
+        Initialises the loading context and starts the timer that processes the
+        pending parameters.
+        """
+        self.load_goal_handle = goal_handle
+        self.nb_params = len(goal_handle.request.params)
+
+        self.result_loading = LoadingParameters.Result()
+        self.result_loading.code = LoadingParameters.Result.REJECTED
+        self.result_loading.message = 'parameter loading did not complete'
+        self.load_param_timer = self.create_timer(1.0 / self.check_serial_freq, self.load_timer,
+                                                  callback_group=MutuallyExclusiveCallbackGroup())
+
+    def finish_load(self, code: int, message: str):
+        """
+        Record the outcome of a parameter load and hand it to the execute callback.
+
+        Args:
+            code {int}: LoadingParameters result code describing the outcome.
+            message {str}: Human readable detail attached to the result.
+        """
+        self.load_param_timer.cancel()
+        self.result_loading.code = code
+        self.result_loading.message = message
+        self.load_goal_handle.execute()
+
+    async def load_timer(self):
+        """
+        Timer callback that advances the calibration parameter loading.
+
+        Writes the next pending parameter, publishes loading progress feedback, and
+        completes the action when all parameters have been processed or if a loading
+        error occurs.
+        """
+        if self.load_param_timer.is_canceled():
+            return
+
+        goal_handle = self.load_goal_handle
+
+        if not goal_handle.request.params:
+            self.finish_load(LoadingParameters.Result.OK, '')
+            return
+
+        if not self.write_param_client.service_is_ready():
+            self.get_logger().error('WriteParameter server not available! '
+                                    'Parameter loading aborted.')
+            self.finish_load(LoadingParameters.Result.REJECTED,
+                             'write_parameter server unavailable')
+            return
+
+        request = WriteParameter.Request()
+        request.param = goal_handle.request.params.pop(0)
+        request.value = goal_handle.request.values.pop(0)
+
+        request.during_calibration = False
+
+        future = self.write_param_client.call_async(request=request)
+        service_response = await future
+        if not service_response.success:
+            if service_response.message == 'firmware error':
+                self.finish_load(LoadingParameters.Result.FIRMWARE_ERROR,
+                                 f'{service_response.message} triggered by the parameter '
+                                 f'{request.param} and its value {request.value}')
+            elif service_response.message == 'aborted':
+                self.finish_load(LoadingParameters.Result.ABORTED, service_response.message)
+            elif service_response.message == 'estopped':
+                self.finish_load(LoadingParameters.Result.ESTOPPED, service_response.message)
+            else:
+                self.finish_load(LoadingParameters.Result.REJECTED, service_response.message)
+            return
+
+        feedback = LoadingParameters.Feedback()
+        feedback.progress = (1 - (len(goal_handle.request.params) / self.nb_params))
+        goal_handle.publish_feedback(feedback)
+
+    async def load_params_execute_callback(
+            self, goal_handle: ServerGoalHandle) -> LoadingParameters.Result:
+        """
+        Execute a loading parameters action.
+
+        Reports the outcome recorded by the loading timer, which owns the actual
+        parameter writing.
+
+        Args:
+            goal_handle {ServerGoalHandle}: Accepted action goal.
+        """
+        self.load_param_timer.cancel()
+        if self.result_loading.code == LoadingParameters.Result.OK:
+            goal_handle.succeed()
+            return self.result_loading
+
+        goal_handle.abort()
+        return self.result_loading
+
     async def estop_command_server(self, request: Trigger.Request,
                                    response: Trigger.Response) -> Trigger.Response:
         """
@@ -540,8 +698,8 @@ class SerialController(Node):
         """
         self.farmbot_cmd_sender('E')
 
-        self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_OFF'])
-        self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_FLASHING'])
+        self.switch_led(self.fb_panel['estop_led'], self.fb_panel['led_off'])
+        self.switch_led(self.fb_panel['unlock_led'], self.fb_panel['led_flashing'])
         self.estop_active.data = True
         self.estop_active_pub.publish(self.estop_active)
 
@@ -562,10 +720,12 @@ class SerialController(Node):
         response.success, response.message, _ = await self._run_command('F09')
 
         if response.success:
-            self.LED_client(self.fb_panel['ESTOP_LED'], self.fb_panel['LED_ON'])
-            self.LED_client(self.fb_panel['UNLOCK_LED'], self.fb_panel['LED_ON'])
+            self.switch_led(self.fb_panel['estop_led'], self.fb_panel['led_on'])
+            self.switch_led(self.fb_panel['unlock_led'], self.fb_panel['led_on'])
             self.estop_active.data = False
             self.estop_active_pub.publish(self.estop_active)
+            self.abort_active.data = False
+            self.abort_active_pub.publish(self.abort_active)
 
         return response
 
@@ -648,6 +808,10 @@ class SerialController(Node):
 
         # Record the transmitted command
         self.previous_cmd = (cmd.split(' ')[0] if ' ' in cmd else cmd.split('\n')[0])
+        for cmd_type in self.non_immediate_cmds:
+            if self.previous_cmd in self.non_immediate_cmds[cmd_type]:
+                self.command_type = cmd_type
+                break
 
         self.get_logger().info(f'Sent message: {cmd}')
         #  Send through serial the command
@@ -672,6 +836,31 @@ class SerialController(Node):
 
     def handle_message(self, message: str):
         """
+        Process a message received from the FarmBot firmware.
+
+        Handles unsolicited reports, publishes the raw message, and processes
+        responses for active commands.
+
+        Args:
+            message {str}: Raw message received from the FarmBot.
+        """
+        # Record the message
+        self.serial_feedback.data = message
+        if message == 'R99 ARDUINO STARTUP COMPLETE':
+            self.config_server.retrieve_config()
+
+        code = (message).split(' ')
+
+        self.handle_unsolicited_reports(code)
+
+        # Send the reporting message for further processing by other nodes
+        self.serial_feedback_pub.publish(self.serial_feedback)
+
+        if self.command_type:
+            self.handle_command_response(code)
+
+    def handle_unsolicited_reports(self, code: list):
+        """
         Process a message received from the FarmBot serial connection.
 
         The received message is parsed to update the robot state, publish action
@@ -681,83 +870,72 @@ class SerialController(Node):
         Args:
             message {str}: Raw message received from the FarmBot.
         """
-        # Record the message
-        self.serial_feedback.data = message
+        match code[0]:
+            case 'R21' | 'R23':
+                self.get_logger().info(f'Updated parameter {code[1][1:]} to {code[2][1:]}')
+                self.config_server.set_value(int(float(code[1][1:])), int(float(code[2][1:])))
+            case 'R87':
+                if not self.estop_active.data:
+                    self.estop_active.data = True
+                    self.estop_active_pub.publish(self.estop_active)
+            case 'R82':
+                self.fb_position.point.x = float(code[1][1:])
+                self.fb_position.point.y = float(code[2][1:])
+                self.fb_position.point.z = float(code[3][1:])
+                self.fb_position.header.stamp = self.get_clock().now().to_msg()
+                self.fb_position_pub.publish(self.fb_position)
+            case 'R88':
+                self.get_logger().warn('No configuration files were found in'
+                                       '/farmbot_data/local_config. Use the C_1 '
+                                       'command to create these files (see the documentation).')
 
-        # Extract the command code
-        rep_code = (message).split(' ')[0]
+    def handle_command_response(self, code: list):
+        """
+        Handle firmware responses for active commands.
 
-        if rep_code == 'R82':
-            code_position = (message).split(' ')
-            self.fb_position.point.x = float(code_position[1][1:])
-            self.fb_position.point.y = float(code_position[2][1:])
-            self.fb_position.point.z = float(code_position[3][1:])
-            self.fb_position.header.stamp = self.get_clock().now().to_msg()
-            self.fb_position_pub.publish(self.fb_position)
+        Publishes action feedback and resolves pending command responses.
 
-        # E-Stop pressed on the robot
-        if rep_code == 'R87' and not self.estop_active.data:
-            self.estop_active.data = True
-            self.estop_active_pub.publish(self.estop_active)
+        Args:
+            code {list}: Parsed firmware response.
+        """
+        if (self.command_type in ['home_axes', 'move_gantry']
+                and self.goal_handle is not None and self.goal_handle.is_active):
+            self.action_feedback_publisher(self.command_type)
 
-        # If a running command has finished OR the response for a request was retrieved
-        # OR the sent command was acknowledged by the farmbot
-        command_type = ''
-        for cmd_type in self.non_immediate_cmds:
-            if self.previous_cmd in self.non_immediate_cmds[cmd_type]:
-                command_type = cmd_type
-                break
-
-        if self.goal_handle is None or not self.goal_handle.is_active:
-            pass
-
-        elif command_type == 'home_axes':
-            feedback = HomeAxes.Feedback()
-            feedback.position.x = self.fb_position.point.x
-            feedback.position.y = self.fb_position.point.y
-            feedback.position.z = self.fb_position.point.z
-            self.goal_handle.publish_feedback(feedback)
-
-        elif command_type == 'move_gantry':
-            feedback = MoveGantry.Feedback()
-            feedback.position.x = self.fb_position.point.x
-            feedback.position.y = self.fb_position.point.y
-            feedback.position.z = self.fb_position.point.z
-            feedback.progress = float(self.percentage_calculation([feedback.position.x,
-                                                                  feedback.position.y,
-                                                                  feedback.position.z]))
-            self.goal_handle.publish_feedback(feedback)
-
-        if (command_type
-           and rep_code in self.non_immediate_cmds[command_type][self.previous_cmd]['responses']
+        if (code[0] in self.non_immediate_cmds[self.command_type][self.previous_cmd]['responses']
            and self.code_response and not self.code_response.done()):
-            match rep_code:
-                case 'R03':
-                    result = [False, 'firmware error', -1]
-                    self.code_response.set_result(result)
-                case 'R86':
-                    result = [False, 'aborted', -1]
-                    self.code_response.set_result(result)
-                case 'R02':
-                    result = [True, '', -1]
-                    self.code_response.set_result(result)
-                case 'R87':
-                    result = [False, 'estopped', -1]
-                    self.code_response.set_result(result)
-                case 'R08':
-                    result = [True, '', -1]
-                    self.code_response.set_result(result)
-                case 'R41' | 'R21':
-                    code = (message).split(' ')
-                    value = int(code[2][1:])
-                    result = [True, '', value]
-                    self.code_response.set_result(result)
-                case 'R81' | 'R82' | 'R83':
-                    result = [True, message[4:], -1]
-                    self.code_response.set_result(result)
+            if code[0] in self.request_result.keys():
+                rep_code = code[0]
+                if rep_code in ['R41', 'R21', 'R23']:
+                    self.request_result[rep_code][2] = int(code[2][1:])
+                elif rep_code == 'R83':
+                    self.request_result[rep_code][1] = code[1]
+                elif rep_code in ['R81', 'R82', 'R83']:
+                    self.request_result[rep_code][1] = f'{code[1]} {code[2]} {code[3]}'
+                self.code_response.set_result(self.request_result[rep_code])
 
-        # Send the reporting message for further processing by other nodes
-        self.serial_feedback_pub.publish(self.serial_feedback)
+    def action_feedback_publisher(self, cmd_type: str):
+        """
+        Publish feedback for the active ROS 2 action.
+
+        Updates the action feedback with the current FarmBot position and, for
+        gantry movements, the current execution progress.
+
+        Args:
+            cmd_type {str}: Type of the active command.
+        """
+        x_pos = self.fb_position.point.x
+        y_pos = self.fb_position.point.y
+        z_pos = self.fb_position.point.z
+        if cmd_type == 'home_axes':
+            feedback = HomeAxes.Feedback()
+        else:
+            feedback = MoveGantry.Feedback()
+            feedback.progress = float(self.percentage_calculation([x_pos, y_pos, z_pos]))
+        feedback.position.x = x_pos
+        feedback.position.y = y_pos
+        feedback.position.z = z_pos
+        self.goal_handle.publish_feedback(feedback)
 
     def percentage_calculation(self, current_position: list) -> float:
         """
@@ -784,8 +962,7 @@ class SerialController(Node):
         return 1.0
 
     # Service Client
-
-    def LED_client(self, led_pin: int, state: bool):
+    def switch_led(self, led_pin: int, state: bool):
         """
         Send a request to switch an LED on or off.
 
@@ -806,9 +983,9 @@ class SerialController(Node):
         request.state = state
 
         future = self.led_client.call_async(request=request)
-        future.add_done_callback(self.LED_panel_callback)
+        future.add_done_callback(self.led_panel_callback)
 
-    def LED_panel_callback(self, future):
+    def led_panel_callback(self, future):
         """
         Handle the response from the LED handling service.
 
@@ -834,12 +1011,13 @@ class SerialController(Node):
 def main(args=None):
     """Initialise and run the Serial controller node."""
     rclpy.init(args=args)
-
     serial_node = SerialController()
-
     try:
         rclpy.spin(serial_node)
     except KeyboardInterrupt:
+        serial_node.destroy_node()
+    except Exception as e:
+        serial_node.get_logger().info(f'{e}')
         serial_node.destroy_node()
 
     rclpy.shutdown()
