@@ -15,6 +15,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/PlantManage.msg"
   "msg/MapCommand.msg"
   "msg/ImageMessage.msg"
+  "msg/SequenceStatus.msg"
   "srv/CaptureImage.srv"
   "srv/ConfigurePin.srv"
   "srv/EnableCamera.srv"
@@ -32,6 +33,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/HomeAxes.action"
   "action/LoadingParameters.action"
   "action/MoveGantry.action"
+  "action/RunSequence.action"
   DEPENDENCIES sensor_msgs geometry_msgs
 )
 

@@ -33,7 +33,25 @@ class Parameters:
             self.node.get_logger().fatal(f'{cmd_name} Server not available!')
             raise ServerError('Parameter module failed: server unavailable')
 
-    def read_param(self, param: int):
+    def _complete(self, future, on_done=None):
+        """Log the outcome and forward the response (or None on failure) to on_done."""
+        try:
+            response = future.result()
+        except Exception as error:  # call failed - report to not leave on_done hanging
+            self.node.get_logger().error('Service call failed %r' % (error, ))
+            response = None
+        if response is None:
+            self.node.get_logger().warn('Command failure!')
+        elif not getattr(response, 'success', True):
+            self.node.get_logger().warn(f'Command failed: {getattr(response, "message", "")}')
+        elif hasattr(response, 'value'):
+            self.node.get_logger().info(f'The value of the parameter is {response.value}')
+        else:
+            self.node.get_logger().info('Command successful')
+        if on_done is not None:
+            on_done(response)
+
+    def read_param(self, param: int, on_done=None):
         """
         Call the ReadParameter service.
 
@@ -41,40 +59,18 @@ class Parameters:
 
         Args:
             param {int}: Parameter in question
+            on_done {callable}: Optional completion callback invoked with the response
+                                (its 'value' field holds the reading).
         """
         self._server_availability('ReadParameter', self.read_param_client)
 
         request = ReadParameter.Request()
         request.param = param
 
-        future = self.read_param_client.call_async(request=request)
-        future.add_done_callback(self.read_client_callback)
+        self.read_param_client.call_async(request=request).add_done_callback(
+            lambda future: self._complete(future, on_done))
 
-    def read_client_callback(self, future):
-        """
-        Handle the response of a parameter read service request.
-
-        Processes the service response and logs the retrieved parameter value
-        or the command status depending on the result of the request.
-        """
-        try:
-            response = future.result()
-            if not response:
-                self.node.get_logger().warn('Command Failure!')
-
-            elif not response.success:
-                self.node.get_logger().warn(f'Command {response.message}!')
-
-            elif response.value != -1:
-                self.node.get_logger().info(f'The value of the parameter is {response.value}')
-
-            else:
-                self.node.get_logger().info('Command succesful')
-
-        except Exception as e:
-            self.node.get_logger().error('Service call failed %r' % (e, ))
-
-    def list_all_params(self):
+    def list_all_params(self, on_done=None):
         """
         Call the ListAllParameters service.
 
@@ -82,12 +78,10 @@ class Parameters:
         """
         self._server_availability('ListAllParameters', self.list_all_param_client)
 
-        request = Trigger.Request()
+        self.list_all_param_client.call_async(Trigger.Request()).add_done_callback(
+            lambda future: self._complete(future, on_done))
 
-        future = self.list_all_param_client.call_async(request=request)
-        future.add_done_callback(self.client_callback)
-
-    def write_param(self, param: int, value: int, during_calibration: bool):
+    def write_param(self, param: int, value: int, during_calibration: bool, on_done=None):
         """
         Call the WriteParameter service.
 
@@ -97,6 +91,7 @@ class Parameters:
             param {int}: Parameter in question
             value {int}: Value written to param if write or update modes are active
             during_calibration {bool}: Indicates whether Farmbot is currently calibrating or not
+            on_done {callable}: Optional completion callback
         """
         self._server_availability('WriteParameter', self.write_param_client)
 
@@ -105,26 +100,5 @@ class Parameters:
         request.value = value
         request.during_calibration = during_calibration
 
-        future = self.write_param_client.call_async(request=request)
-        future.add_done_callback(self.client_callback)
-
-    def client_callback(self, future):
-        """
-        Handle the response of a service request except parameter read requests.
-
-        Processes the service response and logs the command status depending
-        on the result of the request.
-        """
-        try:
-            response = future.result()
-            if not response:
-                self.node.get_logger().warn('Command Failure!')
-
-            elif not response.success:
-                self.node.get_logger().warn(f'Command {response.message}!')
-
-            else:
-                self.node.get_logger().info('Command succesful')
-
-        except Exception as e:
-            self.node.get_logger().error('Service call failed %r' % (e, ))
+        self.write_param_client.call_async(request=request).add_done_callback(
+            lambda future: self._complete(future, on_done))
