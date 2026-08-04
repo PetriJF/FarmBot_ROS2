@@ -78,6 +78,15 @@ class Hardware:
         return StepResult(Outcome.OK if response.success else Outcome.FAILED,
                           getattr(response, 'message', ''))
 
+    @staticmethod
+    def to_outcome(raw) -> StepResult:
+        """Map any client result to a StepResult (action if it has a code, else service)."""
+        if raw is None:
+            return StepResult(Outcome.FAILED, 'call failed or rejected')
+        if hasattr(raw, 'code'):
+            return Hardware.result_to_outcome(raw)
+        return Hardware.service_to_outcome(raw)
+
 
 class TaskSequencer(Node):
     """Serves the RunSequence action over the sequence engine and client modules."""
