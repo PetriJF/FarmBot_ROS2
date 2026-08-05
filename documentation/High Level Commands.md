@@ -26,7 +26,8 @@ These represent high priority commands and configuration commands for the farmbo
 | ---- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | E    |          | ESTOP command (Electronic Stop). Halts any ongoing operation on the farmbot, and clears all sequences and queues. The robot axis are un actuated in this case and the robot cannot perform any physical action until the ESTOP RESET command is set |
 | R    |          | ESTOP RESET. Resets the farmbot from the EStop state back to the working state                                                                                      |                   
-| @    |          | ABORT command. Aborts the current command and pauses the FarmBot. The queue is preserved, and the aborted command is not deleted. Sending @ resumes execution from the point where the command was aborted.                                                                      |                   
+| @    |          | ABORT command. Aborts the current command and pauses the FarmBot. The queue is preserved, and the aborted command is not deleted. Sending @ resumes execution from the point where the command was aborted.                                                                      |
+| SW_VER |          | Get the version of the software used by the Farmbot             |s                   
 | C_0  |          | Calibrate all the axis length and home position                                                                                                                     |
 |      | X        | Calibrate X axis length and home position                                                                                                                           |
 |      | Y        | Calibrate Y axis length and home position                                                                                                                           |
@@ -66,6 +67,7 @@ Commands that control the different devices connected to the farmbot.
 | ----- | -------- | --------------------------------------------------------------------- |
 | D_L_a |          | Turns on (**a** = 1) or off (**a** = 0) the LED strip. E.g. *D_L_1*   |
 | D_W_a |          | Turns on (**a** = 1) or off (**a** = 0) the water pump. E.g. *D_W_1*  |
+| D_WP |          | Triggers a 500 ms water pulse on the pump.|
 | D_V_a |          | Turns on (**a** = 1) or off (**a** = 0) the vacuum pump. E.g. *D_V_1* |
 | D_C   |          | Checks if there is a tool mounted on the UTP mount                    |
 | D_S_C |          | Check the Soil Sensor reading                                         |

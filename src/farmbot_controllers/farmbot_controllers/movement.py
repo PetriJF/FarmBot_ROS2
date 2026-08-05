@@ -158,7 +158,7 @@ class Movement:
                                    on_done=on_done)
 
     def send_move_gantry_goal(self, x_coord: float, y_coord: float, z_coord: float,
-                              interpolated=True, x_speed=100.0, y_speed=100.0, z_speed=100.0,
+                              interpolated=False, x_speed=100.0, y_speed=100.0, z_speed=100.0,
                               on_done=None):
         """
         Send a MoveGantry goal to the FarmBot action server.
