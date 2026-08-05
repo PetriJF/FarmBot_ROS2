@@ -121,9 +121,14 @@ class TaskSequencer(Node):
         # One status contract for observers and for the running goal's feedback.
         self._status_pub = self.create_publisher(SequenceStatus, 'sequence_status', 10)
 
+        # Hold the queue after a failed sequence until abort is released.
+        self.declare_parameter('autopause_on_failure', True)
+        self._autopause = bool(self.get_parameter('autopause_on_failure').value)
+
         # Bounded FIFO of pending sequences; one runs at a time.
         self._queue = deque()
         self._active = None              # the running _Pending (feedback sink)
+        self._paused = False             # queue held after a sequence failed
 
         # Main sequence running action. Reentrant group so the async goal can await.
         self._run_server = ActionServer(
@@ -187,7 +192,7 @@ class TaskSequencer(Node):
 
     def _pump(self) -> None:
         """Start the next queued sequence when idle (dropping any cancelled while waiting)."""
-        if self._estop_active or self._active is not None:
+        if self._estop_active or self._paused or self._active is not None:
             return
         while self._queue:
             pending = self._queue.popleft()
@@ -214,15 +219,19 @@ class TaskSequencer(Node):
         """E-stop: block new starts, drop the queue, cancel the running sequence."""
         self._estop_active = msg.data
         if msg.data:
+            self._paused = False
             self._flush_queue('e-stop')
             self._engine.cancel('e-stop')
 
     def _on_abort(self, msg: Bool) -> None:
-        """Abort: pause the running sequence; the queue is kept and resumes with it."""
+        """Abort: pause the running sequence; release also resumes a failure-paused queue."""
         if msg.data:
             self._engine.pause()
         else:
             self._engine.resume()
+            if self._paused:
+                self._paused = False
+                self._pump()
 
     # --- tracking ----------------------------------------------------------
 
@@ -237,7 +246,13 @@ class TaskSequencer(Node):
                 if not active.done.done():
                     active.done.set_result(status)  # hand the terminal status to the goal
                 self._active = None
-                self._pump()                        # start the next queued sequence
+                if self._autopause and status.state == SequenceStatus.FAILED and self._queue:
+                    self._paused = True             # hold the queue after a failure
+                    self.get_logger().warn(
+                        f"'{name}' failed - queue paused ({len(self._queue)} waiting); "
+                        'release abort to resume')
+                else:
+                    self._pump()                    # start the next queued sequence
             else:
                 feedback = RunSequence.Feedback()
                 feedback.status = status
