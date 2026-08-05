@@ -6,6 +6,8 @@ It wires together 3 separable pieces:
 - the 'sequence_runner' engine
 - the 'sequences' definitions
 """
+from collections import deque
+
 from farmbot_controllers import sequences  # noqa: F401  (registers every sequence)
 from farmbot_controllers.devices import DeviceControl
 from farmbot_controllers.movement import Movement
@@ -36,6 +38,7 @@ _STATE_CODES = {
     engine.CANCELLED: SequenceStatus.CANCELLED,
 }
 _TERMINAL_CODES = (SequenceStatus.DONE, SequenceStatus.FAILED, SequenceStatus.CANCELLED)
+_MAX_QUEUED = 16   # bounded pending queue
 
 # 0 OK, 1 FIRMWARE_ERROR, 2 ESTOPPED, 3 ABORTED, # 4 REJECTED.
 # Map the codes needing special handling; the rest -> FAILED.
@@ -88,6 +91,15 @@ class Hardware:
         return Hardware.service_to_outcome(raw)
 
 
+class _Pending:
+    """A queued sequence: its goal handle and a future for the terminal status."""
+
+    def __init__(self, goal_handle, sequence):
+        self.goal_handle = goal_handle
+        self.sequence = sequence
+        self.done = Future()
+
+
 class TaskSequencer(Node):
     """Serves the RunSequence action over the sequence engine and client modules."""
 
@@ -109,10 +121,9 @@ class TaskSequencer(Node):
         # One status contract for observers and for the running goal's feedback.
         self._status_pub = self.create_publisher(SequenceStatus, 'sequence_status', 10)
 
-        # Per-goal routing state. Only one sequence runs at a time.
-        self._goal_in_progress = False   # reserved synchronously in goal_callback
-        self._active_goal = None         # the executing goal handle (feedback sink)
-        self._done = None                # resolved with the terminal status
+        # Bounded FIFO of pending sequences; one runs at a time.
+        self._queue = deque()
+        self._active = None              # the running _Pending (feedback sink)
 
         # Main sequence running action. Reentrant group so the async goal can await.
         self._run_server = ActionServer(
@@ -135,75 +146,79 @@ class TaskSequencer(Node):
     # --- starting sequences -------------------------------------------------------
 
     def _goal_callback(self, goal_request) -> GoalResponse:
-        """Accept a start request, or reject it (busy / e-stopped / unknown)."""
+        """Accept a start request, or reject it (e-stopped / unknown / queue full)."""
         name = goal_request.name
         if self._estop_active:
             self.get_logger().warn(f"rejected '{name}': e-stop is active")
             return GoalResponse.REJECT
-        if self._goal_in_progress or self._engine.active:
-            self.get_logger().warn(f"rejected '{name}': a sequence is already active")
-            return GoalResponse.REJECT
-        if not registry.is_registered(name):    # verify that the task is registered
+        if not registry.is_registered(name):
             known = ', '.join(registry.names()) or '(none)'
             self.get_logger().warn(f"rejected unknown sequence '{name}'. known: {known}")
             return GoalResponse.REJECT
-        self._goal_in_progress = True           # ensure we lock it
+        if len(self._queue) >= _MAX_QUEUED:
+            self.get_logger().warn(f"rejected '{name}': queue full ({_MAX_QUEUED})")
+            return GoalResponse.REJECT
         return GoalResponse.ACCEPT
 
     def _cancel_callback(self, goal_handle) -> CancelResponse:
-        """Accept a cancel: abandon the sequence without e-stopping the hardware."""
-        self.get_logger().info('cancel requested - abandoning the sequence')
-        self._engine.cancel('caller cancelled the sequence')
+        """Accept a cancel: cancel it if running, else it is dropped when its turn comes."""
+        if self._active is not None and self._active.goal_handle.goal_id == goal_handle.goal_id:
+            self._engine.cancel('caller cancelled the sequence')
         return CancelResponse.ACCEPT
 
     async def _execute_sequence(self, goal_handle) -> RunSequence.Result:
-        """Run the requested sequence."""
-        name = goal_handle.request.name
-        self._active_goal = goal_handle
-        self._done = Future()
+        """Queue the requested sequence, then finalize the goal when it finishes."""
+        pending = _Pending(goal_handle, registry.build(goal_handle.request.name))
+        self._queue.append(pending)
+        self._pump()
 
-        sequence = registry.build(name)
-        started = self._engine.start(sequence)
-        if not started:
-            # Safety net: goal_callback already guards this.
-            self._clear_goal()
-            goal_handle.abort()
-            result = RunSequence.Result()
-            result.status = self._make_status(
-                name, engine.FAILED, 0, len(sequence), 'refused: a sequence is already active')
-            return result
-
-        # The engine drives itself through the callbacks
-        # _publish_status resolves this future when it reaches a terminal state.
-        final_status = await self._done
-        self._clear_goal()
+        status = await pending.done
 
         if goal_handle.is_cancel_requested:
             goal_handle.canceled()
-        elif final_status.state == SequenceStatus.DONE:
+        elif status.state == SequenceStatus.DONE:
             goal_handle.succeed()
         else:
             goal_handle.abort()
 
         result = RunSequence.Result()
-        result.status = final_status
+        result.status = status
         return result
 
-    def _clear_goal(self) -> None:
-        self._active_goal = None
-        self._done = None
-        self._goal_in_progress = False
+    def _pump(self) -> None:
+        """Start the next queued sequence when idle (dropping any cancelled while waiting)."""
+        if self._estop_active or self._active is not None:
+            return
+        while self._queue:
+            pending = self._queue.popleft()
+            if pending.goal_handle.is_cancel_requested:
+                self._resolve(pending, engine.CANCELLED, 'cancelled before running')
+                continue
+            self._active = pending
+            self._engine.start(pending.sequence)
+            return
+
+    def _flush_queue(self, reason: str) -> None:
+        """Drop every pending sequence (the e-stop path)."""
+        while self._queue:
+            self._resolve(self._queue.popleft(), engine.CANCELLED, f'dropped: {reason}')
+
+    def _resolve(self, pending: _Pending, state: str, detail: str) -> None:
+        if not pending.done.done():
+            pending.done.set_result(self._make_status(
+                pending.sequence.name, state, 0, len(pending.sequence), detail))
 
     # --- e-stop / abort -----------------------------------------------------
 
     def _on_estop(self, msg: Bool) -> None:
-        """E-stoped: cancel the active sequence; block starts while set."""
+        """E-stop: block new starts, drop the queue, cancel the running sequence."""
         self._estop_active = msg.data
         if msg.data:
+            self._flush_queue('e-stop')
             self._engine.cancel('e-stop')
 
     def _on_abort(self, msg: Bool) -> None:
-        """Aborted: pause the sequence; on release, resume the held step."""
+        """Abort: pause the running sequence; the queue is kept and resumes with it."""
         if msg.data:
             self._engine.pause()
         else:
@@ -216,15 +231,17 @@ class TaskSequencer(Node):
         """Publish the status (progress) of the sequence runner."""
         status = self._make_status(name, state, index, total, detail)
         self._status_pub.publish(status)           # broadcast to any observer
-        goal = self._active_goal
-        if goal is not None:
+        active = self._active
+        if active is not None:
             if status.state in _TERMINAL_CODES:
-                if self._done is not None and not self._done.done():
-                    self._done.set_result(status)  # hand the terminal status to the goal
+                if not active.done.done():
+                    active.done.set_result(status)  # hand the terminal status to the goal
+                self._active = None
+                self._pump()                        # start the next queued sequence
             else:
                 feedback = RunSequence.Feedback()
                 feedback.status = status
-                goal.publish_feedback(feedback)
+                active.goal_handle.publish_feedback(feedback)
         self.get_logger().info(f'[{name}] {state} step {index}/{total}: {detail}')
 
     @staticmethod
