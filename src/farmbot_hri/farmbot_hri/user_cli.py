@@ -5,9 +5,9 @@ Keyboard teleoperation node for ROS2 Farmbot.
 Publishes keyboard commands to the farmbot controller for execution and
 demonstrates command priority handling versus sequencer commands.
 """
-from farmbot_controllers.farmbot_controllers.sequences.calibration import calibrate_axes
-from farmbot_controllers.farmbot_controllers.sequences.find_home import find_home
-from farmbot_controllers.farmbot_controllers.sequences.single_call import single_call
+from farmbot_controllers.sequences.calibration import calibrate_axes
+from farmbot_controllers.sequences.find_home import find_home
+from farmbot_controllers.sequences.single_call import single_call
 
 from geometry_msgs.msg import PointStamped
 
@@ -19,7 +19,7 @@ from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
 
-class KeyboardTeleOp(Node):
+class UserCLI(Node):
     """
     ROS2 node that publishes keyboard commands for the Farmbot controller.
 
@@ -29,8 +29,8 @@ class KeyboardTeleOp(Node):
 
     # Node contructor
     def __init__(self):
-        """Initialize the KeyboardTeleOp node and its ROS2 publishers."""
-        super().__init__('KeyboardController')
+        """Initialize the UserCLI node and its ROS2 publishers."""
+        super().__init__('UserCLI')
 
         # Keyboard publisher
         self.cmd = String()
@@ -38,9 +38,9 @@ class KeyboardTeleOp(Node):
         self.priority_pub = self.create_publisher(String, 'farmbot_command', 10)
 
         # Initialisation of the service clients for priority commands (estop, abort, resume)
-        self.estop_client = self.node.create_client(Trigger, 'estop')
-        self.abort_client = self.node.create_client(Trigger, 'abort')
-        self.resume_client = self.node.create_client(Trigger, 'resume')
+        self.estop_client = self.create_client(Trigger, 'estop')
+        self.abort_client = self.create_client(Trigger, 'abort')
+        self.resume_client = self.create_client(Trigger, 'resume')
 
         # Farmbot Position Subscriber
         self.fb_position_sub = self.create_subscription(PointStamped, 'farmbot_position',
@@ -52,7 +52,7 @@ class KeyboardTeleOp(Node):
         self.cur_z = 0.0
 
         # Log the initialization
-        self.get_logger().info('Keyboard Controller Initialized..')
+        self.get_logger().info('UserCLI Initialized..')
 
         self.get_logger().info("""\n
                                This is a keyboard based controller for the ROS2 Farmbot
@@ -73,16 +73,16 @@ class KeyboardTeleOp(Node):
         try:
             response = future.result()
         except Exception as error:  # call failed - report, never leave on_done hanging
-            self.node.get_logger().error('Service call failed %r' % (error, ))
+            self.get_logger().error('Service call failed %r' % (error, ))
             response = None
         if response is None:
-            self.node.get_logger().warn('Command failure!')
+            self.get_logger().warn('Command failure!')
         elif not response.success:
-            self.node.get_logger().warn(f'Command failed: {response.message}')
+            self.get_logger().warn(f'Command failed: {response.message}')
         elif response.message:
-            self.node.get_logger().info(response.message)
+            self.get_logger().info(response.message)
         else:
-            self.node.get_logger().info('Command successful')
+            self.get_logger().info('Command successful')
         if on_done is not None:
             on_done(response)
 
@@ -250,15 +250,15 @@ def main(args=None):
     """Initialize and run the keyboard teleoperation node."""
     rclpy.init(args=args)
 
-    keyboard_node = KeyboardTeleOp()
+    user_cli_node = UserCLI()
 
     try:
         while rclpy.ok():
-            keyboard_node.check_input()
+            user_cli_node.check_input()
     except KeyboardInterrupt:
         pass
     finally:
-        keyboard_node.destroy_node()
+        user_cli_node.destroy_node()
         rclpy.shutdown()
 
 

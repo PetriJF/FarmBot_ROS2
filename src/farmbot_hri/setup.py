@@ -34,6 +34,7 @@ setup(
     entry_points={
         'console_scripts': [
             'keyboard_controller = farmbot_hri.keyboard_teleop:main',
+            'user_cli = farmbot_hri.user_cli:main',
             'autonomous_controller = farmbot_hri.autonomous_controller:main'
         ],
     },
