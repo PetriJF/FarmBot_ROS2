@@ -1,0 +1,5 @@
+int64 index                       # Plant index in the active map
+---
+bool success
+string message
+float32 plant_radius              # mm, max distance from frame centre plus padding

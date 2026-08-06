@@ -342,6 +342,10 @@ class MapController(Node):
             response.data = self.set_soil_moisture(index=int(cmd_split[1]),
                                                    reading=int(cmd_split[2]))
             return response
+        elif cmd_split[0] == 'PlantRadius':
+            response.data = self.set_plant_radius(index=int(cmd_split[1]),
+                                                  plant_radius=float(cmd_split[2]))
+            return response
         elif cmd_type == 'T':
             response.data = self.tool_cmd_interpreter(request.data)
             return response
@@ -629,6 +633,32 @@ class MapController(Node):
         else:
             self.get_logger().warn(f"Couldn't find plant with index '{index}' to "
                                    'add moisture reading to')
+            return 'FAILED'
+
+        return 'SUCCESS'
+
+    def set_plant_radius(self, index: int, plant_radius: float) -> str:
+        """
+        Update a plant's exclusion radius in the map.
+
+        Args:
+            index: The plant index to update.
+            plant_radius: The measured exclusion radius, in mm.
+
+        Returns:
+            'SUCCESS' if plant found and updated, 'FAILED' otherwise.
+        """
+        plants = self.map_instance['plant_details']['plants']
+        if plants and index in plants:
+            self.get_logger().info(f"Plant of Index '{index}' has plant radius "
+                                   f"'{plant_radius}'")
+            plants[index]['plant_details']['plant_radius'] = copy.deepcopy(plant_radius)
+
+            self.save_to_yaml(self.map_instance, self.config_path,
+                              self.active_map_file, create_if_empty=False)
+        else:
+            self.get_logger().warn(f"Couldn't find plant with index '{index}' to "
+                                   'add radius reading to')
             return 'FAILED'
 
         return 'SUCCESS'

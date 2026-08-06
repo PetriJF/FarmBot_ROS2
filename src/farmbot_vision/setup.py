@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'standard_camera = farmbot_vision.standard_camera:main',
+            'plant_radius = farmbot_vision.plant_radius:main',
             # Disabled: DepthAI v2 API deprecated, needs updating before use.
             # 'luxonis_camera = farmbot_vision.luxonis_camera:main',
         ],

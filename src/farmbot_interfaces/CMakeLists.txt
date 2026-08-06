@@ -20,6 +20,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/ConfigurePin.srv"
   "srv/EnableCamera.srv"
   "srv/LedPanelHandler.srv"
+  "srv/MeasurePlantRadius.srv"
   "srv/MoveServo.srv"
   "srv/ParameterConfig.srv"
   "srv/ReadI2C.srv"

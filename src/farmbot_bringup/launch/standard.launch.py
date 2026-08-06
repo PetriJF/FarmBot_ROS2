@@ -96,6 +96,25 @@ def generate_launch_description():
         ),
         Node(
             package='farmbot_vision',
+            executable='plant_radius',
+            name='plant_radius',
+            output='screen',
+            parameters=[
+                {'hsv_min': [40, 50, 50]},
+                {'hsv_max': [90, 255, 255]},
+                {'min_contour_area_px': 100},
+                {'mm_per_pixel': 0.5},           # placeholder, needs calibration
+                {'plant_radius_padding_mm': 20.0},
+            ],
+            condition=IfCondition(
+                PythonExpression([
+                    "'", camera, "'",
+                    " == 'Standard'"
+                ])
+            )
+        ),
+        Node(
+            package='farmbot_vision',
             executable='luxonis_camera',
             name='luxonis_camera',
             output='screen',
