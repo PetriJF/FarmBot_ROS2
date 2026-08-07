@@ -6,9 +6,9 @@ tray positions, and plant data. Provides services for map modifications and quer
 """
 import copy
 import math
-import os
 
-from ament_index_python.packages import get_package_share_directory
+from farmbot_hardware_comm.modules.yaml_handler import YAMLError
+from farmbot_hardware_comm.modules.yaml_handler import YAMLHandler
 
 from farmbot_interfaces.msg import MapCommand, PlantManage
 from farmbot_interfaces.srv import StringRepReq
@@ -17,8 +17,6 @@ from map_handler.tool_sequencer import ToolDetails, ToolExchanger
 
 import rclpy
 from rclpy.node import Node
-
-import yaml
 
 
 class MapController(Node):
@@ -45,32 +43,28 @@ class MapController(Node):
         folder_config_name = self.get_parameter(
             'folder_config_name').get_parameter_value().string_value
 
-        self.config_path = os.path.join(ws_path, folder_config_name)
-        os.makedirs(self.config_path, exist_ok=True)
+        config_path = YAMLHandler.join_path(ws_path, folder_config_name)
+        YAMLHandler.make_dir(config_path)
 
-        # The safe Z increment for the sequences
-        self.safe_z_increment_ = 80.0
+        self.directory = YAMLHandler.get_directory_package('map_handler', 'config')
 
-        # Relevant directory and file names
-        self.directory = os.path.join(
-            get_package_share_directory('map_handler'),
-            'config'
-        )
+        try:
+            self.water_guide_instance = YAMLHandler.load_yaml(self.directory, 'watering_guide.yaml')
+            self.plant_ref = YAMLHandler.load_yaml(self.directory, 'plant_reference.yaml')
+            self.tool_ref = YAMLHandler.load_yaml(self.directory, 'tool_reference.yaml')
+            self.tray_ref = YAMLHandler.load_yaml(self.directory, 'tray_reference.yaml')
+            self.tray_16_ref = YAMLHandler.load_yaml(self.directory, '16_seed_tray.yaml')
+            self.watering_thresholds = YAMLHandler.load_yaml(self.directory,
+                                                             'watering_threshold.yaml')
+        except YAMLError as e:
+            self.get_logger().warn(f'yaml error: {e}')
+            return
 
-        self.active_map_file = 'active_map.yaml'
-        tool_ref_file = 'tool_reference.yaml'
-        tray_ref_file = 'tray_reference.yaml'
-        tray_16_ref_file = '16_seed_tray.yaml'
-        reference_plant_file = 'plant_reference.yaml'
-        reference_map_file = 'map_references.yaml'
-        watering_guide_file = 'watering_guide.yaml'
+        self.active_map = 'active_map.yaml'
 
         # Loading the map instance from memory
-        self.map_instance = self.retrieve_map(directory=self.config_path,
-                                              file_name1=self.active_map_file,
-                                              file_name2=reference_map_file)
-
-        self.water_guide_instance = self.load_from_yaml(self.directory, watering_guide_file)
+        self.retrieve_map(path=self.config_path, file_name1=self.active_map,
+                          file_name2='map_references.yaml')
 
         # Loading the tool exhanging module and the tool command object
         self.tool_exchanger = ToolExchanger(node=self,
@@ -80,15 +74,8 @@ class MapController(Node):
                                             )
         self.tool_details = ToolDetails()
 
-        # Loading the plant referencing method
-        self.plant_ref = self.load_from_yaml(self.directory, reference_plant_file)
-        # Loading the tool referencing method
-        self.tool_ref = self.load_from_yaml(self.directory, tool_ref_file)
-        # Loading the tray reference and 16 seed tray addon reference
-        self.tray_ref = self.load_from_yaml(self.directory, tray_ref_file)
-        self.tray_16_ref = self.load_from_yaml(self.directory, tray_16_ref_file)
-        # Loading the watering thresholds
-        self.watering_thresholds = self.load_from_yaml(self.directory, 'watering_threshold.yaml')
+        # The safe Z increment for the sequences
+        self.safe_z_increment_ = 80.0
 
         # MapCommand subscriber
         self.map_cmd_sub = self.create_subscription(MapCommand,
@@ -146,8 +133,8 @@ class MapController(Node):
                 map_max_z=-self.map_instance['map_reference']['z_len']
             )
             # Save the new active map
-            self.save_to_yaml(self.map_instance, self.config_path,
-                              self.active_map_file, create_if_empty=True)
+            YAMLHandler.save_to_yaml(self.map_instance, self.config_path,
+                                     self.active_map)
         if cmd.back_up:
             pass
 
@@ -203,8 +190,7 @@ class MapController(Node):
         self.map_instance['plant_details']['plants'][copy.deepcopy(index)] = copy.deepcopy(
                                                                                     self.plant_ref)
 
-        self.save_to_yaml(self.map_instance, self.config_path, self.active_map_file,
-                          create_if_empty=True)
+        YAMLHandler.save_to_yaml(self.map_instance, self.config_path, self.active_map)
 
     def remove_plant(self, index: int):
         """Remove the plant of the represented index."""
@@ -212,7 +198,7 @@ class MapController(Node):
         if index in plants:
             del plants[index]
             self.reindex_plants()
-            self.save_to_yaml(self.map_instance, self.config_path, self.active_map_file)
+            YAMLHandler.save_to_yaml(self.map_instance, self.config_path, self.active_map)
 
             self.get_logger().info(f'Removed plant with index {index}')
         else:
@@ -267,8 +253,8 @@ class MapController(Node):
         if cmd_sequence[-1] == '\n':
             cmd_sequence = cmd_sequence[:-1]
 
-        self.save_to_yaml(self.map_instance, self.config_path,
-                          self.active_map_file, create_if_empty=True)
+        YAMLHandler.save_to_yaml(self.map_instance, self.config_path,
+                                 self.active_map)
         return cmd_sequence
 
     def __check_loaded_seeds(self, seed_type: str):
@@ -545,8 +531,8 @@ class MapController(Node):
 
             self.map_instance['map_reference']['trays'][index] = tray_ref
             self.get_logger().info(str(self.map_instance))
-            self.save_to_yaml(self.map_instance, self.config_path,
-                              self.active_map_file, create_if_empty=True)
+            YAMLHandler.save_to_yaml(self.map_instance, self.config_path,
+                                     self.active_map)
         if cmd == 1:
             trays = self.map_instance['map_reference']['trays']
             if index in trays:
@@ -604,8 +590,8 @@ class MapController(Node):
 
         self.map_instance['map_reference']['tools']['T' + index] = tool_ref
         self.get_logger().info(str(self.map_instance))
-        self.save_to_yaml(self.map_instance, self.config_path,
-                          self.active_map_file, create_if_empty=True)
+        YAMLHandler.save_to_yaml(self.map_instance, self.config_path,
+                                 self.active_map)
 
     def set_soil_moisture(self, index: int, reading: int) -> str:
         """
@@ -624,8 +610,8 @@ class MapController(Node):
                                    f"moisture reading: '{reading}'")
             plants[index]['plant_details']['soil_moisture'] = copy.deepcopy(reading)
 
-            self.save_to_yaml(self.map_instance, self.config_path,
-                              self.active_map_file, create_if_empty=False)
+            YAMLHandler.save_to_yaml(self.map_instance, self.config_path,
+                                     self.active_map, create_if_empty=False)
         else:
             self.get_logger().warn(f"Couldn't find plant with index '{index}' to "
                                    'add moisture reading to')
@@ -633,84 +619,28 @@ class MapController(Node):
 
         return 'SUCCESS'
 
-    def save_to_yaml(self, data: dict, path='', file_name='', create_if_empty=False):
-        """
-        Save a dictionary to a yaml file in the share directory.
-
-        If the file exists already, it updates it.
-        Args:
-            path {String}: The share directory the yaml files are located at
-            file_name {String}: The active config (i.e. the one from memory)
-        """
-        if not isinstance(data, dict):
-            self.get_logger().warn('Parsed dictionary data is not of type dictionary')
-            return
-        if path == '':
-            self.get_logger().warn('Path not set for retrieving the parameter config file')
-            return
-        if file_name == '':
-            self.get_logger().warn('Parameter Config File name not set')
-            return
-        if not create_if_empty and not os.path.exists(path):
-            self.get_logger().warn('File path is invalid')
-            return
-
-        if create_if_empty and not os.path.exists(path):
-            self.get_logger().info('Creating the active map configuration file..')
-            os.makedirs(os.path.dirname(os.path.join(path, file_name)), exist_ok=True)
-
-        self.get_logger().info('Saving current parameter configuration at '
-                               f'{os.path.join(path, file_name)}')
-
-        with open(os.path.join(path, file_name), 'w') as yaml_file:
-            yaml.dump(data, yaml_file, default_flow_style=False)
-
-    def load_from_yaml(self, path='', file_name=''):
-        """
-        Lead a dictionary from a yaml file in the share directory.
-
-        Args:
-            path {String}: The share directory the yaml files are located at
-            file_name {String}: The active config (i.e. the one from memory)
-        """
-        if path == '':
-            self.get_logger().warn('Path not set for retrieving the parameter config file')
-            return
-        if file_name == '':
-            self.get_logger().warn('Parameter Config File name not set')
-            return
-        if not os.path.exists(path):
-            self.get_logger().warn('File path is invalid')
-            return
-
-        with open(os.path.join(path, file_name), 'r') as yaml_file:
-            loaded_data = yaml.safe_load(yaml_file)
-            if isinstance(loaded_data, dict):
-                return loaded_data
-            else:
-                self.get_logger().warn('Invalid YAML file format..')
-
-    def retrieve_map(self, directory='', file_name1='', file_name2=''):
+    def retrieve_map(self, path='', file_name1='', file_name2=''):
         """
         Attempt to retrieve the map configuration file from memory.
 
         If it fails, it either means that the file was deleted or the
         current run is a fresh run.
         Args:
-            directory {String}: The share directory the yaml files are located at
+            path {String}: The path to the directory containing the yaml files
             file_name1 {String}: The active config (i.e. the one from memory)
             file_name2 {String}: The initial empty config (i.e. fresh run)
         """
-        active_config = os.path.join(directory, file_name1)
-        if os.path.exists(active_config):
+        try:
+            self.map_instance = YAMLHandler.load_yaml(path, file_name1)
             self.get_logger().info('Initialized map from previous run!')
-            return self.load_from_yaml(directory, file_name1)
-        else:
-            self.get_logger().warn(
-                'Previous map info could not be found! Unless you have '
-                'a back-up, previous items need to be re-added'
-            )
-            return self.load_from_yaml(self.directory, file_name2)
+        except YAMLError as e:
+            try:
+                self.node.get_logger().warn(f'{e}. Previous map could not be found! Unless you have'
+                                            ' a back-up, previous items need to be re-added')
+                self.map_instance = YAMLHandler.load_yaml(self.directory, file_name2)
+            except YAMLError as e:
+                self.node.get_logger().error(f'{e}. Failed to load any map configuration.')
+                return
 
 
 def main(args=None):

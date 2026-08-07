@@ -94,7 +94,7 @@ class YAMLHandler:
                 raise YAMLError('Invalid YAML file format..')
 
     @staticmethod
-    def save_to_yaml(data: dict, path='', file_name=''):
+    def save_to_yaml(data: dict, path='', file_name='', create_if_empty=True):
         """
         Save a Python dictionary into a YAML configuration file.
 
@@ -104,6 +104,7 @@ class YAMLHandler:
             data (dict): Data to save in the YAML file.
             path (str): Directory where the YAML file will be saved.
             file_name (str): Name of the YAML configuration file.
+            create_if_empty (bool): Whether to create the directory if it doesn't exist.
         """
         if path == '':
             raise YAMLError('Path not set for retrieving the parameter config file')
@@ -112,7 +113,8 @@ class YAMLHandler:
         if not isinstance(data, dict):
             raise YAMLError('Invalid YAML file format..')
 
-        os.makedirs(path, exist_ok=True)
+        if create_if_empty:
+            os.makedirs(path, exist_ok=True)
 
         file_path = YAMLHandler.join_path(path, file_name)
         with open(file_path, 'w') as yaml_file:
