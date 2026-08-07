@@ -5,10 +5,20 @@ Keyboard teleoperation node for ROS2 Farmbot.
 Publishes keyboard commands to the farmbot controller for execution and
 demonstrates command priority handling versus sequencer commands.
 """
+import readline
+
 import rclpy
 from rclpy.node import Node
 
 from std_msgs.msg import String
+
+from std_srvs.srv import Trigger
+
+
+class ServerError(Exception):
+    """Raised when a server is not available."""
+
+    pass
 
 
 class KeyboardTeleOp(Node):
@@ -29,6 +39,13 @@ class KeyboardTeleOp(Node):
         self.input_pub = self.create_publisher(String, 'input_topic', 10)
         self.priority_pub = self.create_publisher(String, 'farmbot_command', 10)
 
+        # Initialisation of the service clients for priority commands (estop, abort, resume)
+        self.estop_client = self.create_client(Trigger, 'estop')
+        self.abort_client = self.create_client(Trigger, 'abort')
+        self.resume_client = self.create_client(Trigger, 'resume')
+
+        self.line_number_list = []
+
         # Log the initialization
         self.get_logger().info('Keyboard Controller Initialized..')
 
@@ -36,9 +53,45 @@ class KeyboardTeleOp(Node):
                                This is a keyboard based controller for the ROS2 Farmbot
                                Controllers. The commands accepted can be found in the
                                Documentation under High Level Commands.\n
-                               NOTE: The commands here DO NOT automatically enter the
-                               sequencer as they hold execution priority! An exception
-                               is shown for sequencing commands such as 'P_4' for watering.""")
+                               Main Commands:
+                               -------------------
+                               C_0  - Calibrate the FarmBot
+                               C_1  - Load parameter configuration
+                               M    - Move the FarmBot
+                               H_0  - Return the FarmBot to the home position
+                               P_4  - Water all plants (sequenced command)
+                               E    - Emergency stop
+                               R    - Restart the robot after an emergency stop
+                               @    - Pause the FarmBot""")
+
+    def _send(self, client, on_done=None):
+        """Check the server, send a Trigger request and complete via _complete."""
+        if client.service_is_ready():
+            client.call_async(Trigger.Request()).add_done_callback(
+                              lambda future: self._complete(future, on_done))
+
+    def _server_availability(self, cmd_name: str, client):
+        if not client.wait_for_server(1.0):
+            self.get_logger().fatal(f'{cmd_name} Server not available!')
+            raise ServerError('Task_Sequencer failed: server unavailable')
+
+    def _complete(self, future, on_done=None):
+        """Log the outcome and forward the response (or None on failure) to on_done."""
+        try:
+            response = future.result()
+        except Exception as error:  # call failed - report, never leave on_done hanging
+            self.get_logger().error('Service call failed %r' % (error, ))
+            response = None
+        if response is None:
+            self.get_logger().warn('Command failure!')
+        elif not response.success:
+            self.get_logger().warn(f'Command failed: {response.message}')
+        elif response.message:
+            self.get_logger().info(response.message)
+        else:
+            self.get_logger().info('Command successful')
+        if on_done is not None:
+            on_done(response)
 
     def check_input(self):
         """
@@ -61,26 +114,50 @@ class KeyboardTeleOp(Node):
         # Record the user input
         user_input = input('\nEnter command: ')
 
+        line_number = 2  # By default, 2 lines are printed for each command (input + \n)
+
         # Send the user input to the farmbot controller if it is a valid key or command
         if user_input in valid_keys or user_input.split(' ')[0] in compound_cmds:
             # Send the command with priority at the UART controller
             if user_input == 'E':
-                self.cmd.data = 'E'
-                self.priority_pub.publish(self.cmd)
+                self._send(self.estop_client)
                 self.get_logger().info('ESTOP button pressed')
+                line_number += 1
             elif user_input == 'R':
-                self.cmd.data = 'F09'
-                self.priority_pub.publish(self.cmd)
+                self._send(self.resume_client)
                 self.get_logger().info('RESET button pressed')
+                line_number += 1
             elif user_input == '@':
-                self.cmd.data = '@'
-                self.priority_pub.publish(self.cmd)
+                self._send(self.abort_client)
                 self.get_logger().info('Abort movement')
-
-            self.cmd.data = user_input
-            self.input_pub.publish(self.cmd)
+                line_number += 1
+            else:
+                self.cmd.data = user_input
+                self.input_pub.publish(self.cmd)
         else:
             print('Invalid input\n')
+            line_number += 2
+
+        self.line_number_list.append(line_number)
+        self.screen_scrolling()
+
+    def screen_scrolling(self):
+        """
+        Keep the command help visible by scrolling the terminal display.
+
+        Uses ANSI escape sequences to move the cursor upward, remove the oldest
+        command lines from the terminal, and restore the cursor to its original
+        position.
+        """
+        if len(self.line_number_list) >= 3:
+            line_number = self.line_number_list[0]
+            print(f'\033[{sum(self.line_number_list)}A', end='')
+
+            for _ in range(line_number):
+                print('\033[1M', end='')
+
+            self.line_number_list.pop(0)
+            print(f'\033[{sum(self.line_number_list)}B', end='')
 
 
 def main(args=None):
@@ -95,6 +172,7 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
+        readline.clear_history()
         keyboard_node.destroy_node()
         rclpy.shutdown()
 

@@ -5,6 +5,8 @@ Keyboard teleoperation node for ROS2 Farmbot.
 Publishes keyboard commands to the farmbot controller for execution and
 demonstrates command priority handling versus sequencer commands.
 """
+import readline
+
 from farmbot_controllers.sequences.calibration import calibrate_axes
 from farmbot_controllers.sequences.find_home import find_home
 from farmbot_controllers.sequences.single_call import single_call
@@ -66,16 +68,30 @@ class UserCLI(Node):
         self.cur_y = 0.0
         self.cur_z = 0.0
 
+        self.line_number_list = []
+
         # Log the initialization
         self.get_logger().info('UserCLI Initialized..')
 
         self.get_logger().info("""\n
-                               This is a keyboard based controller for the ROS2 Farmbot
-                               Controllers. The commands accepted can be found in the
-                               Documentation under High Level Commands.\n
-                               NOTE: The commands here DO NOT automatically enter the
-                               sequencer as they hold execution priority! An exception
-                               is shown for sequencing commands such as 'P_4' for watering.""")
+                               This is a keyboard-based controller for the ROS 2 FarmBot.
+                               The accepted commands are documented under "High-Level Commands".
+
+                               NOTE:
+                               Commands entered here do NOT automatically enter the sequencer
+                               because they take execution priority. The exception is sequencing
+                               commands, such as `P_4` for watering.
+
+                               Main Commands:
+                               -------------------
+                               C_0  - Calibrate the FarmBot
+                               C_1  - Load parameter configuration
+                               M    - Move the FarmBot
+                               H_0  - Return the FarmBot to the home position
+                               P_4  - Water all plants (sequenced command)
+                               E    - Emergency stop
+                               R    - Restart the robot after an emergency stop
+                               @    - Pause the FarmBot""")
 
     def _send(self, client, on_done=None):
         """Check the server, send a Trigger request and complete via _complete."""
@@ -217,17 +233,21 @@ class UserCLI(Node):
         # Record the user input
         user_input = input('\nEnter command: ')
         code = user_input.split(' ')
+        line_number = 2  # By default, 2 lines are printed for each command (input + \n)
 
         match code[0]:
             case 'E':
                 self._send(self.estop_client)
                 self.get_logger().info('ESTOP button pressed')
+                line_number += 1
             case 'R':
                 self._send(self.resume_client)
                 self.get_logger().info('RESET button pressed')
+                line_number += 1
             case '@':
                 self._send(self.abort_client)
                 self.get_logger().info('Abort movement')
+                line_number += 1
             case 'SW_VER':
                 single_call('software version', lambda hw,
                             cb: hw.states.request_sw_version(on_done=cb))
@@ -235,6 +255,7 @@ class UserCLI(Node):
                 if len(code) != 4:
                     self.get_logger().warning('You need to include all 3 coordinates! '
                                               'Command ignored!')
+                    line_number += 1
                 else:
                     x = float(code[1])
                     y = float(code[2])
@@ -245,6 +266,7 @@ class UserCLI(Node):
                 if len(code) != 5:
                     self.get_logger().warning('You need to include all 3 coordinates and a '
                                               'speed percentage! Command ignored!')
+                    line_number += 1
                 else:
                     x = float(code[1])
                     y = float(code[2])
@@ -275,6 +297,7 @@ class UserCLI(Node):
                     self.get_logger().warning('You need to specify the axes on which you want to '
                                               'determine the origin position! '
                                               'Command ignored!')
+                    line_number += 1
                 find_home(x=True if code[1] == 'X' else False,
                           y=True if code[1] == 'Y' else False,
                           z=True if code[1] == 'Z' else False)
@@ -344,19 +367,35 @@ class UserCLI(Node):
                 if len(code) != 3:
                     self.get_logger().warning('You need to include the servo pin and angle! '
                                               'Command ignored!')
+                    line_number += 1
                 else:
                     self.get_logger().info(f'Trying to move servo {int(code[1])} to {int(code[2])}')
+                    line_number += 1
                     single_call('move_servo', lambda hw,
                                 cb: hw.devices.move_servo(pin=int(code[1]), angle=float(code[2]),
                                                           on_done=cb))
             case _:
                 print('Invalid input\n')
+                line_number += 2
+
+        self.line_number_list.append(line_number)
+        self._screen_scrolling()
+
+    def _screen_scrolling(self):
+        if len(self.line_number_list) >= 3:
+            line_number = self.line_number_list[0]
+            print(f'\033[{sum(self.line_number_list)}A', end='')
+
+            for _ in range(line_number):
+                print('\033[1M', end='')
+
+            self.line_number_list.pop(0)
+            print(f'\033[{sum(self.line_number_list)}B', end='')
 
 
 def main(args=None):
     """Initialize and run the keyboard teleoperation node."""
     rclpy.init(args=args)
-
     user_cli_node = UserCLI()
 
     try:
@@ -365,6 +404,7 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
+        readline.clear_history()
         user_cli_node.destroy_node()
         rclpy.shutdown()
 
