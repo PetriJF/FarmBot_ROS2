@@ -9,14 +9,26 @@ from farmbot_controllers.sequences.calibration import calibrate_axes
 from farmbot_controllers.sequences.find_home import find_home
 from farmbot_controllers.sequences.single_call import single_call
 
+from farmbot_interfaces.action import RunSequence
+
 from geometry_msgs.msg import PointStamped
 
 import rclpy
+from rclpy.action import ActionClient
+from rclpy.action.client import ClientGoalHandle
 from rclpy.node import Node
 
 from std_msgs.msg import String
 
 from std_srvs.srv import Trigger
+
+_RESULT_OK, _RESULT_ESTOPPED, _RESULT_ABORTED = 0, 2, 3
+
+
+class ServerError(Exception):
+    """Raised when a server is not available."""
+
+    pass
 
 
 class UserCLI(Node):
@@ -41,6 +53,9 @@ class UserCLI(Node):
         self.estop_client = self.create_client(Trigger, 'estop')
         self.abort_client = self.create_client(Trigger, 'abort')
         self.resume_client = self.create_client(Trigger, 'resume')
+
+        # Initialisation of the run sequence client for sending commands to the sequencer
+        self._run_client = ActionClient(self, RunSequence, 'run_sequence')
 
         # Farmbot Position Subscriber
         self.fb_position_sub = self.create_subscription(PointStamped, 'farmbot_position',
@@ -68,6 +83,11 @@ class UserCLI(Node):
             client.call_async(Trigger.Request()).add_done_callback(
                               lambda future: self._complete(future, on_done))
 
+    def _server_availability(self, cmd_name: str, client):
+        if not client.wait_for_server(1.0):
+            self.get_logger().fatal(f'{cmd_name} Server not available!')
+            raise ServerError('Task_Sequencer failed: server unavailable')
+
     def _complete(self, future, on_done=None):
         """Log the outcome and forward the response (or None on failure) to on_done."""
         try:
@@ -85,6 +105,93 @@ class UserCLI(Node):
             self.get_logger().info('Command successful')
         if on_done is not None:
             on_done(response)
+
+    def _run_client(self, name: str, on_done=None):
+        """
+        Send a RunSequence goal to the FarmBot action server.
+
+        Creates and sends a RunSequence goal containing the name of the sequence
+        to execute.
+
+        Args:
+            name (str): Name of the sequence to execute.
+            on_done (callable, optional): Callback function called when the goal
+                response is received.
+        """
+        self._server_availability('run_sequence', self._run_client)
+
+        goal = RunSequence.Goal()
+        goal.name = name
+
+        self._run_client.send_goal_async(
+            goal,
+            feedback_callback=self._run_client_feedback_callback
+        ).add_done_callback(lambda future: self._goal_response_callback(future, on_done))
+
+    def _run_client_feedback_callback(self, feedback_msg: RunSequence.Feedback):
+        """
+        Handle feedback messages from the RunSequence action server.
+
+        Logs the goal status during the sequence execution.
+        """
+        status = feedback_msg.feedback.status
+        self.get_logger().info(f'Status of the current command : {status}')
+
+    def _goal_response_callback(self, future, on_done=None):
+        """
+        Handle the action server goal response.
+
+        Retrieves the result asynchronously when the goal is accepted; otherwise
+        signals completion with None (rejected or send failed) so a chained
+        caller (on_done) is never left waiting.
+        """
+        try:
+            goal_handle: ClientGoalHandle = future.result()
+        except Exception as error:  # send failed - report, never leave on_done hanging
+            self.get_logger().error(f'Goal send failed: {error}')
+            if on_done is not None:
+                on_done(None)
+            return
+
+        if goal_handle.accepted:
+            self.get_logger().info('Goal accepted')
+            goal_handle.get_result_async().add_done_callback(
+                lambda result_future: self._goal_result_callback(result_future, on_done)
+            )
+        else:
+            self.get_logger().warn('Goal rejected')
+            # A rejected goal never produces a result so signal it so on_done resolves.
+            if on_done is not None:
+                on_done(None)
+
+    def _goal_result_callback(self, future, on_done=None):
+        """
+        Handle the final result from the action server.
+
+        Logs the returned status and forwards the result (or None on failure) to
+        the completion callback so a chained caller always resolves.
+        """
+        try:
+            result = future.result().result
+        except Exception as error:  # result failed - report, never leave on_done hanging
+            self.get_logger().error(f'Result retrieval failed: {error}')
+            if on_done is not None:
+                on_done(None)
+            return
+
+        cmd_status = result.status
+
+        if cmd_status == _RESULT_ESTOPPED:
+            self.get_logger().info('The current command has been stopped by a estop request')
+
+        elif cmd_status == _RESULT_ABORTED:
+            self.get_logger().info('The Farmbot has been paused.')
+
+        elif cmd_status == _RESULT_OK:
+            self.get_logger().info('The command was successful and has been completed')
+
+        if on_done is not None:
+            on_done(result)
 
     def fb_position_callback(self, position: PointStamped):
         """
