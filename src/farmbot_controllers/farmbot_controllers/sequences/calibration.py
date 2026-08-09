@@ -1,22 +1,12 @@
-"""
-Axis calibration sequence.
-
-Defines the calibrate step and the sequence that uses it, and registers the sequence.
-"""
+"""Axis calibration sequence for the farmbot."""
 from dataclasses import dataclass
 
-from farmbot_controllers.sequence_runner.registry import sequence
 from farmbot_controllers.sequence_runner.steps import Outcome, Sequence, Step, StepResult
 
 
 @dataclass
 class CalibrateAxis(Step):
-    """
-    Calibrate one axis (only one of x/y/z should be true True).
-
-    The firmware calibrates a single axis per command, so a full calibration is
-    a sequence of these.
-    """
+    """Calibrate one axis at a time (z, y, and x)."""
 
     x: bool = False
     y: bool = False
@@ -27,12 +17,11 @@ class CalibrateAxis(Step):
         try:
             hardware.movement.calibrate_axis(
                 x=self.x, y=self.y, z=self.z,
-                on_done=lambda result: done(hardware.result_to_outcome(result)))
+                on_done=lambda result: done(hardware.to_outcome(result)))
         except Exception as error:  # any client error - report, never hang the engine
             done(StepResult(Outcome.FAILED, str(error)))
 
 
-@sequence('calibrate_axes')
 def calibrate_axes(x: bool = True, y: bool = True, z: bool = True) -> Sequence:
     """
     Build the axis calibration sequence (registered as 'calibrate_axes').

@@ -1,7 +1,0 @@
-# Used to start and run a registered sequence on the task sequencer
-
-string name                       # registered sequence, e.g. 'calibrate_axes'
----
-SequenceStatus status             # terminal status: DONE / FAILED / CANCELLED
----
-SequenceStatus status             # progress on every engine transition (RUNNING / PAUSED)
