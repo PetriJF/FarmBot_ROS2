@@ -3,8 +3,9 @@
 GPIO controller module for the FarmBot panel interface.
 
 Manages GPIO hardware components including LEDs, buttons, and the emergency
-stop input. Provides ROS 2 services and callbacks to handle button events,
-control LED states, and publish panel commands.
+stop input. The emergency stop and unlock buttons call the bridge's state
+triggers directly, while the configurable panel buttons publish the high-level
+command they are mapped to in ButtonCommand.yaml.
 """
 import RPi.GPIO as GPIO
 
@@ -64,12 +65,15 @@ class GPIOController(Node):
         GPIO.setup(self.fb_panel['button_b'], GPIO.IN)
         GPIO.setup(self.fb_panel['button_c'], GPIO.IN)
 
-        self.cmd = String()
         self.estop_client = self.create_client(Trigger, 'estop')
         self.resume_client = self.create_client(Trigger, 'resume')
 
         # TODO: migrate high-level commands to language-agnostic service calls
-        self.highlevel_command_pub = self.create_publisher(String, 'input_topic', 10)
+        self.request_command_pub = self.create_publisher(String, 'request_command', 10)
+
+        # Maps a button's GPIO channel to its ButtonCommand.yaml entry
+        self.button_channels = {self.fb_panel[button]: button
+                                for button in ('button_a', 'button_b', 'button_c')}
 
         # LED Flasher Button
         self.flash_state = False
@@ -189,8 +193,6 @@ class GPIOController(Node):
             future = self.estop_client.call_async(request=request)
             future.add_done_callback(self.client_callback)
 
-            self.cmd.data = 'E'
-            self.highlevel_command_pub.publish(self.cmd)
             self.get_logger().info('ESTOP button pressed')
 
     def reset_button_handler(self, channel):
@@ -212,8 +214,6 @@ class GPIOController(Node):
             future = self.resume_client.call_async(request=request)
             future.add_done_callback(self.client_callback)
 
-            self.cmd.data = 'R'
-            self.highlevel_command_pub.publish(self.cmd)
             self.get_logger().info('RESET button pressed')
 
     def client_callback(self, future):
@@ -240,34 +240,30 @@ class GPIOController(Node):
         except Exception as e:
             self.get_logger().error('Service call failed %r' % (e, ))
 
-    # For now, buttons other than “estop” and “reset estop” do not work because they have not been
-    # implemented. If we want to maintain flexibility and be able to modify only the YAML file, we
-    # cannot simply place the client services within this function.
     def button_handler(self, channel):
         """
-        Handle button press events for the panel buttons.
+        Handle button press events for the configurable panel buttons.
 
-        Reads the GPIO channel state and triggers the command associated with
-        the pressed button.
+        Reads the GPIO channel state and publishes the high-level command that
+        ButtonCommand.yaml maps to the pressed button.
 
         Args:
             channel {int}: GPIO channel that triggered the callback.
         """
-        current_state = GPIO.input(channel)
-        if current_state == GPIO.LOW:
-            if channel == self.fb_panel['button_a']:
-                self.get_logger().info('button A pressed : ' +
-                                       self.button['button_a']['command_name'] + ' is triggered')
-                self.cmd.data = self.button['button_a']['command']
-            elif channel == self.fb_panel['button_b']:
-                self.get_logger().info('button B pressed : ' +
-                                       self.button['button_b']['command_name'] + ' is triggered')
-                self.cmd.data = self.button['button_b']['command']
-            elif channel == self.fb_panel['button_c']:
-                self.get_logger().info('button C pressed : ' +
-                                       self.button['button_c']['command_name'] + ' is triggered')
-                self.cmd.data = self.button['button_c']['command']
-            self.highlevel_command_pub.publish(self.cmd)
+        if GPIO.input(channel) != GPIO.LOW:
+            return
+
+        button = self.button_channels.get(channel)
+        if button is None:
+            self.get_logger().warn(f'GPIO channel {channel} is not a mapped button. Ignored')
+            return
+
+        self.get_logger().info(f"{button} pressed : {self.button[button]['command_name']} "
+                               'is triggered')
+
+        cmd = String()
+        cmd.data = self.button[button]['command']
+        self.request_command_pub.publish(cmd)
 
     def destroy_node(self):
         """Destroy_node overloading for cleaning up the GPIO."""

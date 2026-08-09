@@ -111,7 +111,7 @@ class TaskSequencer(Node):
             self.get_logger().error(f'command map has unresolved calls: {", ".join(broken)}')
         self.get_logger().info('task sequencer initialized')
 
-    # --- dispatch: grammar -> the task the command map defines ---------------
+    # --- dispatch for command map ------------------------------------
 
     def _on_command(self, msg: String) -> None:
         """Handle a manual movement key locally."""
