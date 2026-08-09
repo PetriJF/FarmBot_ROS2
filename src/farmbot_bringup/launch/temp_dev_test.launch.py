@@ -1,21 +1,4 @@
-"""
-Temporary dev launch: only the refactored nodes, for testing the new stack.
-
-Brings up the two refactored, independently-launchable pieces of the current
-architecture:
-- serial_controller -- the typed hardware bridge (actions / services / triggers;
-  the only node that speaks F-code; loads config via the ConfigServer helper).
-- task_sequencer    -- the programmatic sequence engine (RunSequence action).
-
-Legacy / not-yet-refactored nodes are intentionally excluded: the
-farmbot_controller god-node, map_controller, gpio_controller, the camera stack
-and the HRI nodes. Config is not a separate node any more (folded into the
-bridge), so there is nothing else to launch.
-
-Drive a sequence once it is up, e.g.:
-    ros2 action send_goal /run_sequence farmbot_interfaces/action/RunSequence \\
-        "{name: calibrate_axes}" --feedback
-"""
+"""Temporary dev launch: only the refactored nodes, for testing the new stack."""
 import os
 
 from launch import LaunchDescription

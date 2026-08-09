@@ -1,4 +1,5 @@
-uint16[] params                   # list of parameter to load
+string profile                    # 'genesis'/'express'/'custom'/'active'; empty -> params below
+uint16[] params                   # list of parameter to load, when no profile is named
 int64[] values
 ---
 uint8 OK=0

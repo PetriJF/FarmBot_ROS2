@@ -33,7 +33,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/HomeAxes.action"
   "action/LoadingParameters.action"
   "action/MoveGantry.action"
-  "action/RunSequence.action"
   DEPENDENCIES sensor_msgs geometry_msgs
 )
 

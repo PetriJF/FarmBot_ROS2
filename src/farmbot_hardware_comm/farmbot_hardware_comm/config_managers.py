@@ -1,323 +1,311 @@
 """
 Configuration parameter management module for the FarmBot SerialController.
 
-Handles loading, writing and storing FarmBot firmware parameters on YAML file.
-Provides the parameter management logic used by the SerialController to
-synchronize configuration values with the firmware.
+Contains the ParameterTable and ConfigServer classes.
+ParameterTable is used for organizing the parameter indexing and values, while the
+ConfigServer wraps it in the services the rest of the system calls.
 """
-from farmbot_hardware_comm.modules.exceptions import YAMLError
+from farmbot_hardware_comm.modules.exceptions import EncodeError, YAMLError
 from farmbot_hardware_comm.modules.param_info import ParameterList
 from farmbot_hardware_comm.modules.yaml_handler import YAMLHandler
 
 from farmbot_interfaces.action import LoadingParameters
 from farmbot_interfaces.msg import MapCommand
-from farmbot_interfaces.srv import ParameterConfig, StringRepReq
+from farmbot_interfaces.srv import WriteParameter
 
-from rclpy.action import ActionClient
-from rclpy.action.client import ClientGoalHandle
+from rclpy.action.server import ServerGoalHandle
 from rclpy.node import Node
-from rclpy.task import Future
+
+from std_srvs.srv import Trigger
+
+LOAD_FAILURES = {
+    'firmware error': LoadingParameters.Result.FIRMWARE_ERROR,
+    'aborted': LoadingParameters.Result.ABORTED,
+    'estopped': LoadingParameters.Result.ESTOPPED,
+}
+
+BASE_CONFIG = 'firmwareDefault.yaml'    # what the firmware boots with
+ACTIVE_CONFIG = 'activeConfig.yaml'     # configuration loaded from previous run
+
+PROFILES = {
+    'genesis': 'Genesis.yaml',
+    'express': 'Express.yaml',
+    'custom': 'Custom1.yaml',           # modify in source and build
+}
+PROFILE_ALIASES = {'gen': 'genesis', 'exp': 'express'}
+ACTIVE_PROFILE = 'active'               # reload what the previous run saved
+
+
+class ParameterTable:
+    """The farmduino parameter values, their source files and their pending writes."""
+
+    def __init__(self, config_path: str, default_path: str, log=None):
+        """Load the table, preferring the previous run's config over the firmware defaults."""
+        self.config_path = config_path
+        self.default_path = default_path
+        self.params = ParameterList()
+        self._log = log or (lambda message: None)
+
+        YAMLHandler.make_dir(config_path)
+
+        try:
+            self.firmware_defaults = YAMLHandler.load_yaml(default_path, BASE_CONFIG)
+        except YAMLError as e:
+            self._log(f'Could not load the firmware defaults: {e}')
+            self.firmware_defaults = {}
+
+        try:
+            self.values = YAMLHandler.load_yaml(config_path, ACTIVE_CONFIG)
+        except YAMLError as e:
+            self._log(f'{e}. Starting from the firmware defaults - load a profile with the '
+                      'loading_params action to configure the farmbot.')
+            self.values = dict(self.firmware_defaults)
+
+    def get_value(self, param: int) -> int:
+        """Return the stored value of a parameter."""
+        return self.values[param]
+
+    def set_value(self, param: int, value: int):
+        """Store the value the firmware reported for a parameter."""
+        self.values[param] = value
+
+    def pending_writes(self) -> list[tuple[int, int]]:
+        """Return the (param, value) pairs that still differ from the firmware defaults."""
+        return [(param, value) for param, value in self.values.items()
+                if self.firmware_defaults.get(param) != value]
+
+    def resolve_profile(self, name: str) -> str:
+        """Return the canonical name of a profile, raising ValueError if it is unknown."""
+        requested = name.strip().lower()
+        canonical = PROFILE_ALIASES.get(requested, requested)
+
+        if canonical != ACTIVE_PROFILE and canonical not in PROFILES:
+            known = ', '.join(sorted(PROFILES) + [ACTIVE_PROFILE])
+            raise ValueError(f"unknown profile '{name}'. known profiles: {known}")
+        return canonical
+
+    def load_profile(self, name: str) -> str:
+        """Replace the table with a stored profile and return its canonical name."""
+        canonical = self.resolve_profile(name)
+
+        if canonical == ACTIVE_PROFILE:
+            self.values = YAMLHandler.load_yaml(self.config_path, ACTIVE_CONFIG)
+        else:
+            self.values = YAMLHandler.load_yaml(self.default_path, PROFILES[canonical])
+        return canonical
+
+    def save(self) -> str:
+        """Save the table as the active config and return where it was written."""
+        YAMLHandler.save_to_yaml(self.values, self.config_path, ACTIVE_CONFIG)
+        return YAMLHandler.join_path(self.config_path, ACTIVE_CONFIG)
+
+    def axis_lengths(self) -> dict:
+        """Return the {x, y, z} axis lengths in mm implied by the table."""
+        axes = (
+            ('X', self.params.MOVEMENT_AXIS_NR_STEPS_X, self.params.MOVEMENT_STEP_PER_MM_X),
+            ('Y', self.params.MOVEMENT_AXIS_NR_STEPS_Y, self.params.MOVEMENT_STEP_PER_MM_Y),
+            ('Z', self.params.MOVEMENT_AXIS_NR_STEPS_Z, self.params.MOVEMENT_STEP_PER_MM_Z),
+        )
+
+        lengths = {}
+        for axis, steps, steps_per_mm in axes:
+            nr_steps = self.values.get(steps)
+            per_mm = self.values.get(steps_per_mm)
+            if not nr_steps or not per_mm:
+                self._log(f'Axis {axis} length unknown: parameters {steps}/{steps_per_mm} unset.')
+                continue
+            lengths[axis] = nr_steps / per_mm
+        return lengths
 
 
 class ConfigServer:
     """Handle the parameter recording and loading onto the farmduino."""
 
     # Node contructor
-    def __init__(self, node: Node, config_path: str):
+    def __init__(self, node: Node, config_path: str, run_command=None, encoder=None):
         """
-        Config Handling Node Constructor.
+        Build the parameter table and call the configuration services.
 
-        Sets up all the paths, servers, publishers and subscribers for the node.
+        Args:
+            node {Node}: Node the servers are created on.
+            config_path {str}: Workspace directory holding the active configuration.
+            run_command {callable}: Awaitable the node uses to send one FCode.
+            encoder {Encoder}: Encoder turning a write request into FCode.
         """
         self.node = node
-
-        # The parameter identifiers used to index the table below
-        self.params = ParameterList()
+        self.run_command = run_command
+        self.encoder = encoder
+        self.loading = False
 
         self.default_path = YAMLHandler.get_directory_package('farmbot_hardware_comm', 'config')
-        self.config_path = config_path
+        self.table = ParameterTable(config_path, self.default_path,
+                                    log=lambda message: self.node.get_logger().warn(message))
+        self.params = self.table.params
 
-        self.base_config = 'firmwareDefault.yaml'  # default config loaded by the firmware
-        self.custom1_config = 'Custom1.yaml'       # custom config, modify in source and build
-        self.genesis_config = 'Genesis.yaml'       # farmbot genesis config
-        self.express_config = 'Express.yaml'       # farmbot express config
-        self.active_config = 'activeConfig.yaml'   # configuration loaded from previous run
-
-        # The dictionary containing all of the parameters for the farmbot
-        self.param_vals = self._initial_params()
-
+        ### FIXME TODO these should be handled automatically and removed in the future
         # Config Service Servers
-        self.config_server = self.node.create_service(ParameterConfig,
-                                                      'manage_param_config',
-                                                      self.config_request_server)
-        self.config_loading_server = self.node.create_service(StringRepReq,
-                                                              'load_param_config',
-                                                              self.param_loading_server)
-
-        # Config parameter clients
-        self.load_params_client = ActionClient(self.node, LoadingParameters, 'loading_params')
-
+        self.save_config_server = self.node.create_service(Trigger, 'save_parameter_config',
+                                                           self.save_config_server_cb)
+        self.map_dimensions_server = self.node.create_service(Trigger, 'publish_map_dimensions',
+                                                              self.map_dimensions_server_cb)
         # Map updating publisher
-        self.map_cmd = MapCommand()
         self.map_cmd_pub = self.node.create_publisher(MapCommand, 'map_cmd', 10)
+        ###
 
         # Log the initialization
         self.node.get_logger().info('Config Server Initialized..')
 
-    def _initial_params(self) -> dict:
-        """Return the parameter table the node starts from.
-
-        Prefers the configuration saved by the previous run (active config) and falls back
-        to the values the firmware boots with.
-        """
-        try:
-            return YAMLHandler.load_yaml(self.config_path, self.active_config)
-        except YAMLError as e:
-            self.node.get_logger().warn(f'{e}. Falling back to the firmware defaults.')
-
-        try:
-            return YAMLHandler.load_yaml(self.default_path, self.base_config)
-        except YAMLError as e:
-            self.node.get_logger().error(f'Could not load the firmware defaults either: {e}')
-            return {}
-
-    def _server_availability(self, cmd_name: str, client: ActionClient) -> bool:
-        """Check if an action server is ready to accept a goal.
-
-        Args:
-            cmd_name {str}: Name of the server, used for logging.
-            client {ActionClient}: Action client whose server is being checked.
-        """
-        if not client.server_is_ready():
-            self.node.get_logger().error(f'{cmd_name} server not available!')
-            return False
-        return True
-
-    def retrieve_config(self):
-        """Load the active configuration file, if it exists, and write it to the Farmduino."""
-        try:
-            self.param_vals = YAMLHandler.load_yaml(self.config_path, self.active_config)
-        except YAMLError as e:
-            self.node.get_logger().warn(f'{e}. Previous config could not be found!')
-            return
-
-        self.node.get_logger().info('Initializing with the active config from the previous run')
-        self.load_params()
-
-    def param_loading_server(self, request: StringRepReq.Request,
-                             response: StringRepReq.Response) -> StringRepReq.Response:
-        """Service Server that loads the default parameter configurations onto the Farmduino."""
-        try:
-            if request.data in ['Genesis', 'genesis', 'Gen', 'gen']:
-                self.param_vals = YAMLHandler.load_yaml(path=self.default_path,
-                                                        file=self.genesis_config)
-                self.node.get_logger().info('Loading the genesis configuration')
-                self.load_params()
-            elif request.data in ['Express', 'express', 'exp', 'Exp']:
-                self.param_vals = YAMLHandler.load_yaml(path=self.default_path,
-                                                        file=self.express_config)
-                self.node.get_logger().info('Loading the express configuration')
-                self.load_params()
-            # A configuration more specific to the model you are running
-            elif request.data in ['Custom', 'custom']:
-                self.param_vals = YAMLHandler.load_yaml(path=self.default_path,
-                                                        file=self.custom1_config)
-                self.node.get_logger().info('Loading the custom configuration')
-                self.load_params()
-            else:
-                self.node.get_logger().warning('Config type unrecognized or not set.'
-                                               'Nothing Loaded!')
-                response.data = 'FAILED'
-                return response
-            response.data = 'LOADED'
-            return response
-
-        except YAMLError as e:
-            self.node.get_logger().warn(f'yaml error: {e}')
-            response.data = 'FAILED'
-            return response
-
-    def load_params(self):
-        """
-        Load the required parameters on the Farmduino.
-
-        Compares the current firmware configuration with the desired parameter
-        values and sends only the parameters that need to be updated.
-        """
-        try:
-            loaded_firmware_config = YAMLHandler.load_yaml(self.default_path, self.base_config)
-        except YAMLError as e:
-            self.node.get_logger().warn(f'yaml error: {e}')
-            return
-
-        params = []
-        param_values = []
-        for key, value in self.param_vals.items():
-            if (loaded_firmware_config[key] != value):
-                params.append(key)
-                param_values.append(value)
-
-        self.send_loading_params_goal(params, param_values)
-
-    def send_loading_params_goal(self, params: list[int], values: list[int]):
-        """
-        Send a LoadingParameters goal to the FarmBot action server.
-
-        Creates and sends a LoadingParameters goal containing the parameters
-            to load and their associated values.
-
-        Args:
-            params (list[int]): List of parameter identifiers to load.
-            values (list[int]): List of values associated with each parameter.
-        """
-        if not self._server_availability('LoadingParameters', self.load_params_client):
-            return
-
-        goal = LoadingParameters.Goal()
-        goal.params = params
-        goal.values = values
-
-        self.node.get_logger().info(f'Parameters to load: {len(params)}')
-        self.load_params_client.send_goal_async(
-            goal,
-            feedback_callback=self.loading_goal_feedback_callback
-            ).add_done_callback(self.goal_response_callback)
-
-    def loading_goal_feedback_callback(self, feedback_msg: LoadingParameters.Impl.FeedbackMessage):
-        """
-        Handle feedback messages from the LoadingParameters action server.
-
-        Logs the progress of he parameter loading on the Farmbot.
-        """
-        progress = feedback_msg.feedback.progress
-
-        self.node.get_logger().info(f'Loading parameter progression: {progress*100:.2f} %')
-
-    def goal_response_callback(self, future: Future):
-        """
-        Handle the action server goal response.
-
-        Processes the goal response and retrieves the result asynchronously if
-        the goal has been accepted.
-        """
-        self.goal_handle: ClientGoalHandle = future.result()
-
-        if self.goal_handle.accepted:
-            self.node.get_logger().info('Goal accepted')
-
-            self.goal_handle.get_result_async().add_done_callback(
-                self.goal_result_callback
-            )
-
-        else:
-            self.busy_state = False
-            self.node.get_logger().warn('Goal rejected')
-
-    def goal_result_callback(self, future: Future):
-        """
-        Handle the final result from the action server.
-
-        Processes the action result and logs the command status returned by the
-        FarmBot action server.
-        """
-        result = future.result().result
-        cmd_status = result.code
-
-        if cmd_status == result.ESTOPPED:
-            self.node.get_logger().info('The current command has been stopped by a estop request')
-
-        elif cmd_status == result.ABORTED:
-            self.node.get_logger().info('The Farmbot has been paused.')
-
-        elif cmd_status == result.FIRMWARE_ERROR:
-            self.node.get_logger().info('The command has finished with due to a firmware error.')
-
-        elif cmd_status == result.REJECTED:
-            self.node.get_logger().info(f'The command has been rejected. {result.message}')
-
-        elif cmd_status == result.OK:
-            self.node.get_logger().info('Parameter loading complete!')
-
-    def config_request_server(self, request: ParameterConfig.Request,
-                              response: ParameterConfig.Response) -> ParameterConfig.Response:
-        """Service server that receives commands, returns responses, and executes instructions."""
-        response.success = True    # success until proven otherwise
-        response.cmd = request.data
-        msg_split = (request.data).split(' ')
-        code = msg_split[0]
-
-        try:
-            # Using both command and report codes so that the commands themselves
-            # can be just fed into it with ease
-            if code == 'R21' or code == 'R23' or code == 'F22' or code == 'F23':
-                self.set_value(int(msg_split[1][1:]), int(msg_split[2][1:]))
-                response.value = 0
-                return response
-            if code == 'F21':
-                response.value = self.get_value(int(msg_split[1][1:]))
-                return response
-
-            # Requests with non farmbot commands
-            if code == 'S':  # Format S PARAM_INDEX PARAM_VALUE. e.g. S 2 1
-                self.set_value(int(msg_split[1]), int(msg_split[2]))
-
-                return response
-            if code == 'G':
-                response.value = self.get_value(int(msg_split[1]))
-                return response
-        except (IndexError, ValueError, KeyError) as e:
-            self.node.get_logger().warn(f'Could not process parameter request '
-                                        f'"{request.data}": {e!r}')
-            response.success = False
-            response.value = 0
-            return response
-        if code == 'MAP':
-            response.value = 0
-            self.map_cmd.sort = False
-            self.map_cmd.reindex = False
-            self.map_cmd.back_up = False
-            self.map_cmd.update = True
-            self.map_cmd.update_info = [
-                'X ' + str(
-                    self.param_vals[self.params.MOVEMENT_AXIS_NR_STEPS_X]
-                    / self.param_vals[self.params.MOVEMENT_STEP_PER_MM_X]
-                ),
-                'Y ' + str(
-                    self.param_vals[self.params.MOVEMENT_AXIS_NR_STEPS_Y]
-                    / self.param_vals[self.params.MOVEMENT_STEP_PER_MM_Y]
-                ),
-                'Z ' + str(
-                    self.param_vals[self.params.MOVEMENT_AXIS_NR_STEPS_Z]
-                    / self.param_vals[self.params.MOVEMENT_STEP_PER_MM_Z]
-                ),
-            ]
-
-            response.cmd = ('MAP ' + self.map_cmd.update_info[0]
-                            + ' ' + self.map_cmd.update_info[1]
-                            + ' ' + self.map_cmd.update_info[2])
-
-            self.map_cmd_pub.publish(self.map_cmd)
-            return response
-        if code == 'SAVE':
-            response.value = 0
-            YAMLHandler.save_to_yaml(self.param_vals, self.config_path, self.active_config)
-            self.node.get_logger().info('Saving current parameter configuration at'
-                                        f'{YAMLHandler.join_path(self.config_path,
-                                                                 self.active_config)}')
-            return response
-
-        # If the service gets here, the request could not be processed
-        self.node.get_logger().warn('Config managing service could not process'
-                                    f'request {request.data}')
-        response.success = False
-        response.value = 0
-        return response
+    @property
+    def param_vals(self) -> dict:
+        """Return the parameter table the encoder validates and scales against."""
+        return self.table.values
 
     def set_value(self, param: int, value: int):
         """Set the selected parameter to the parsed value."""
         self.node.get_logger().info(f'Set parameter {param} to {value}')
-        self.param_vals[param] = value
+        self.table.set_value(param, value)
 
     def get_value(self, param: int) -> int:
         """Return a value of a selected parameter."""
-        return self.param_vals[param]
+        return self.table.get_value(param)
+
+    def pending_writes(self) -> list[tuple[int, int]]:
+        """Return the parameters that still differ from the firmware defaults."""
+        return self.table.pending_writes()
+
+    def writes_for_goal(self, goal) -> list[tuple[int, int]]:
+        """
+        Return the (param, value) pairs a LoadingParameters goal asks for.
+
+        A named profile is loaded and diffed against the firmware defaults; otherwise
+        the goal's own params/values are used as given.
+        """
+        if not goal.profile:
+            return list(zip(goal.params, goal.values))
+
+        profile = self.table.load_profile(goal.profile)
+        self.node.get_logger().info(f'Loading the {profile} configuration')
+        return self.table.pending_writes()
+
+    async def load_params_execute_callback(
+            self, goal_handle: ServerGoalHandle) -> LoadingParameters.Result:
+        """
+        Execute a loading parameters action.
+
+        Resolves the goal into the parameters to write, then writes them one by one,
+        reporting the progress as feedback.
+
+        Args:
+            goal_handle {ServerGoalHandle}: Accepted action goal.
+        """
+        result = LoadingParameters.Result()
+
+        try:
+            writes = self.writes_for_goal(goal_handle.request)
+        except (ValueError, YAMLError) as e:
+            result.code = LoadingParameters.Result.REJECTED
+            result.message = str(e)
+            goal_handle.abort()
+            return result
+
+        result.code, result.message = await self.write_parameters(writes, goal_handle)
+
+        if result.code == LoadingParameters.Result.OK:
+            goal_handle.succeed()
+        else:
+            goal_handle.abort()
+        return result
+
+    async def write_parameters(self, writes: list, goal_handle=None) -> tuple[int, str]:
+        """
+        Write parameters to the Farmduino one at a time, publishing the progress.
+
+        Args:
+            writes {list}: (parameter, value) pairs to write.
+            goal_handle {ServerGoalHandle}: Goal to publish feedback on, if any.
+        """
+        total = len(writes)
+        if not total:
+            return LoadingParameters.Result.OK, 'the firmware already matches the config'
+
+        self.loading = True
+        self.node.get_logger().info(f'Parameters to load: {total}')
+
+        try:
+            for done, (param, value) in enumerate(writes, start=1):
+                request = WriteParameter.Request()
+                request.param = param
+                request.value = value
+                request.during_calibration = False
+
+                try:
+                    fcode = self.encoder.encode_write_parameter(request, self.param_vals)
+                except EncodeError as e:
+                    return LoadingParameters.Result.REJECTED, str(e)
+
+                success, message, _ = await self.run_command(fcode)
+                if not success:
+                    return (LOAD_FAILURES.get(message, LoadingParameters.Result.REJECTED),
+                            f'{message} triggered by the parameter {param} '
+                            f'and its value {value}')
+
+                if goal_handle is not None:
+                    feedback = LoadingParameters.Feedback()
+                    feedback.progress = done / total
+                    goal_handle.publish_feedback(feedback)
+                self.node.get_logger().info(f'Loading parameter progression: '
+                                            f'{done / total * 100:.2f} %')
+        finally:
+            self.loading = False
+
+        return LoadingParameters.Result.OK, f'{total} parameters loaded'
+
+    def schedule_startup_load(self):
+        """Reload the configuration onto the Farmduino after a firmware restart."""
+        if self.node.executor is None:
+            self.node.get_logger().warn('No executor available, skipping the parameter load.')
+            return
+
+        self.node.executor.create_task(self.startup_load())
+
+    async def startup_load(self):
+        """Write the stored config back to a freshly booted firmware and log the outcome."""
+        code, message = await self.write_parameters(self.pending_writes())
+        if code == LoadingParameters.Result.OK:
+            self.node.get_logger().info(f'Parameter loading complete! {message}')
+        else:
+            self.node.get_logger().error(f'Parameter loading failed: {message}')
+
+    def save_config_server_cb(self, request: Trigger.Request,
+                              response: Trigger.Response) -> Trigger.Response:
+        """Server saves the current parameter table for the next run."""
+        try:
+            path = self.table.save()
+        except YAMLError as e:
+            self.node.get_logger().warn(f'Could not save the parameter config: {e}')
+            response.success = False
+            response.message = str(e)
+            return response
+
+        self.node.get_logger().info(f'Saved the current parameter configuration at {path}')
+        response.success = True
+        response.message = path
+        return response
+
+    def map_dimensions_server_cb(self, request: Trigger.Request,
+                                 response: Trigger.Response) -> Trigger.Response:
+        """Server reports the bed dimensions the parameters imply to the map."""
+        lengths = self.table.axis_lengths()
+        if len(lengths) != 3:
+            response.success = False
+            response.message = 'axis lengths are not set in the parameter configuration'
+            return response
+
+        map_cmd = MapCommand()
+        map_cmd.update = True
+        map_cmd.update_info = [f'{axis} {length}' for axis, length in lengths.items()]
+        self.map_cmd_pub.publish(map_cmd)
+
+        response.success = True
+        response.message = ' '.join(map_cmd.update_info)
+        return response

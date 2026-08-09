@@ -7,22 +7,21 @@ controller. It handles service and action requests, converts commands into
 FCode, sends them to the Farmduino over the serial connection, and processes
 received messages to provide feedback and update the system state.
 """
+from farmbot_hardware_comm.command_servers import CommandServers
 from farmbot_hardware_comm.config_managers import ConfigServer
 from farmbot_hardware_comm.fcode_encoder import Encoder
+from farmbot_hardware_comm.led_panel import LedPanel
 from farmbot_hardware_comm.modules.exceptions import EncodeError, YAMLError
 from farmbot_hardware_comm.modules.yaml_handler import YAMLHandler
 
 from farmbot_interfaces.action import HomeAxes, LoadingParameters, MoveGantry
-from farmbot_interfaces.srv import (ConfigurePin, LedPanelHandler, MoveServo,
-                                    ReadI2C, ReadParameter, ReadPin, SetI2C,
-                                    Watering, WriteParameter, WritePin)
 
 from geometry_msgs.msg import PointStamped
 
 import rclpy
 from rclpy.action import ActionServer, GoalResponse
 from rclpy.action.server import ServerGoalHandle
-from rclpy.callback_groups import MutuallyExclusiveCallbackGroup, ReentrantCallbackGroup
+from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
 from rclpy.task import Future
@@ -51,7 +50,6 @@ class SerialController(Node):
         super().__init__('SerialController')
 
         self.goal_handle = None
-        self.load_goal_handle = None
 
         self.declare_parameter('serial_port', rclpy.Parameter.Type.STRING)
         self.declare_parameter('serial_speed', rclpy.Parameter.Type.INTEGER)
@@ -94,56 +92,35 @@ class SerialController(Node):
         config_path = YAMLHandler.join_path(ws_path, folder_config_name)
         YAMLHandler.make_dir(config_path)
 
-        if not YAMLHandler.existing_path(YAMLHandler.join_path(config_path, 'activeConfig.yaml')):
-            self.get_logger().warn('The activeConfig.yaml file was not found. An activeConfig'
-                                   f' file must be present at the following path: {config_path}'
-                                   ' Please use the C_1 command (see the documentation).')
-
         if not YAMLHandler.existing_path(YAMLHandler.join_path(config_path, 'active_map.yaml')):
             self.get_logger().warn('The active_map.yaml file was not found at '
                                    f'{config_path}. Gantry boundary checking stays disabled '
                                    'until the map is set up.')
 
         # Initialising modules
-        self.config_server = ConfigServer(self, config_path)
         self.fcode_encoder = Encoder(config_path)
+        self.config_server = ConfigServer(self, config_path,
+                                          run_command=self._run_command,
+                                          encoder=self.fcode_encoder)
 
         self.directory = YAMLHandler.get_directory_package('farmbot_hardware_comm', 'config')
 
         try:
             self.non_immediate_cmds = YAMLHandler.load_yaml(self.directory,
                                                             'CommandsResponses.yaml')
-            self.fb_panel = YAMLHandler.load_yaml(self.directory, 'FarmbotPanel.yaml')
+            fb_panel = YAMLHandler.load_yaml(self.directory, 'FarmbotPanel.yaml')
         except YAMLError as e:
             self.get_logger().warn(f'yaml error: {e}')
             return
 
-        self.led_client = self.create_client(LedPanelHandler, 'set_led')
-        # Initialise the LED states
-        self.switch_led(self.fb_panel['estop_led'], self.fb_panel['led_on'])
-        self.switch_led(self.fb_panel['unlock_led'], self.fb_panel['led_on'])
+        self.led_panel = LedPanel(self, fb_panel)
+        self.led_panel.show_ready()
 
         self.cmd_callback_group = ReentrantCallbackGroup()
 
-        # Initialise device servers
-        self.watering_server = self.create_service(Watering, 'watering',
-                                                   self.watering_command_server,
-                                                   callback_group=self.cmd_callback_group)
-        self.read_i2c_server = self.create_service(ReadI2C, 'read_i2c',
-                                                   self.read_i2c_command_server,
-                                                   callback_group=self.cmd_callback_group)
-        self.set_i2c_server = self.create_service(SetI2C, 'set_i2c',
-                                                  self.set_i2c_command_server,
-                                                  callback_group=self.cmd_callback_group)
-        self.configure_pin_server = self.create_service(ConfigurePin, 'configure_pin',
-                                                        self.configure_pin_command_server,
-                                                        callback_group=self.cmd_callback_group)
-        self.read_pin_server = self.create_service(ReadPin, 'read_pin',
-                                                   self.read_pin_command_server,
-                                                   callback_group=self.cmd_callback_group)
-        self.write_pin_server = self.create_service(WritePin, 'write_pin',
-                                                    self.write_pin_command_server,
-                                                    callback_group=self.cmd_callback_group)
+        self.command_servers = CommandServers(self, self.fcode_encoder, self._run_command,
+                                              lambda: self.config_server.param_vals,
+                                              self.cmd_callback_group)
 
         # Initialise motor servers
         self.move_gantry_server = ActionServer(self, MoveGantry, 'move_gantry',
@@ -154,26 +131,14 @@ class SerialController(Node):
                                              goal_callback=self.goal_callback,
                                              execute_callback=self.home_execute_callback,
                                              callback_group=self.cmd_callback_group)
-        self.move_servo_server = self.create_service(MoveServo, 'move_servo',
-                                                     self.move_servo_command_server,
-                                                     callback_group=self.cmd_callback_group)
+        self.load_params_server = ActionServer(self, LoadingParameters, 'loading_params',
+                                               goal_callback=self.goal_callback,
+                                               execute_callback=(
+                                                   self.config_server
+                                                   .load_params_execute_callback),
+                                               callback_group=self.cmd_callback_group)
 
         # Initialise state servers
-        self.read_parameter_server = self.create_service(ReadParameter, 'read_parameter',
-                                                         self.read_parameter_command_server,
-                                                         callback_group=self.cmd_callback_group)
-        self.write_parameter_server = self.create_service(WriteParameter, 'write_parameter',
-                                                          self.write_parameter_command_server,
-                                                          callback_group=self.cmd_callback_group)
-        self.list_all_parameter_server = self.create_service(
-            Trigger, 'list_all_parameters', self.list_all_command_server,
-            callback_group=self.cmd_callback_group)
-        self.load_params_server = ActionServer(self, LoadingParameters, 'loading_params',
-                                               goal_callback=self.load_goal_callback,
-                                               execute_callback=self.load_params_execute_callback,
-                                               handle_accepted_callback=self.handle_load_callback,
-                                               callback_group=self.cmd_callback_group)
-        self.result_loading = LoadingParameters.Result()
         self.estop_trigger_server = self.create_service(Trigger, 'estop',
                                                         self.estop_command_server,
                                                         callback_group=self.cmd_callback_group)
@@ -183,18 +148,6 @@ class SerialController(Node):
         self.abort_trigger_server = self.create_service(Trigger, 'abort',
                                                         self.abort_command_server,
                                                         callback_group=self.cmd_callback_group)
-        self.end_stop_trigger_server = self.create_service(Trigger, 'end_stop',
-                                                           self.end_stop_command_server,
-                                                           callback_group=self.cmd_callback_group)
-        self.sw_version_trigger_server = self.create_service(
-            Trigger, 'sw_version', self.sw_version_command_server,
-            callback_group=self.cmd_callback_group)
-        self.curr_pos_trigger_server = self.create_service(Trigger, 'curr_pos',
-                                                           self.curr_position_command_server,
-                                                           callback_group=self.cmd_callback_group)
-
-        # Initialise WriteParameter client
-        self.write_param_client = self.create_client(WriteParameter, 'write_parameter')
 
         # Initialise publishers
         self.fb_position = PointStamped()
@@ -233,147 +186,12 @@ class SerialController(Node):
         return result[0], result[1], result[2]
 
     # Callbacks
-    async def watering_command_server(self, request: Watering.Request,
-                                      response: Watering.Response) -> Watering.Response:
-        """
-        Handle a watering command service request.
-
-        Encodes the watering request into FCode and sends it
-        to the FarmBot command sender.
-
-        Args:
-            request {Watering.Request}: Watering command parameters.
-            response {Watering.Response}: Service response object.
-        """
-        try:
-            fcode = self.fcode_encoder.encode_watering(request)
-        except EncodeError as e:
-            response.success = False
-            response.message = str(e)
-            return response
-
-        response.success, response.message, _ = await self._run_command(fcode)
-        return response
-
-    async def read_i2c_command_server(self, request: ReadI2C.Request,
-                                      response: ReadI2C.Response) -> ReadI2C.Response:
-        """
-        Handle a i2c reading command service request.
-
-        Encodes the i2c reading request into FCode and sends it
-        to the FarmBot command sender.
-
-        Args:
-            request {ReadI2C.Request}: ReadI2C command parameters.
-            response {ReadI2C.Response}: Service response object.
-        """
-        try:
-            fcode = self.fcode_encoder.encode_read_i2c(request)
-        except EncodeError as e:
-            response.success = False
-            response.message = str(e)
-            response.value = -1
-            return response
-
-        response.success, response.message, response.value = await self._run_command(fcode)
-        return response
-
-    async def set_i2c_command_server(self, request: SetI2C.Request,
-                                     response: SetI2C.Response) -> SetI2C.Response:
-        """
-        Handle a i2c setting command service request.
-
-        Encodes the i2c setting request into FCode and sends it
-        to the FarmBot command sender.
-
-        Args:
-            request {SetI2C.Request}: SetI2C command parameters.
-            response {SetI2C.Response}: Service response object.
-        """
-        try:
-            fcode = self.fcode_encoder.encode_set_i2c(request)
-        except EncodeError as e:
-            response.success = False
-            response.message = str(e)
-            return response
-
-        response.success, response.message, _ = await self._run_command(fcode)
-        return response
-
-    async def configure_pin_command_server(
-            self, request: ConfigurePin.Request,
-            response: ConfigurePin.Response) -> ConfigurePin.Response:
-        """
-        Handle a configure pin command service request.
-
-        Encodes the configure pin request into FCode and sends it
-        to the FarmBot command sender.
-
-        Args:
-            request {ConfigurePin.Request}: ConfigurePin command parameters.
-            response {ConfigurePin.Response}: Service response object.
-        """
-        try:
-            fcode = self.fcode_encoder.encode_configure_pin(request)
-        except EncodeError as e:
-            response.success = False
-            response.message = str(e)
-            return response
-
-        response.success, response.message, _ = await self._run_command(fcode)
-        return response
-
-    async def read_pin_command_server(self, request: ReadPin.Request,
-                                      response: ReadPin.Response) -> ReadPin.Response:
-        """
-        Handle a read pin command service request.
-
-        Encodes the read pin request into FCode and sends it
-        to the FarmBot command sender.
-
-        Args:
-            request {ReadPin.Request}: ReadPin command parameters.
-            response {ReadPin.Response}: Service response object.
-        """
-        try:
-            fcode = self.fcode_encoder.encode_read_pin(request)
-        except EncodeError as e:
-            response.success = False
-            response.message = str(e)
-            response.value = -1
-            return response
-
-        response.success, response.message, response.value = await self._run_command(fcode)
-        return response
-
-    async def write_pin_command_server(self, request: WritePin.Request,
-                                       response: WritePin.Response) -> WritePin.Response:
-        """
-        Handle a write pin command service request.
-
-        Encodes the write pin request into FCode and sends it
-        to the FarmBot command sender.
-
-        Args:
-            request {WritePin.Request}: WritePin command parameters.
-            response {WritePin.Response}: Service response object.
-        """
-        try:
-            fcode = self.fcode_encoder.encode_write_pin(request)
-        except EncodeError as e:
-            response.success = False
-            response.message = str(e)
-            return response
-
-        response.success, response.message, _ = await self._run_command(fcode)
-        return response
-
     def goal_callback(self, goal_request) -> GoalResponse:
         """
         Check whether an incoming action goal can be accepted.
 
-        A goal is rejected if an emergency stop or abort command is active,
-        or if another command is already being executed.
+        A goal is rejected if an emergency stop or abort command is active, if a
+        parameter load is running, or if another command is already being executed.
         Otherwise, the goal is accepted.
 
         Args:
@@ -383,6 +201,10 @@ class SerialController(Node):
 
         if self.estop_active.data or self.abort_active.data:
             self.get_logger().info('Goal rejected because an estop or abort command is running')
+            return GoalResponse.REJECT
+
+        if self.config_server.loading:
+            self.get_logger().info('Goal rejected: a parameter load is running')
             return GoalResponse.REJECT
 
         if self.code_response is not None and not self.code_response.done():
@@ -490,201 +312,6 @@ class SerialController(Node):
 
         return result
 
-    async def move_servo_command_server(self, request: MoveServo.Request,
-                                        response: MoveServo.Response) -> MoveServo.Response:
-        """
-        Handle a move servo command service request.
-
-        Encodes the move servo request into FCode and sends it
-        to the FarmBot command sender.
-
-        Args:
-            request {MoveServo.Request}: MoveServo command parameters.
-            response {MoveServo.Response}: Service response object.
-        """
-        try:
-            fcode = self.fcode_encoder.encode_move_servo(request)
-        except EncodeError as e:
-            response.success = False
-            response.message = str(e)
-            return response
-
-        response.success, response.message, _ = await self._run_command(fcode)
-        return response
-
-    async def read_parameter_command_server(
-            self, request: ReadParameter.Request,
-            response: ReadParameter.Response) -> ReadParameter.Response:
-        """
-        Handle a read parameter command service request.
-
-        Encodes the read parameter request into FCode and sends it
-        to the FarmBot command sender.
-
-        Args:
-            request {ReadParameter.Request}: ReadParameter command parameters.
-            response {ReadParameter.Response}: Service response object.
-        """
-        try:
-            fcode = self.fcode_encoder.encode_read_parameter(request,
-                                                             self.config_server.param_vals)
-        except EncodeError as e:
-            response.success = False
-            response.message = str(e)
-            response.value = -1
-            return response
-
-        response.success, response.message, response.value = await self._run_command(fcode)
-        return response
-
-    async def write_parameter_command_server(
-            self, request: WriteParameter.Request,
-            response: WriteParameter.Response) -> WriteParameter.Response:
-        """
-        Handle a write parameter command service request.
-
-        Encodes the write parameter request into FCode and sends it
-        to the FarmBot command sender.
-
-        Args:
-            request {WriteParameter.Request}: WriteParameter command parameters.
-            response {WriteParameter.Response}: Service response object.
-        """
-        try:
-            fcode = self.fcode_encoder.encode_write_parameter(request,
-                                                              self.config_server.param_vals)
-        except EncodeError as e:
-            response.success = False
-            response.message = str(e)
-            return response
-
-        response.success, response.message, _ = await self._run_command(fcode)
-        return response
-
-    async def list_all_command_server(self, request: Trigger.Request,
-                                      response: Trigger.Response) -> Trigger.Response:
-        """
-        Handle the list all parameter command service request.
-
-        Sends the F20 command to the FarmBot.
-
-        Args:
-            request {Trigger.Request}: Empty trigger request.
-            response {Trigger.Response}: Service response object.
-        """
-        response.success, response.message, _ = await self._run_command('F20')
-        return response
-
-    def load_goal_callback(self, goal_request) -> GoalResponse:
-        """
-        Check whether an incoming parameter loading goal can be accepted.
-
-        Args:
-            goal_request: Incoming action goal request.
-        """
-        if self.load_goal_handle is not None and self.load_goal_handle.is_active:
-            self.get_logger().info('Goal rejected: a parameter load is already running')
-            return GoalResponse.REJECT
-
-        return self.goal_callback(goal_request)
-
-    async def handle_load_callback(self, goal_handle: ServerGoalHandle):
-        """
-        Handle an accepted calibration parameter loading goal.
-
-        Initialises the loading context and starts the timer that processes the
-        pending parameters.
-        """
-        self.load_goal_handle = goal_handle
-        self.nb_params = len(goal_handle.request.params)
-
-        self.result_loading = LoadingParameters.Result()
-        self.result_loading.code = LoadingParameters.Result.REJECTED
-        self.result_loading.message = 'parameter loading did not complete'
-        self.load_param_timer = self.create_timer(1.0 / self.check_serial_freq, self.load_timer,
-                                                  callback_group=MutuallyExclusiveCallbackGroup())
-
-    def finish_load(self, code: int, message: str):
-        """
-        Record the outcome of a parameter load and hand it to the execute callback.
-
-        Args:
-            code {int}: LoadingParameters result code describing the outcome.
-            message {str}: Human readable detail attached to the result.
-        """
-        self.load_param_timer.cancel()
-        self.result_loading.code = code
-        self.result_loading.message = message
-        self.load_goal_handle.execute()
-
-    async def load_timer(self):
-        """
-        Timer callback that advances the calibration parameter loading.
-
-        Writes the next pending parameter, publishes loading progress feedback, and
-        completes the action when all parameters have been processed or if a loading
-        error occurs.
-        """
-        if self.load_param_timer.is_canceled():
-            return
-
-        goal_handle = self.load_goal_handle
-
-        if not goal_handle.request.params:
-            self.finish_load(LoadingParameters.Result.OK, '')
-            return
-
-        if not self.write_param_client.service_is_ready():
-            self.get_logger().error('WriteParameter server not available! '
-                                    'Parameter loading aborted.')
-            self.finish_load(LoadingParameters.Result.REJECTED,
-                             'write_parameter server unavailable')
-            return
-
-        request = WriteParameter.Request()
-        request.param = goal_handle.request.params.pop(0)
-        request.value = goal_handle.request.values.pop(0)
-
-        request.during_calibration = False
-
-        future = self.write_param_client.call_async(request=request)
-        service_response = await future
-        if not service_response.success:
-            if service_response.message == 'firmware error':
-                self.finish_load(LoadingParameters.Result.FIRMWARE_ERROR,
-                                 f'{service_response.message} triggered by the parameter '
-                                 f'{request.param} and its value {request.value}')
-            elif service_response.message == 'aborted':
-                self.finish_load(LoadingParameters.Result.ABORTED, service_response.message)
-            elif service_response.message == 'estopped':
-                self.finish_load(LoadingParameters.Result.ESTOPPED, service_response.message)
-            else:
-                self.finish_load(LoadingParameters.Result.REJECTED, service_response.message)
-            return
-
-        feedback = LoadingParameters.Feedback()
-        feedback.progress = (1 - (len(goal_handle.request.params) / self.nb_params))
-        goal_handle.publish_feedback(feedback)
-
-    async def load_params_execute_callback(
-            self, goal_handle: ServerGoalHandle) -> LoadingParameters.Result:
-        """
-        Execute a loading parameters action.
-
-        Reports the outcome recorded by the loading timer, which owns the actual
-        parameter writing.
-
-        Args:
-            goal_handle {ServerGoalHandle}: Accepted action goal.
-        """
-        self.load_param_timer.cancel()
-        if self.result_loading.code == LoadingParameters.Result.OK:
-            goal_handle.succeed()
-            return self.result_loading
-
-        goal_handle.abort()
-        return self.result_loading
-
     async def estop_command_server(self, request: Trigger.Request,
                                    response: Trigger.Response) -> Trigger.Response:
         """
@@ -698,8 +325,7 @@ class SerialController(Node):
         """
         self.farmbot_cmd_sender('E')
 
-        self.switch_led(self.fb_panel['estop_led'], self.fb_panel['led_off'])
-        self.switch_led(self.fb_panel['unlock_led'], self.fb_panel['led_flashing'])
+        self.led_panel.show_estopped()
         self.estop_active.data = True
         self.estop_active_pub.publish(self.estop_active)
 
@@ -720,8 +346,7 @@ class SerialController(Node):
         response.success, response.message, _ = await self._run_command('F09')
 
         if response.success:
-            self.switch_led(self.fb_panel['estop_led'], self.fb_panel['led_on'])
-            self.switch_led(self.fb_panel['unlock_led'], self.fb_panel['led_on'])
+            self.led_panel.show_ready()
             self.estop_active.data = False
             self.estop_active_pub.publish(self.estop_active)
             self.abort_active.data = False
@@ -748,48 +373,6 @@ class SerialController(Node):
             self.abort_active_pub.publish(self.abort_active)
 
         response.success = True
-        return response
-
-    async def end_stop_command_server(self, request: Trigger.Request,
-                                      response: Trigger.Response) -> Trigger.Response:
-        """
-        Handle the end stops command service request.
-
-        Sends the end stops command to the FarmBot command sender.
-
-        Args:
-            request {Trigger.Request}: Empty trigger request.
-            response {Trigger.Response}: Service response object.
-        """
-        response.success, response.message, _ = await self._run_command('F81')
-        return response
-
-    async def sw_version_command_server(self, request: Trigger.Request,
-                                        response: Trigger.Response) -> Trigger.Response:
-        """
-        Handle the software version command service request.
-
-        Sends the software version command to the FarmBot command sender.
-
-        Args:
-            request {Trigger.Request}: Empty trigger request.
-            response {Trigger.Response}: Service response object.
-        """
-        response.success, response.message, _ = await self._run_command('F83')
-        return response
-
-    async def curr_position_command_server(self, request: Trigger.Request,
-                                           response: Trigger.Response) -> Trigger.Response:
-        """
-        Handle the current position command service request.
-
-        Sends the current position command to the FarmBot command sender.
-
-        Args:
-            request {Trigger.Request}: Empty trigger request.
-            response {Trigger.Response}: Service response object.
-        """
-        response.success, response.message, _ = await self._run_command('F82')
         return response
 
     def farmbot_cmd_sender(self, cmd: str):
@@ -847,7 +430,7 @@ class SerialController(Node):
         # Record the message
         self.serial_feedback.data = message
         if message == 'R99 ARDUINO STARTUP COMPLETE':
-            self.config_server.retrieve_config()
+            self.config_server.schedule_startup_load()
 
         code = (message).split(' ')
 
@@ -962,46 +545,6 @@ class SerialController(Node):
         return 1.0
 
     # Service Client
-    def switch_led(self, led_pin: int, state: bool):
-        """
-        Send a request to switch an LED on or off.
-
-        The request is sent asynchronously. If the LED handling service is not
-        available, the request is ignored to avoid blocking the executor.
-
-        Args:
-            led_pin {int}: GPIO pin of the LED to control.
-            state {bool}: Desired LED state (True for on, False for off).
-        """
-        # Never block the executor waiting for the LED server (estop path!)
-        if not self.led_client.service_is_ready():
-            self.get_logger().warn('LED Handling Server not available!')
-            return
-
-        request = LedPanelHandler.Request()
-        request.led_pin = led_pin
-        request.state = state
-
-        future = self.led_client.call_async(request=request)
-        future.add_done_callback(self.led_panel_callback)
-
-    def led_panel_callback(self, future):
-        """
-        Handle the response from the LED handling service.
-
-        Logs a warning if the service reports a failure or an error if the service
-        call itself fails.
-
-        Args:
-            future: Future containing the service response.
-        """
-        try:
-            response = future.result()
-            if not response:
-                self.get_logger().warn('Failure in LED Panel Handling!')
-        except Exception as e:
-            self.get_logger().error('Service call failed %r' % (e, ))
-
     def destroy_node(self):
         """Close the serial when the node is destroyed."""
         self.ser.close()
