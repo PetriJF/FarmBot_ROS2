@@ -100,28 +100,30 @@ class PlantRadiusNode(Node):
             return response
 
         plant_radius = radius_px * self.mm_per_pixel + self.plant_radius_padding_mm
+        response.plant_radius = plant_radius
 
-        self.update_map(request.index, plant_radius)
+        if not await self.update_map(request.index, plant_radius):
+            response.success = False
+            response.message = 'Plant radius measured but map update failed'
+            return response
 
         response.success = True
         response.message = 'Plant radius measured'
-        response.plant_radius = plant_radius
         return response
 
-    def update_map(self, index: int, plant_radius: float):
+    async def update_map(self, index: int, plant_radius: float) -> bool:
         """Push the measured radius to the map handler for persistence."""
         if not self.map_client.service_is_ready():
             self.get_logger().warn('Map service not available; radius measurement not saved')
-            return
+            return False
 
         request = StringRepReq.Request()
         request.data = f'PlantRadius {index} {plant_radius}'
-        self.map_client.call_async(request).add_done_callback(self.update_map_callback)
-
-    def update_map_callback(self, future):
-        """Log the map handler's response to the radius update."""
-        if future.result().data != 'SUCCESS':
-            self.get_logger().warn(f"Map update failed: '{future.result().data}'")
+        result = await self.map_client.call_async(request)
+        if result.data != 'SUCCESS':
+            self.get_logger().warn(f"Map update failed: '{result.data}'")
+            return False
+        return True
 
 
 def main(args=None):

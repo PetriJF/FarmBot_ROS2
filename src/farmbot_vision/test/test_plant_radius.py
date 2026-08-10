@@ -1,7 +1,10 @@
 """Unit tests for the plant radius measurement function, run without rclpy."""
+import asyncio
+from types import SimpleNamespace
+
 import cv2
 
-from farmbot_vision.plant_radius import green_mask, measure_plant_radius_px
+from farmbot_vision.plant_radius import green_mask, measure_plant_radius_px, PlantRadiusNode
 
 import numpy as np
 
@@ -41,3 +44,45 @@ def test_measure_plant_radius_no_green_returns_none():
     image = np.zeros((480, 640, 3), dtype=np.uint8)
 
     assert measure_plant_radius_px(_mask_for(image), min_area_px=100) is None
+
+
+def test_measure_callback_reports_map_update_failure():
+    """A measured radius is not a successful pipeline result unless it is saved."""
+    image = np.zeros((100, 100, 3), dtype=np.uint8)
+    cv2.circle(image, (50, 50), 20, GREEN_BGR, -1)
+
+    class CaptureClient:
+        """Return a successful synthetic camera capture."""
+
+        @staticmethod
+        def service_is_ready():
+            """Report that the synthetic service is available."""
+            return True
+
+        @staticmethod
+        async def call_async(_request):
+            """Return a tightly packed bgr8 image like standard_camera does."""
+            image_msg = SimpleNamespace(data=image.tobytes(), height=100, width=100)
+            return SimpleNamespace(success=True, message='', image=image_msg)
+
+    async def failed_map_update(_index, _radius):
+        """Simulate a rejected map update."""
+        return False
+
+    node = SimpleNamespace(
+        capture_client=CaptureClient(),
+        hsv_min=HSV_MIN,
+        hsv_max=HSV_MAX,
+        min_contour_area_px=100,
+        mm_per_pixel=0.5,
+        plant_radius_padding_mm=20.0,
+        update_map=failed_map_update,
+    )
+    request = SimpleNamespace(index=99)
+    response = SimpleNamespace(success=False, message='', plant_radius=0.0)
+
+    result = asyncio.run(PlantRadiusNode.measure_callback(node, request, response))
+
+    assert result.success is False
+    assert result.message == 'Plant radius measured but map update failed'
+    assert result.plant_radius > 20.0
