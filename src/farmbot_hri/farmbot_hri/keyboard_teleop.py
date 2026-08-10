@@ -36,8 +36,7 @@ class KeyboardTeleOp(Node):
 
         # Keyboard publisher
         self.cmd = String()
-        self.input_pub = self.create_publisher(String, 'input_topic', 10)
-        self.priority_pub = self.create_publisher(String, 'farmbot_command', 10)
+        self.input_pub = self.create_publisher(String, 'request_command', 10)
 
         # Initialisation of the service clients for priority commands (estop, abort, resume)
         self.estop_client = self.create_client(Trigger, 'estop')
@@ -101,16 +100,16 @@ class KeyboardTeleOp(Node):
         key is followed by more information that is to be used by the farmbot
         """
         # Valid Keys and Commands
-        valid_keys = ('E', 'R', '@', 'w', 'a', 's', 'd', '1', '2', '3', 'h', 'j', 'k', 'l', 'fh',
-                      'o', 'p',
-                      'T_1_1', 'T_1_2', 'T_2_1', 'T_2_2', 'T_3_1', 'T_3_2',
-                      'T_4_1', 'T_4_2', 'T_5_1', 'T_5_2', 'T_6_1', 'T_6_2',
-                      'P_3', 'P_4', 'P_5', 'P_9', 'I_0', 'I_1', 'I_2', 'I_3', 'I_4', 'D_C', 'D_L_1',
-                      'D_L_0', 'D_W_1', 'D_W_0', 'D_V_1', 'D_V_0',
-                      'H_0', 'H_1', 'D_S_C', 'P4_0', 'P4_1')
+        valid_keys = ('E', 'R', '@', 'SW_VER', 'w', 'a', 's', 'd', '1', '2', '3', 'h', 'j', 'k',
+                      'l', 'fh', 'o', 'p', 'T_1_1', 'T_1_2', 'T_2_1', 'T_2_2', 'T_3_1', 'T_3_2',
+                      'T_4_1', 'T_4_2', 'T_5_1', 'T_5_2', 'T_6_1', 'T_6_2', 'P_3', 'P_4', 'P_5',
+                      'P_9', 'I_0', 'I_1', 'I_2', 'I_3', 'I_4', 'D_C', 'D_L_1', 'D_L_0', 'D_W_1',
+                      'D_W_0', 'D_V_1', 'D_V_0', 'H_0', 'D_S_C', 'P4_0', 'P4_1')
+
         compound_cmds = ('C_0', 'P_1', 'P_2', 'C_1', 'C_2', 'T_1_0', 'T_2_0',
                          'T_3_0', 'T_4_0', 'T_5_0', 'T_6_0', 'S_1_0', 'S_2_0',
-                         'S_3_0', 'M', 'M_S', 'CONF', 'H_2', 'M_SV')
+                         'S_3_0', 'M', 'M_S', 'CONF', 'H_1', 'M_SV')
+
         # Record the user input
         user_input = input('\nEnter command: ')
 

@@ -142,7 +142,7 @@ class ConfigServer:
                                     log=lambda message: self.node.get_logger().warn(message))
         self.params = self.table.params
 
-        ### FIXME TODO these should be handled automatically and removed in the future
+        # FIXME TODO these should be handled automatically and removed in the future
         # Config Service Servers
         self.save_config_server = self.node.create_service(Trigger, 'save_parameter_config',
                                                            self.save_config_server_cb)
