@@ -1,8 +1,9 @@
-# Used to change the functions associated with each button
+# Used to change the functions associated with each button.
 
 button_a:                        ### Button associated with the command
   command_name: 'Homing'
   command: 'H_0'                 # Code of the command
+  abort: false                   # true = button A calls the abort trigger instead
 
 button_b:
   command_name: 'Calibration'
@@ -10,4 +11,4 @@ button_b:
 
 button_c:
   command_name: 'Watering'
-  command: 'P_4'
+  command: 'P_4'                  # TODO: Not yet fully implemented
