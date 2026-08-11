@@ -49,6 +49,7 @@ class SerialController(Node):
         """Node Constructor."""
         super().__init__('SerialController')
 
+        self.fb_startup = False
         self.goal_handle = None
 
         self.declare_parameter('serial_port', rclpy.Parameter.Type.STRING)
@@ -92,7 +93,8 @@ class SerialController(Node):
         self.config_path = YAMLHandler.join_path(ws_path, folder_config_name)
         YAMLHandler.make_dir(self.config_path)
 
-        if not YAMLHandler.existing_path(YAMLHandler.join_path(self.config_path, 'active_map.yaml')):
+        if not YAMLHandler.existing_path(YAMLHandler.join_path(self.config_path,
+                                                               'active_map.yaml')):
             self.get_logger().warn('The active_map.yaml file was not found at '
                                    f'{self.config_path}. Gantry boundary checking stays disabled '
                                    'until the map is set up.')
@@ -430,6 +432,7 @@ class SerialController(Node):
         # Record the message
         self.serial_feedback.data = message
         if message == 'R99 ARDUINO STARTUP COMPLETE':
+            self.fb_startup = True
             self.config_server.schedule_startup_load()
 
         code = (message).split(' ')
@@ -455,8 +458,9 @@ class SerialController(Node):
         """
         match code[0]:
             case 'R21' | 'R23':
-                self.get_logger().info(f'Updated parameter {code[1][1:]} to {code[2][1:]}')
-                self.config_server.set_value(int(float(code[1][1:])), int(float(code[2][1:])))
+                if self.fb_startup:
+                    self.get_logger().info(f'Updated parameter {code[1][1:]} to {code[2][1:]}')
+                    self.config_server.set_value(int(float(code[1][1:])), int(float(code[2][1:])))
             case 'R87':
                 if not self.estop_active.data:
                     self.estop_active.data = True

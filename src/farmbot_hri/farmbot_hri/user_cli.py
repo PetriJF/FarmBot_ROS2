@@ -7,7 +7,11 @@ demonstrates command priority handling versus sequencer commands.
 """
 import readline
 
+from farmbot_interfaces.action import LoadingParameters
+
 import rclpy
+from rclpy.action import ActionClient
+from rclpy.action.client import ClientGoalHandle
 from rclpy.node import Node
 
 from std_msgs.msg import String
@@ -42,6 +46,8 @@ class UserCLI(Node):
         self.estop_client = self.create_client(Trigger, 'estop')
         self.abort_client = self.create_client(Trigger, 'abort')
         self.resume_client = self.create_client(Trigger, 'resume')
+
+        self.loading_params_client = ActionClient(self, LoadingParameters, 'loading_params')
 
         self.line_number_list = []
 
@@ -104,19 +110,18 @@ class UserCLI(Node):
                       'l', 'fh', 'o', 'p', 'T_1_1', 'T_1_2', 'T_2_1', 'T_2_2', 'T_3_1', 'T_3_2',
                       'T_4_1', 'T_4_2', 'T_5_1', 'T_5_2', 'T_6_1', 'T_6_2', 'P_3', 'P_4', 'P_5',
                       'P_9', 'I_0', 'I_1', 'I_2', 'I_3', 'I_4', 'D_C', 'D_L_1', 'D_L_0', 'D_W_1',
-                      'D_W_0', 'D_V_1', 'D_V_0', 'H_0', 'D_S_C', 'P4_0', 'P4_1')
-
-        compound_cmds = ('C_0', 'P_1', 'P_2', 'C_1', 'C_2', 'T_1_0', 'T_2_0',
-                         'T_3_0', 'T_4_0', 'T_5_0', 'T_6_0', 'S_1_0', 'S_2_0',
-                         'S_3_0', 'M', 'M_S', 'CONF', 'H_1', 'M_SV')
+                      'D_W_0', 'D_V_1', 'D_V_0', 'H_0', 'D_S_C', 'P4_0', 'P4_1', 'C_0', 'P_1',
+                      'P_2', 'C_1', 'C_2', 'T_1_0', 'T_2_0', 'T_3_0', 'T_4_0', 'T_5_0', 'T_6_0',
+                      'S_1_0', 'S_2_0', 'S_3_0', 'M', 'M_S', 'CONF', 'H_1', 'M_SV')
 
         # Record the user input
         user_input = input('\nEnter command: ')
+        code = user_input.split(' ')
 
         line_number = 2  # By default, 2 lines are printed for each command (input + \n)
 
         # Send the user input to the farmbot controller if it is a valid key or command
-        if user_input in valid_keys or user_input.split(' ')[0] in compound_cmds:
+        if code[0] in valid_keys:
             # Send the command with priority at the UART controller
             if user_input == 'E':
                 self._send(self.estop_client)
@@ -130,6 +135,8 @@ class UserCLI(Node):
                 self._send(self.abort_client)
                 self.get_logger().info('Abort movement')
                 line_number += 1
+            elif code[0] == 'C_1':
+                self.send_load_params_goal(code[1])
             else:
                 self.cmd.data = user_input
                 self.input_pub.publish(self.cmd)
@@ -157,6 +164,102 @@ class UserCLI(Node):
 
             self.line_number_list.pop(0)
             print(f'\033[{sum(self.line_number_list)}B', end='')
+
+    def send_load_params_goal(self, config_name: str, params=[], values=[], on_done=None):
+        """
+        Send a LoadingParameters goal to the FarmBot action server.
+
+        The goal is configured with the specified profile name, parameter names, and corresponding
+        values, then sent asynchronously to the loading parameters action server.
+
+        Args:
+            config_name (str): Name of the configuration profile to load.
+            params (list[int]): List of parameter identifiers to load.
+            values (list[int]): List of values corresponding to the specified parameters.
+            on_done (callable, optional): Callback function called when the goal has been completed.
+        """
+        self._server_availability('LoadingParameters', self.loading_params_client)
+
+        goal = LoadingParameters.Goal()
+        goal.profile = config_name
+        goal.params = params
+        goal.values = values
+
+        self.move_gantry_client.send_goal_async(
+            goal,
+            feedback_callback=self.loading_params_feedback_callback
+        ).add_done_callback(lambda future: self.goal_response_callback(future, on_done))
+
+    def loading_params_feedback_callback(self, feedback_msg: LoadingParameters.Feedback):
+        """
+        Handle feedback messages from the LoadingParameters action server.
+
+        Logs the goal completion during the loading of the parameters.
+        """
+        percentage = feedback_msg.feedback.progress
+        self.node.get_logger().info(f'Loading progress: {percentage*100:.2f} %')
+
+    def goal_response_callback(self, future, on_done=None):
+        """
+        Handle the action server goal response.
+
+        Retrieves the result asynchronously when the goal is accepted; otherwise
+        signals completion with None (rejected or send failed) so a chained
+        caller (on_done) is never left waiting.
+        """
+        try:
+            goal_handle: ClientGoalHandle = future.result()
+        except Exception as error:  # send failed - report, never leave on_done hanging
+            self.node.get_logger().error(f'Goal send failed: {error}')
+            if on_done is not None:
+                on_done(None)
+            return
+
+        if goal_handle.accepted:
+            self.node.get_logger().info('Goal accepted')
+            goal_handle.get_result_async().add_done_callback(
+                lambda result_future: self.goal_result_callback(result_future, on_done)
+            )
+        else:
+            self.node.get_logger().warn('Goal rejected')
+            # A rejected goal never produces a result so signal it so on_done resolves.
+            if on_done is not None:
+                on_done(None)
+
+    def goal_result_callback(self, future, on_done=None):
+        """
+        Handle the final result from the action server.
+
+        Logs the returned status and forwards the result (or None on failure) to
+        the completion callback so a chained caller always resolves.
+        """
+        try:
+            result = future.result().result
+        except Exception as error:  # result failed - report, never leave on_done hanging
+            self.node.get_logger().error(f'Result retrieval failed: {error}')
+            if on_done is not None:
+                on_done(None)
+            return
+
+        cmd_status = result.code
+
+        if cmd_status == result.ESTOPPED:
+            self.node.get_logger().info('The current command has been stopped by a estop request')
+
+        elif cmd_status == result.ABORTED:
+            self.node.get_logger().info('The Farmbot has been paused.')
+
+        elif cmd_status == result.FIRMWARE_ERROR:
+            self.node.get_logger().info('The command has finished with due to a firmware error.')
+
+        elif cmd_status == result.REJECTED:
+            self.node.get_logger().info(f'The command has been rejected. {result.message}')
+
+        elif cmd_status == result.OK:
+            self.node.get_logger().info('The command was successful and has been completed')
+
+        if on_done is not None:
+            on_done(result)
 
 
 def main(args=None):

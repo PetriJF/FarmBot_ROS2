@@ -30,6 +30,7 @@ class FindHome(Step):
         except Exception as error:  # any client error - report, never hang the engine
             done(StepResult(Outcome.FAILED, str(error)))
 
+
 def find_home(x: bool = True, y: bool = True, z: bool = True) -> Sequence:
     """
     Build the axis homing sequence (registered as 'find_home').

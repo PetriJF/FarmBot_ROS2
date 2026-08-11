@@ -253,6 +253,7 @@ class ConfigServer:
                     feedback = LoadingParameters.Feedback()
                     feedback.progress = done / total
                     goal_handle.publish_feedback(feedback)
+                self.table.firmware_defaults[param] = value
                 self.node.get_logger().info(f'Loading parameter progression: '
                                             f'{done / total * 100:.2f} %')
         finally:

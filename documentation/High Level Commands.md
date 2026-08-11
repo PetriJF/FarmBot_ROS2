@@ -14,8 +14,8 @@ Movement commands are used to move the gantry relative to the home position.
 | 2    |             | Sets movement increment to 100mm                                                                |
 | 3    |             | Sets movement increment to 500mm                                                                |
 | H_0  |             | Go to Home Position                                                                             |
-| H_1  |             | Find all Home Positions                                                                         |
-| H_2  | X, Y or Z   | Find the home position for the specified axis. **Note that you can only select one at a time!** |
+| H_1  |          | Find all Home Positions                                                                                                        |
+|      | X, Y or Z   | Find the home position for the specified axis. **Note that you can only select one at a time!** |
 | M    | {x} {y} {z} | Move the gantry to the parsed position (e.g. M 100 11.2 -150.0)                               |
 | M_S  | {x} {y} {z} {s}| Move the gantry to the parsed position at given speed (%) (e.g. M_S 100 11.2 -150.0 80 )                               |
 # Farmbot Configuration and Status Commands
@@ -67,7 +67,6 @@ Commands that control the different devices connected to the farmbot.
 | ----- | -------- | --------------------------------------------------------------------- |
 | D_L_a |          | Turns on (**a** = 1) or off (**a** = 0) the LED strip. E.g. *D_L_1*   |
 | D_W_a |          | Turns on (**a** = 1) or off (**a** = 0) the water pump. E.g. *D_W_1*  |
-| D_WP |          | Triggers a 500 ms water pulse on the pump.|
 | D_V_a |          | Turns on (**a** = 1) or off (**a** = 0) the vacuum pump. E.g. *D_V_1* |
 | D_C   |          | Checks if there is a tool mounted on the UTP mount                    |
 | D_S_C |          | Check the Soil Sensor reading                                         |
