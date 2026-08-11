@@ -15,7 +15,7 @@ from farmbot_interfaces.srv import (ConfigurePin, MoveServo, ReadI2C, ReadParame
 class Encoder:
     """Encode incoming FarmBot service/action requests into FCode commands."""
 
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str, log):
         """Initialise the encoder class."""
         self.directory = YAMLHandler.get_directory_package('farmbot_hardware_comm', 'config')
         self.cmd_validation = YAMLHandler.load_yaml(self.directory, 'CommandValidation.yaml')
@@ -23,7 +23,7 @@ class Encoder:
         try:
             self.active_map = YAMLHandler.load_yaml(config_path, 'active_map.yaml')
         except YAMLError as e:
-            self.get_logger().warn(f'yaml error: {e}')
+            log.warn(f'yaml error: {e}')
             return
 
     # Water commands

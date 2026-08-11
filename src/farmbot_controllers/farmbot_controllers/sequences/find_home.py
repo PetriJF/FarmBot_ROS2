@@ -5,7 +5,6 @@ Defines the calibrate step and the sequence that uses it, and registers the sequ
 """
 from dataclasses import dataclass
 
-from farmbot_controllers.sequence_runner.registry import sequence
 from farmbot_controllers.sequence_runner.steps import Outcome, Sequence, Step, StepResult
 
 
@@ -31,8 +30,6 @@ class FindHome(Step):
         except Exception as error:  # any client error - report, never hang the engine
             done(StepResult(Outcome.FAILED, str(error)))
 
-
-@sequence('find_home')
 def find_home(x: bool = True, y: bool = True, z: bool = True) -> Sequence:
     """
     Build the axis homing sequence (registered as 'find_home').
