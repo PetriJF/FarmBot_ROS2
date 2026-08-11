@@ -89,17 +89,17 @@ class SerialController(Node):
             'R83': [True, '', -1],
         }
 
-        config_path = YAMLHandler.join_path(ws_path, folder_config_name)
-        YAMLHandler.make_dir(config_path)
+        self.config_path = YAMLHandler.join_path(ws_path, folder_config_name)
+        YAMLHandler.make_dir(self.config_path)
 
-        if not YAMLHandler.existing_path(YAMLHandler.join_path(config_path, 'active_map.yaml')):
+        if not YAMLHandler.existing_path(YAMLHandler.join_path(self.config_path, 'active_map.yaml')):
             self.get_logger().warn('The active_map.yaml file was not found at '
-                                   f'{config_path}. Gantry boundary checking stays disabled '
+                                   f'{self.config_path}. Gantry boundary checking stays disabled '
                                    'until the map is set up.')
 
         # Initialising modules
-        self.fcode_encoder = Encoder(config_path)
-        self.config_server = ConfigServer(self, config_path,
+        self.fcode_encoder = Encoder(self.config_path, log=self.get_logger)
+        self.config_server = ConfigServer(self, self.config_path,
                                           run_command=self._run_command,
                                           encoder=self.fcode_encoder)
 
@@ -468,8 +468,8 @@ class SerialController(Node):
                 self.fb_position.header.stamp = self.get_clock().now().to_msg()
                 self.fb_position_pub.publish(self.fb_position)
             case 'R88':
-                self.get_logger().warn('No configuration files were found in'
-                                       '/farmbot_data/local_config. Use the C_1 '
+                self.get_logger().warn('No configuration files were found in '
+                                       f'{self.config_path}. Use the C_1 '
                                        'command to create these files (see the documentation).')
 
     def handle_command_response(self, code: list):
