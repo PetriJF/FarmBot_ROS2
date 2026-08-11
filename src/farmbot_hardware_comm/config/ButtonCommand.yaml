@@ -3,6 +3,7 @@
 button_a:                        ### Button associated with the command
   command_name: 'Homing'
   command: 'H_0'                 # Code of the command
+  abort: false                   # true = button A calls the abort trigger instead
 
 button_b:
   command_name: 'Calibration'

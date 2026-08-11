@@ -16,8 +16,9 @@ from farmbot_interfaces.srv import LedPanelHandler
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile
 
-from std_msgs.msg import String
+from std_msgs.msg import Bool, String
 
 from std_srvs.srv import Trigger
 
@@ -68,6 +69,11 @@ class GPIOController(Node):
         self.estop_client = self.create_client(Trigger, 'estop')
         self.resume_client = self.create_client(Trigger, 'resume')
 
+        # If configured, Button A calls the abort trigger instead of sending its command
+        self.abort_button = bool(self.button['button_a'].get('abort', False))
+        if self.abort_button:
+            self.abort_client = self.create_client(Trigger, 'abort')
+
         # TODO: migrate high-level commands to language-agnostic service calls
         self.request_command_pub = self.create_publisher(String, 'request_command', 10)
 
@@ -83,6 +89,13 @@ class GPIOController(Node):
                                                 ).get_parameter_value().double_value
 
         self.leds_to_flash = []
+
+        # Button A is set to abort, use its LED to track the abort state
+        if self.abort_button:
+            GPIO.output(self.fb_panel['button_led_a'], GPIO.HIGH)
+            self.create_subscription(Bool, 'abort_active', self.abort_led,
+                                     QoSProfile(depth=1,
+                                                durability=DurabilityPolicy.TRANSIENT_LOCAL))
 
         self.led_flasher_timer = self.create_timer(1.0 / flashing_frequency, self.led_flasher)
 
@@ -174,6 +187,19 @@ class GPIOController(Node):
             GPIO.output(led_pin, GPIO.HIGH if self.flash_state else GPIO.LOW)
         self.flash_state = not self.flash_state
 
+    def abort_led(self, msg: Bool):
+        """
+        Flash button A's LED while an abort is latched, steady on otherwise.
+
+        Args:
+            msg {Bool}: Latched abort state from the serial controller.
+        """
+        if msg.data:
+            self.add_flashing_led(self.fb_panel['button_led_a'])
+        else:
+            self.remove_flashing_led(self.fb_panel['button_led_a'])
+            GPIO.output(self.fb_panel['button_led_a'], GPIO.HIGH)
+
     def estop_button_handler(self, channel):
         """
         Handle the emergency stop button event.
@@ -216,6 +242,19 @@ class GPIOController(Node):
 
             self.get_logger().info('RESET button pressed')
 
+    def call_trigger(self, name: str, client):
+        """
+        Send a Trigger request and report the result through client_callback.
+
+        Args:
+            name {str}: Server name, used for logging.
+            client {Client}: Trigger client to call.
+        """
+        if not client.wait_for_service(1.0):
+            self.get_logger().fatal(f'{name} Server not available!')
+            raise ServerError('GPIO controller failed: server unavailable')
+        client.call_async(request=Trigger.Request()).add_done_callback(self.client_callback)
+
     def client_callback(self, future):
         """
         Handle the response of a service client request.
@@ -256,6 +295,11 @@ class GPIOController(Node):
         button = self.button_channels.get(channel)
         if button is None:
             self.get_logger().warn(f'GPIO channel {channel} is not a mapped button. Ignored')
+            return
+
+        if button == 'button_a' and self.abort_button:
+            self.call_trigger('Abort', self.abort_client)
+            self.get_logger().info('ABORT button pressed')
             return
 
         self.get_logger().info(f"{button} pressed : {self.button[button]['command_name']} "
