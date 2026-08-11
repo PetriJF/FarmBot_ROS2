@@ -32,8 +32,18 @@ Optional local sanity check before touching hardware at all (these don't need a 
 colcon test --packages-select farmbot_vision --event-handlers console_direct+
 colcon test-result --verbose --test-result-base build/farmbot_vision
 ```
+📝 **Note down**: the `colcon test-result` summary line (e.g. "X tests, 0 failures") — evidence for
+the PR that doesn't depend on having a camera/plant in front of you.
 
 ## 2. Launch the three nodes
+
+**Why not just `ros2 launch farmbot_bringup standard.launch.py`?** It does start `standard_camera`
++ `plant_radius` together (behind `camera:='Standard'`, with the same defaults used below — see
+`src/farmbot_bringup/launch/standard.launch.py`), but it also unconditionally brings up
+`farmbot_controller`, `gpio_controller`, and — after a 10s delay — `serial_controller`, which
+needs a real Farmduino on `/dev/ttyACM0`. There's no launch arg to get just camera+map+plant_radius
+without those three, so launching the three nodes manually below is the actual minimal path, not
+a shortcut around bringup.
 
 Three terminals (each sourced as above):
 
@@ -73,6 +83,9 @@ ros2 service list -t | grep -E "camera/capture|camera/enable|map_info|plant_radi
 Expect `/camera/capture`, `/camera/enable`, `/map_info`, `/plant_radius`. If a
 service is missing, check that terminal's node for an error/crash before continuing.
 
+📝 **If something's missing**: note which service and what error appeared in its terminal —
+useful if the failure doesn't reproduce later.
+
 ## 4. Make sure there's a plant to test against
 
 ```bash
@@ -96,6 +109,9 @@ assigns the next free one, so confirm which index it actually got:
 grep -A2 identifiers ~/FarmBot_ROS2/farmbot_data/local_config/active_map.yaml
 ```
 Remember this index for cleanup in section 8.
+
+📝 **Note down**: the actual assigned index — the add-request's own `index` field is ignored, so
+you need the real one for every later step (6, 7, 8).
 
 ## 5. (Optional) Confirm the camera is framing correctly
 
@@ -139,11 +155,21 @@ The `plant_radius` value should match what the service call reported.
 Run it a couple more times without moving anything — values should be reasonably
 repeatable.
 
+📝 **Copy down, verbatim, for the PR:**
+- The full service response (all three fields) from at least one successful call
+- The 2-3 repeated `plant_radius` values, so a reviewer can see how tight the spread is
+- The matching `active_map.yaml` line confirming the write actually landed, not just the
+  service response
+
 ## 7. Check the failure paths (optional but useful)
 
 - **Bad index**: `ros2 service call /plant_radius farmbot_interfaces/srv/MeasurePlantRadius "{index: 9999}"` → expect `success=False, message='Plant radius measured but map update failed'` (this is what the map-update-failure fix on this branch specifically covers).
 - **No plant visible**: pull the object out from under the camera (or cover the lens), call again with the real index → expect `success=False, message='No plant detected in the image'`.
 - **Camera down**: `Ctrl+C` terminal B, call again → expect `success=False, message='Camera capture service not available'`.
+
+📝 **Definitely copy all three responses verbatim into the PR.** This section is the strongest
+evidence that the map-update-failure fix actually works — if the bad-index case comes back
+`success=True` or with a different message, that's a regression, not a pass.
 
 ## 8. Clean up
 
