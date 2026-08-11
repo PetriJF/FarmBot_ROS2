@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Keyboard teleoperation node for ROS2 Farmbot.
+User CLI node for ROS2 Farmbot.
 
-Publishes keyboard commands to the farmbot controller for execution and
+Publishes user commands to the farmbot controller for execution and
 demonstrates command priority handling versus sequencer commands.
 """
 import readline
@@ -21,20 +21,20 @@ class ServerError(Exception):
     pass
 
 
-class KeyboardTeleOp(Node):
+class UserCLI(Node):
     """
-    ROS2 node that publishes keyboard commands for the Farmbot controller.
+    ROS2 node that publishes the user commands for the Task sequencer.
 
-    Node used for recording keyboard commands and sending them forward to the
-    farmbot controller for interpretation and execution.
+    Node used for recording user commands and sending them forward to the
+    task sequencer for interpretation, the queuing and execution.
     """
 
     # Node contructor
     def __init__(self):
-        """Initialize the KeyboardTeleOp node and its ROS2 publishers."""
-        super().__init__('KeyboardController')
+        """Initialize the UserCLI node and its ROS2 publishers."""
+        super().__init__('UserCLI')
 
-        # Keyboard publisher
+        # User command publisher
         self.cmd = String()
         self.input_pub = self.create_publisher(String, 'request_command', 10)
 
@@ -46,10 +46,10 @@ class KeyboardTeleOp(Node):
         self.line_number_list = []
 
         # Log the initialization
-        self.get_logger().info('Keyboard Controller Initialized..')
+        self.get_logger().info('User CLI Initialized..')
 
         self.get_logger().info("""\n
-                               This is a keyboard based controller for the ROS2 Farmbot
+                               This is a user interface for the ROS2 Farmbot
                                Controllers. The commands accepted can be found in the
                                Documentation under High Level Commands.\n
                                Main Commands:
@@ -160,19 +160,19 @@ class KeyboardTeleOp(Node):
 
 
 def main(args=None):
-    """Initialize and run the keyboard teleoperation node."""
+    """Initialize and run the user CLI node."""
     rclpy.init(args=args)
 
-    keyboard_node = KeyboardTeleOp()
+    user_cli_node = UserCLI()
 
     try:
         while rclpy.ok():
-            keyboard_node.check_input()
+            user_cli_node.check_input()
     except KeyboardInterrupt:
         pass
     finally:
         readline.clear_history()
-        keyboard_node.destroy_node()
+        user_cli_node.destroy_node()
         rclpy.shutdown()
 
 
