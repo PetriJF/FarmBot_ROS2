@@ -334,16 +334,16 @@ class MapController(Node):
         elif cmd_type == 'S':
             response.data = self.tray_cmd_interpreter(request.data)
             return response
-        elif request.data == 'P_3':
+        elif request.data == 'P_3':                                       # DONE
             response.data = self.seed_plants()
             return response
-        elif request.data == 'P_4':
+        elif request.data == 'P_4':                                       # DONE
             response.data = self.water_plants(rigid=True)
             return response
-        elif request.data == 'P_5':  # Using moisture sensor reading
+        elif request.data == 'P_5':  # Using moisture sensor reading          # DONE
             response.data = self.water_plants(rigid=False)
             return response
-        elif request.data == 'P_9':
+        elif request.data == 'P_9':                                      # DONE (see Pause sequence)
             response.data = self.check_moisture()
             return response
 
