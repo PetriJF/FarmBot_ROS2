@@ -34,7 +34,6 @@ These represent high priority commands and configuration commands for the farmbo
 |      | Z        | Calibrate Z axis length and home position                                                                                                                           |
 | C_1  | {conf}   | Load parameter configuration for the farmbot version you are using. For Farmbot Genesis {conf} = Gen, gen, Genesis, genesis (any of the 4 is accepted)              |
 | C_2  | {a}   | Invert the direction of the encoders for the 3 axis. Select the axis you want to invert using the axis name from the options {a} = X, Y, Z. E.g. "C_2 X" for inverting the direction of the encoder for the X axis.                                   |
-| CONF | {var}    | Saves the config and/or map information to memory. If *var* is left **empty**, both the map and parameter configs are saved. If you want to save a specific config use **S** for parameter configuration and **M** for map information.              |
 # Tool and Tray commands
 
 These commands handle the position and information of the toolheads and trays that are mounted on the side of the farmbot's bed.
