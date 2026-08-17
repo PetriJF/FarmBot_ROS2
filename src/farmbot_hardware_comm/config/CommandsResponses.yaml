@@ -64,7 +64,7 @@ write_parameter:
   F23:
     responses: ['R23','R03','R86','R87']
   F22:
-    responses: ['R08']
+    responses: ['R21','R03','R86','R87']
 
 list_all_parameter:
   F20:

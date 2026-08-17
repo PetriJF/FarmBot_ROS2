@@ -185,7 +185,7 @@ class UserCLI(Node):
         goal.params = params
         goal.values = values
 
-        self.move_gantry_client.send_goal_async(
+        self.loading_params_client.send_goal_async(
             goal,
             feedback_callback=self.loading_params_feedback_callback
         ).add_done_callback(lambda future: self.goal_response_callback(future, on_done))

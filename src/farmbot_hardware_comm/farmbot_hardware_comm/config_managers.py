@@ -65,9 +65,14 @@ class ParameterTable:
         """Return the stored value of a parameter."""
         return self.values[param]
 
-    def set_value(self, param: int, value: int):
-        """Store the value the firmware reported for a parameter."""
+    def set_value(self, param: int, value: int, loading: bool):
+        """Store the firmware-reported value and save it to .yaml if no loading is in progress."""
         self.values[param] = value
+        if not loading:
+            try:
+                self.save()
+            except YAMLError as e:
+                return (f'Could not save the parameter config: {e}')
 
     def pending_writes(self) -> list[tuple[int, int]]:
         """Return the (param, value) pairs that still differ from the firmware defaults."""
@@ -144,8 +149,6 @@ class ConfigServer:
 
         # FIXME TODO these should be handled automatically and removed in the future
         # Config Service Servers
-        self.save_config_server = self.node.create_service(Trigger, 'save_parameter_config',
-                                                           self.save_config_server_cb)
         self.map_dimensions_server = self.node.create_service(Trigger, 'publish_map_dimensions',
                                                               self.map_dimensions_server_cb)
         # Map updating publisher
@@ -163,7 +166,10 @@ class ConfigServer:
     def set_value(self, param: int, value: int):
         """Set the selected parameter to the parsed value."""
         self.node.get_logger().info(f'Set parameter {param} to {value}')
-        self.table.set_value(param, value)
+        try:
+            self.table.set_value(param, value, self.loading)
+        except YAMLError:
+            self.node.get_logger().warn(f'{self.table.set_value(param, value, self.loading)}')
 
     def get_value(self, param: int) -> int:
         """Return a value of a selected parameter."""
@@ -258,6 +264,7 @@ class ConfigServer:
                                             f'{done / total * 100:.2f} %')
         finally:
             self.loading = False
+            self.save_config()
 
         return LoadingParameters.Result.OK, f'{total} parameters loaded'
 
@@ -277,21 +284,15 @@ class ConfigServer:
         else:
             self.node.get_logger().error(f'Parameter loading failed: {message}')
 
-    def save_config_server_cb(self, request: Trigger.Request,
-                              response: Trigger.Response) -> Trigger.Response:
-        """Server saves the current parameter table for the next run."""
+    def save_config(self):
+        """Save the current parameter table."""
         try:
             path = self.table.save()
         except YAMLError as e:
             self.node.get_logger().warn(f'Could not save the parameter config: {e}')
-            response.success = False
-            response.message = str(e)
-            return response
+            return
 
         self.node.get_logger().info(f'Saved the current parameter configuration at {path}')
-        response.success = True
-        response.message = path
-        return response
 
     def map_dimensions_server_cb(self, request: Trigger.Request,
                                  response: Trigger.Response) -> Trigger.Response:
