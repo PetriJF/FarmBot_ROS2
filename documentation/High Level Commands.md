@@ -6,7 +6,7 @@ Movement commands are used to move the gantry relative to the home position.
 
 | Code | Subcodes    | Description                                                                                     |
 | ---- | ----------- | ----------------------------------------------------------------------------------------------- |
-| w    |             | Adds a set increment to the current gantry x-axis position and moves to it. NOTE: The final position is relative to the current position at the time of the movement request (i.e. if you want the robot to go '2 w-s' forward, you have to wait for the first one to complete).                                 |
+| w    |             | Adds a set increment to the current gantry x-axis position and moves to it. NOTE: The final position is relative to the current position at the time of the movement request (i.e. if you want the robot to go '2 w-s' forward, you have to wait for the first one to complete).                                                                                                             |
 | a    |             | Same as above, but substracts increment from the y-axis                                         |
 | s    |             | Same as above, but substracts increment from x-axis                                             |
 | d    |             | Same as above, but adds increment to y-axis                                                     |
@@ -15,9 +15,9 @@ Movement commands are used to move the gantry relative to the home position.
 | 3    |             | Sets movement increment to 500mm                                                                |
 | H_0  |             | Go to Home Position                                                                             |
 | H_1  |             | Find all Home Positions                                                                         |
-| H_2  | X, Y or Z   | Find the home position for the specified axis. **Note that you can only select one at a time!** |
-| M    | {x} {y} {z} | Move the gantry to the parsed position (e.g. M 100 11.2 -150.0)                               |
-| M_S  | {x} {y} {z} {s}| Move the gantry to the parsed position at given speed (%) (e.g. M_S 100 11.2 -150.0 80 )                               |
+|      | X, Y or Z   | Find the home position for the specified axis. **Note that you can only select one at a time!** |
+| M    | {x} {y} {z} | Move the gantry to the parsed position (e.g. M 100 11.2 -150.0)                                 |
+| M_S  | {x} {y} {z} {s}| Move the gantry to the parsed position at given speed (%) (e.g. M_S 100 11.2 -150.0 80 )     |
 # Farmbot Configuration and Status Commands
 
 These represent high priority commands and configuration commands for the farmbot.
@@ -26,14 +26,14 @@ These represent high priority commands and configuration commands for the farmbo
 | ---- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | E    |          | ESTOP command (Electronic Stop). Halts any ongoing operation on the farmbot, and clears all sequences and queues. The robot axis are un actuated in this case and the robot cannot perform any physical action until the ESTOP RESET command is set |
 | R    |          | ESTOP RESET. Resets the farmbot from the EStop state back to the working state                                                                                      |                   
-| @    |          | ABORT command. Aborts the current command and pauses the FarmBot. The queue is preserved, and the aborted command is not deleted. Sending @ resumes execution from the point where the command was aborted.                                                                      |                   
+| @    |          | ABORT command. Aborts the current command and pauses the FarmBot. The queue is preserved, and the aborted command is not deleted. Sending @ resumes execution from the point where the command was aborted.                                                                      |
+| SW_VER |          | Get the version of the software used by the Farmbot             |
 | C_0  |          | Calibrate all the axis length and home position                                                                                                                     |
 |      | X        | Calibrate X axis length and home position                                                                                                                           |
 |      | Y        | Calibrate Y axis length and home position                                                                                                                           |
 |      | Z        | Calibrate Z axis length and home position                                                                                                                           |
 | C_1  | {conf}   | Load parameter configuration for the farmbot version you are using. For Farmbot Genesis {conf} = Gen, gen, Genesis, genesis (any of the 4 is accepted)              |
 | C_2  | {a}   | Invert the direction of the encoders for the 3 axis. Select the axis you want to invert using the axis name from the options {a} = X, Y, Z. E.g. "C_2 X" for inverting the direction of the encoder for the X axis.                                   |
-| CONF | {var}    | Saves the config and/or map information to memory. If *var* is left **empty**, both the map and parameter configs are saved. If you want to save a specific config use **S** for parameter configuration and **M** for map information.              |
 # Tool and Tray commands
 
 These commands handle the position and information of the toolheads and trays that are mounted on the side of the farmbot's bed.

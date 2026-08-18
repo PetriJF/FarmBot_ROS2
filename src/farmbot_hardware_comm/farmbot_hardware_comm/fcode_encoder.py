@@ -23,8 +23,7 @@ class Encoder:
         try:
             self.active_map = YAMLHandler.load_yaml(config_path, 'active_map.yaml')
         except YAMLError as e:
-            self.get_logger().warn(f'yaml error: {e}')
-            return
+            return (f'yaml error: {e}')
 
     # Water commands
     def encode_watering(self, req: Watering.Request) -> str:

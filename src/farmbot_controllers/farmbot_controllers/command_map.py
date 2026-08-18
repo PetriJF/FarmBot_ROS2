@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from farmbot_controllers.sequences.calibration import calibrate_axes
+from farmbot_controllers.sequences.find_home import find_home
 from farmbot_controllers.sequences.single_call import single_call
 
 # Peripheral pins live here, in the dispatch, and never reach the operator.
@@ -77,8 +78,7 @@ COMMANDS = {
     'M':     Call('move', 'movement', 'move_gantry_abs', types=(float, float, float)),
     'M_S':   Call('move', 'movement', 'move_gantry_s', types=(float, float, float, float)),
     'H_0':   Call('home', 'movement', 'go_home'),
-    'H_1':   Call('find_home', 'movement', 'find_axis_home', parse=axes),   # no letter = all axes
-    'H_2':   Call('find_home', 'movement', 'find_axis_home', parse=axes),
+    'H_1':   Sequence(find_home, parse=axes),   # no letter = all axes
     'C_0':   Sequence(calibrate_axes, parse=axes),
 
     # Peripherals
@@ -107,6 +107,9 @@ COMMANDS = {
     'M_SV':  Call('servo', 'devices', 'move_servo', types=(int, float)),
     'D_C':   Call('check_tool', 'devices', 'read_pin', fixed={'pin': TOOL_PIN, 'pin_mode': False}),
     'D_S_C': Call('check_soil', 'devices', 'read_pin', fixed={'pin': SOIL_PIN, 'pin_mode': True}),
+
+    # States
+    'SW_VER': Call('sw_version', 'states', 'request_sw_version')
 }
 
 
