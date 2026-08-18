@@ -11,7 +11,7 @@ from farmbot_controllers.sequence_runner.steps import Outcome, Sequence, Step, S
 @dataclass
 class FindHome(Step):
     """
-    Find the home position for one axis (only one of x/y/z should be true True).
+    Find the home position for one axis (only one of x/y/z should be True).
 
     The firmware finds the home position for a single axis per command, so a full home finding is
     a sequence of these.

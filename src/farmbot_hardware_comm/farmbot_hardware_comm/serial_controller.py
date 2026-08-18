@@ -100,7 +100,7 @@ class SerialController(Node):
                                    'until the map is set up.')
 
         # Initialising modules
-        self.fcode_encoder = Encoder(self.config_path, log=self.get_logger)
+        self.fcode_encoder = Encoder(self.config_path)
         self.config_server = ConfigServer(self, self.config_path,
                                           run_command=self._run_command,
                                           encoder=self.fcode_encoder)

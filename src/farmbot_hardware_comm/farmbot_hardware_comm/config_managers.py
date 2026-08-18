@@ -66,7 +66,7 @@ class ParameterTable:
         return self.values[param]
 
     def set_value(self, param: int, value: int, loading: bool):
-        """Store the firmware-reported value and save it to .yaml if no loading is in progress."""
+        """Store the firmware reported value and save it to .yaml if no loading is in progress."""
         self.values[param] = value
         if not loading:
             try:

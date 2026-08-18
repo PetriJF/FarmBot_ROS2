@@ -6,7 +6,7 @@ Movement commands are used to move the gantry relative to the home position.
 
 | Code | Subcodes    | Description                                                                                     |
 | ---- | ----------- | ----------------------------------------------------------------------------------------------- |
-| w    |             | Adds a set increment to the current gantry x-axis position and moves to it. NOTE: The final position is relative to the current position at the time of the movement request (i.e. if you want the robot to go '2 w-s' forward, you have to wait for the first one to complete).                                 |
+| w    |             | Adds a set increment to the current gantry x-axis position and moves to it. NOTE: The final position is relative to the current position at the time of the movement request (i.e. if you want the robot to go '2 w-s' forward, you have to wait for the first one to complete).                                                                                                             |
 | a    |             | Same as above, but substracts increment from the y-axis                                         |
 | s    |             | Same as above, but substracts increment from x-axis                                             |
 | d    |             | Same as above, but adds increment to y-axis                                                     |
@@ -14,10 +14,10 @@ Movement commands are used to move the gantry relative to the home position.
 | 2    |             | Sets movement increment to 100mm                                                                |
 | 3    |             | Sets movement increment to 500mm                                                                |
 | H_0  |             | Go to Home Position                                                                             |
-| H_1  |          | Find all Home Positions                                                                                                        |
+| H_1  |             | Find all Home Positions                                                                         |
 |      | X, Y or Z   | Find the home position for the specified axis. **Note that you can only select one at a time!** |
-| M    | {x} {y} {z} | Move the gantry to the parsed position (e.g. M 100 11.2 -150.0)                               |
-| M_S  | {x} {y} {z} {s}| Move the gantry to the parsed position at given speed (%) (e.g. M_S 100 11.2 -150.0 80 )                               |
+| M    | {x} {y} {z} | Move the gantry to the parsed position (e.g. M 100 11.2 -150.0)                                 |
+| M_S  | {x} {y} {z} {s}| Move the gantry to the parsed position at given speed (%) (e.g. M_S 100 11.2 -150.0 80 )     |
 # Farmbot Configuration and Status Commands
 
 These represent high priority commands and configuration commands for the farmbot.
