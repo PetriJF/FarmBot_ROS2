@@ -57,6 +57,7 @@ Commands used to manage the plants that are loaded onto the farmbot.
 | P_4  |                                          | Water all the plants regardless of moisture levels (amount set in config)      |
 | P_5  |                                          | Water all the plants based on moisture levels                                  |
 | P_9  |                                          | Check the moisture levels around all the plants                                |
+| P_R  |                                          | Measure and update the exclusion radius of every plant, one image per plant    |
 
 # Device Commands
 

@@ -96,6 +96,7 @@ class PlantRadiusNode(Node):
 
         if radius_px is None:
             response.success = False
+            response.no_plant_detected = True
             response.message = 'No plant detected in the image'
             return response
 

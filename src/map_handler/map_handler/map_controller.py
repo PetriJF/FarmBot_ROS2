@@ -346,6 +346,9 @@ class MapController(Node):
             response.data = self.set_plant_radius(index=int(cmd_split[1]),
                                                   plant_radius=float(cmd_split[2]))
             return response
+        elif cmd_split[0] == 'PlantList':
+            response.data = self.list_plants()
+            return response
         elif cmd_type == 'T':
             response.data = self.tool_cmd_interpreter(request.data)
             return response
@@ -662,6 +665,27 @@ class MapController(Node):
             return 'FAILED'
 
         return 'SUCCESS'
+
+    def list_plants(self) -> str:
+        """
+        List every known plant's index and position.
+
+        Returns:
+            One 'index x y' row per plant, newline-separated, or '' if the map has no plants.
+        """
+        plants = self.map_instance['plant_details']['plants']
+        if not plants:
+            return ''
+
+        rows = []
+        for plant_index in plants:
+            plant = plants[plant_index]
+            index = plant['identifiers']['index']
+            x = plant['position']['x']
+            y = plant['position']['y']
+            rows.append(f'{index} {x} {y}')
+
+        return '\n'.join(rows)
 
     def save_to_yaml(self, data: dict, path='', file_name='', create_if_empty=False):
         """

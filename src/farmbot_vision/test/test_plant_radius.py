@@ -79,10 +79,48 @@ def test_measure_callback_reports_map_update_failure():
         update_map=failed_map_update,
     )
     request = SimpleNamespace(index=99)
-    response = SimpleNamespace(success=False, message='', plant_radius=0.0)
+    response = SimpleNamespace(success=False, message='', plant_radius=0.0,
+                               no_plant_detected=False)
 
     result = asyncio.run(PlantRadiusNode.measure_callback(node, request, response))
 
     assert result.success is False
     assert result.message == 'Plant radius measured but map update failed'
     assert result.plant_radius > 20.0
+    assert result.no_plant_detected is False
+
+
+def test_measure_callback_flags_no_plant_detected():
+    """A frame with no green pixels is reported as no_plant_detected, not a generic failure."""
+    image = np.zeros((100, 100, 3), dtype=np.uint8)
+
+    class CaptureClient:
+        """Return a synthetic camera capture of bare soil."""
+
+        @staticmethod
+        def service_is_ready():
+            """Report that the synthetic service is available."""
+            return True
+
+        @staticmethod
+        async def call_async(_request):
+            """Return a tightly packed bgr8 image like standard_camera does."""
+            image_msg = SimpleNamespace(data=image.tobytes(), height=100, width=100)
+            return SimpleNamespace(success=True, message='', image=image_msg)
+
+    node = SimpleNamespace(
+        capture_client=CaptureClient(),
+        hsv_min=HSV_MIN,
+        hsv_max=HSV_MAX,
+        min_contour_area_px=100,
+        mm_per_pixel=0.5,
+        plant_radius_padding_mm=20.0,
+    )
+    request = SimpleNamespace(index=1)
+    response = SimpleNamespace(success=False, message='', plant_radius=0.0,
+                               no_plant_detected=False)
+
+    result = asyncio.run(PlantRadiusNode.measure_callback(node, request, response))
+
+    assert result.success is False
+    assert result.no_plant_detected is True

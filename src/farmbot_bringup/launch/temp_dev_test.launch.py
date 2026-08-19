@@ -54,6 +54,11 @@ def generate_launch_description():
             package='farmbot_controllers',
             executable='task_sequencer',
             name='task_sequencer',
-            output='screen'
+            output='screen',
+            parameters=[
+                # TODO: placeholder, needs calibrating together with plant_radius's
+                # mm_per_pixel (see standard.launch.py)
+                {'radius_capture_z': 0.0},
+            ]
         ),
     ])
