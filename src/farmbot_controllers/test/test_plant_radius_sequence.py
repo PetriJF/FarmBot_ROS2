@@ -47,8 +47,10 @@ class _FakeMovement:
 class _FakeVision:
     """Return one preset MeasurePlantRadius response per call, in order."""
 
-    def __init__(self, capture_z, responses):
-        self.capture_z = capture_z
+    def __init__(self, radius_capture_z, camera_offset_x, camera_offset_y, responses):
+        self.radius_capture_z = radius_capture_z
+        self.camera_offset_x = camera_offset_x
+        self.camera_offset_y = camera_offset_y
         self.responses = list(responses)
         self.calls = []
         self.node = SimpleNamespace(get_logger=lambda: _NullLogger())
@@ -73,9 +75,11 @@ class _FakeMapInfo:
 class _FakeHardware:
     """Duck-typed hardware bundle exercising only what the sweep step calls."""
 
-    def __init__(self, plant_list_data, move_results=(), vision_responses=(), capture_z=-100.0):
+    def __init__(self, plant_list_data, move_results=(), vision_responses=(),
+                 radius_capture_z=-100.0, camera_offset_x=0.0, camera_offset_y=0.0):
         self.movement = _FakeMovement(move_results)
-        self.vision = _FakeVision(capture_z, vision_responses)
+        self.vision = _FakeVision(radius_capture_z, camera_offset_x, camera_offset_y,
+                                  vision_responses)
         self.map_info = _FakeMapInfo(plant_list_data)
         self.to_outcome = _to_outcome
 
@@ -118,6 +122,22 @@ def test_sweep_measures_every_plant():
     assert result.ok
     assert hardware.movement.calls == [(10.0, 20.0, -100.0), (30.0, 40.0, -100.0)]
     assert hardware.vision.calls == [1, 2]
+
+
+def test_sweep_moves_gantry_to_plant_minus_camera_offset():
+    """The gantry target is the plant position minus the camera's offset from the gantry."""
+    move_ok = SimpleNamespace(code=0, message='')
+    measure_ok = SimpleNamespace(success=True, message='', no_plant_detected=False)
+    hardware = _FakeHardware(
+        plant_list_data='1 100.0 200.0',
+        move_results=[move_ok],
+        vision_responses=[measure_ok],
+        camera_offset_x=18.0, camera_offset_y=65.0)
+
+    result = _run(hardware)
+
+    assert result.ok
+    assert hardware.movement.calls == [(82.0, 135.0, -100.0)]
 
 
 def test_sweep_skips_plant_with_no_plant_detected():

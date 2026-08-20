@@ -1,7 +1,0 @@
-# Fixed physical offset between the camera and the robot's reported position (the UTM / tool
-# mount), in millimeters. camera_position = robot_position + offset.
-
-camera_offset:
-  offset_x: 18   # mm
-  offset_y: 65   # mm
-  offset_z: -8   # mm

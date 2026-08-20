@@ -89,9 +89,18 @@ class TaskSequencer(Node):
         self.declare_parameter('autopause_on_failure', True)
         self._autopause = bool(self.get_parameter('autopause_on_failure').value)
         self.declare_parameter('radius_capture_z', 0.0)
-        capture_z = float(self.get_parameter('radius_capture_z').value)
+        radius_capture_z = float(self.get_parameter('radius_capture_z').value)
+        self.declare_parameter('stitch_capture_z', 0.0)
+        stitch_capture_z = float(self.get_parameter('stitch_capture_z').value)
+        self.declare_parameter('stitch_step_mm', 135.0)
+        stitch_step_mm = float(self.get_parameter('stitch_step_mm').value)
+        self.declare_parameter('camera_offset_x', 18.0)
+        camera_offset_x = float(self.get_parameter('camera_offset_x').value)
+        self.declare_parameter('camera_offset_y', 65.0)
+        camera_offset_y = float(self.get_parameter('camera_offset_y').value)
 
-        self.vision = VisionControl(self, capture_z)
+        self.vision = VisionControl(self, radius_capture_z, stitch_capture_z, stitch_step_mm,
+                                    camera_offset_x, camera_offset_y)
         self.map_info = MapInfo(self)
         hardware = Hardware(self.movement, self.devices, self.states, self.parameters,
                             self.vision, self.map_info)

@@ -44,18 +44,21 @@ class MapInfo:
             on_done(response)
 
     def list_plants(self, on_done=None):
-        """
-        Call the map_info service with the PlantList command.
-
-        Args:
-            on_done {callable}: Optional completion callback; receives the StringRepReq
-                                response (data is a newline-separated 'index x y' list, or
-                                None on a communication failure)
-        """
+        """Request the active map's plant list."""
         self._server_availability('map_info', self.map_info_client)
 
         request = StringRepReq.Request()
         request.data = 'PlantList'
+
+        self.map_info_client.call_async(request=request).add_done_callback(
+            lambda future: self._complete(future, on_done))
+
+    def map_size(self, on_done=None):
+        """Request the active map's bed dimensions."""
+        self._server_availability('map_info', self.map_info_client)
+
+        request = StringRepReq.Request()
+        request.data = 'MapSize'
 
         self.map_info_client.call_async(request=request).add_done_callback(
             lambda future: self._complete(future, on_done))

@@ -349,6 +349,9 @@ class MapController(Node):
         elif cmd_split[0] == 'PlantList':
             response.data = self.list_plants()
             return response
+        elif cmd_split[0] == 'MapSize':
+            response.data = self.map_size()
+            return response
         elif cmd_type == 'T':
             response.data = self.tool_cmd_interpreter(request.data)
             return response
@@ -641,16 +644,7 @@ class MapController(Node):
         return 'SUCCESS'
 
     def set_plant_radius(self, index: int, plant_radius: float) -> str:
-        """
-        Update a plant's exclusion radius in the map.
-
-        Args:
-            index: The plant index to update.
-            plant_radius: The measured exclusion radius, in mm.
-
-        Returns:
-            'SUCCESS' if plant found and updated, 'FAILED' otherwise.
-        """
+        """Update one plant's exclusion radius."""
         plants = self.map_instance['plant_details']['plants']
         if plants and index in plants:
             self.get_logger().info(f"Plant of Index '{index}' has plant radius "
@@ -667,12 +661,7 @@ class MapController(Node):
         return 'SUCCESS'
 
     def list_plants(self) -> str:
-        """
-        List every known plant's index and position.
-
-        Returns:
-            One 'index x y' row per plant, newline-separated, or '' if the map has no plants.
-        """
+        """Return newline-separated 'index x y' rows for known plants."""
         plants = self.map_instance['plant_details']['plants']
         if not plants:
             return ''
@@ -686,6 +675,11 @@ class MapController(Node):
             rows.append(f'{index} {x} {y}')
 
         return '\n'.join(rows)
+
+    def map_size(self) -> str:
+        """Return the bed dimensions as 'x_len y_len' in millimetres."""
+        map_reference = self.map_instance['map_reference']
+        return f"{map_reference['x_len']} {map_reference['y_len']}"
 
     def save_to_yaml(self, data: dict, path='', file_name='', create_if_empty=False):
         """

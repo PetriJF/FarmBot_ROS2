@@ -64,9 +64,13 @@ class MeasureAllPlantRadii(Step):
             done(StepResult(Outcome.OK, f'measured {len(plants)} plant(s)'))
             return
         _, x, y = plants[position]
+        # The camera, not the gantry, needs to end up over the plant - move the gantry to
+        # the plant's position minus the camera's known offset from it.
+        gantry_x = x - hardware.vision.camera_offset_x
+        gantry_y = y - hardware.vision.camera_offset_y
         try:
             hardware.movement.move_gantry_abs(
-                x, y, hardware.vision.capture_z,
+                gantry_x, gantry_y, hardware.vision.radius_capture_z,
                 on_done=lambda result: self._on_move(hardware, plants, position, result, done))
         except Exception as error:
             done(StepResult(Outcome.FAILED, str(error)))
