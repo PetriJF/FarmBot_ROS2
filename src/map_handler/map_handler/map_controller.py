@@ -342,6 +342,16 @@ class MapController(Node):
             response.data = self.set_soil_moisture(index=int(cmd_split[1]),
                                                    reading=int(cmd_split[2]))
             return response
+        elif cmd_split[0] == 'PlantRadius':
+            response.data = self.set_plant_radius(index=int(cmd_split[1]),
+                                                  plant_radius=float(cmd_split[2]))
+            return response
+        elif cmd_split[0] == 'PlantList':
+            response.data = self.list_plants()
+            return response
+        elif cmd_split[0] == 'MapSize':
+            response.data = self.map_size()
+            return response
         elif cmd_type == 'T':
             response.data = self.tool_cmd_interpreter(request.data)
             return response
@@ -632,6 +642,44 @@ class MapController(Node):
             return 'FAILED'
 
         return 'SUCCESS'
+
+    def set_plant_radius(self, index: int, plant_radius: float) -> str:
+        """Update one plant's exclusion radius."""
+        plants = self.map_instance['plant_details']['plants']
+        if plants and index in plants:
+            self.get_logger().info(f"Plant of Index '{index}' has plant radius "
+                                   f"'{plant_radius}'")
+            plants[index]['plant_details']['plant_radius'] = copy.deepcopy(plant_radius)
+
+            self.save_to_yaml(self.map_instance, self.config_path,
+                              self.active_map_file, create_if_empty=False)
+        else:
+            self.get_logger().warn(f"Couldn't find plant with index '{index}' to "
+                                   'add radius reading to')
+            return 'FAILED'
+
+        return 'SUCCESS'
+
+    def list_plants(self) -> str:
+        """Return newline-separated 'index x y' rows for known plants."""
+        plants = self.map_instance['plant_details']['plants']
+        if not plants:
+            return ''
+
+        rows = []
+        for plant_index in plants:
+            plant = plants[plant_index]
+            index = plant['identifiers']['index']
+            x = plant['position']['x']
+            y = plant['position']['y']
+            rows.append(f'{index} {x} {y}')
+
+        return '\n'.join(rows)
+
+    def map_size(self) -> str:
+        """Return the bed dimensions as 'x_len y_len' in millimetres."""
+        map_reference = self.map_instance['map_reference']
+        return f"{map_reference['x_len']} {map_reference['y_len']}"
 
     def save_to_yaml(self, data: dict, path='', file_name='', create_if_empty=False):
         """

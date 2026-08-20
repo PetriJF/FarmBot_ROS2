@@ -96,6 +96,62 @@ def generate_launch_description():
         ),
         Node(
             package='farmbot_vision',
+            executable='plant_radius',
+            name='plant_radius',
+            output='screen',
+            parameters=[
+                {'hsv_min': [40, 50, 50]},
+                {'hsv_max': [90, 255, 255]},
+                {'min_contour_area_px': 100},
+                {'mm_per_pixel': 0.5},           # placeholder, needs calibration
+                {'plant_radius_padding_mm': 20.0},
+            ],
+            condition=IfCondition(
+                PythonExpression([
+                    "'", camera, "'",
+                    " == 'Standard'"
+                ])
+            )
+        ),
+        Node(
+            package='farmbot_vision',
+            executable='camera_calibration',
+            name='camera_calibration',
+            output='screen',
+            parameters=[
+                {'ws_path': ws_path},
+                {'folder_config_name': 'local_config'},
+            ],
+            condition=IfCondition(
+                PythonExpression([
+                    "'", camera, "'",
+                    " == 'Standard'"
+                ])
+            )
+        ),
+        Node(
+            package='farmbot_vision',
+            executable='image_stitcher',
+            name='image_stitcher',
+            output='screen',
+            parameters=[
+                {'ws_path': ws_path},
+                {'folder_config_name': 'local_config'},
+                {'map_mm_per_px': 0.5},          # map resolution; raise to shrink the canvas
+                {'feather_px': 40},              # seam softness across overlapping frames
+                {'frame_crop_fraction': 0.8},    # drop the lens-distorted frame border
+                {'camera_offset_x': 18.0},       # lens offset from the reported gantry position
+                {'camera_offset_y': 65.0},
+            ],
+            condition=IfCondition(
+                PythonExpression([
+                    "'", camera, "'",
+                    " == 'Standard'"
+                ])
+            )
+        ),
+        Node(
+            package='farmbot_vision',
             executable='luxonis_camera',
             name='luxonis_camera',
             output='screen',

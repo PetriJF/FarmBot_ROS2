@@ -4,7 +4,9 @@ from typing import Callable
 
 from farmbot_controllers.sequences.calibration import calibrate_axes
 from farmbot_controllers.sequences.find_home import find_home
+from farmbot_controllers.sequences.plant_radius import measure_all_plant_radii
 from farmbot_controllers.sequences.single_call import single_call
+from farmbot_controllers.sequences.stitch_bed import stitch_whole_bed
 
 # Peripheral pins live here, in the dispatch, and never reach the operator.
 WATER_PUMP_PIN = 8
@@ -109,7 +111,11 @@ COMMANDS = {
     'D_S_C': Call('check_soil', 'devices', 'read_pin', fixed={'pin': SOIL_PIN, 'pin_mode': True}),
 
     # States
-    'SW_VER': Call('sw_version', 'states', 'request_sw_version')
+    'SW_VER': Call('sw_version', 'states', 'request_sw_version'),
+
+    # Vision
+    'P_R':   Sequence(measure_all_plant_radii),
+    'P_S':   Sequence(stitch_whole_bed),
 }
 
 

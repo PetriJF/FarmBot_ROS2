@@ -1,0 +1,4 @@
+int8 step                           # 1, 2 or 3; the capture at each known gantry offset in order
+---
+bool success
+string message

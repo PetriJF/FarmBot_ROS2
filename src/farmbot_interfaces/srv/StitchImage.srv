@@ -1,0 +1,5 @@
+float64 x                           # mm, gantry position the frame is captured from
+float64 y
+---
+bool success
+string message
