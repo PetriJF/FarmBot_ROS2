@@ -4,11 +4,11 @@ Straight-through command servers for the FarmBot SerialController.
 Every service here encodes the request into FCode, then runs it and copy the outcome
 into the response.
 """
-from farmbot_hardware_comm.modules.exceptions import EncodeError
-
 from farmbot_interfaces.srv import (ConfigurePin, MoveServo, ReadI2C,
                                     ReadParameter, ReadPin, SetI2C, Watering,
                                     WriteParameter, WritePin)
+
+from farmbot_utils.exceptions import EncodeError
 
 from rclpy.node import Node
 

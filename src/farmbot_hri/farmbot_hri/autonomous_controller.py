@@ -4,17 +4,15 @@ Autonomous command sender module.
 Publishes scheduled autonomous commands from AutonomousCommand.yaml to /input_topic
 at configured times.
 """
-import os
 from datetime import datetime
 
-from ament_index_python.packages import get_package_share_directory
+from farmbot_utils.exceptions import YAMLError
+from farmbot_utils.yaml_handler import YAMLHandler
 
 import rclpy
 from rclpy.node import Node
 
 from std_msgs.msg import String
-
-import yaml
 
 
 class AutonomousCmds(Node):
@@ -32,13 +30,13 @@ class AutonomousCmds(Node):
         timer_period = 60  # seconds
         self.timer = self.create_timer(timer_period, self.send_command)
 
-        self.directory_ = os.path.join(
-            get_package_share_directory('farmbot_hri'),
-            'config'
-        )
+        self.directory_ = YAMLHandler.get_directory_package('farmbot_hri', 'config')
 
-        self.auto_command = yaml.safe_load(open(os.path.join(self.directory_,
-                                                             'AutonomousCommand.yaml'), 'r'))
+        try:
+            self.auto_command = YAMLHandler.load_yaml(self.directory_, 'AutonomousCommand.yaml')
+        except YAMLError as e:
+            self.get_logger().warn(f'yaml error: {e}')
+            return
 
     def send_command(self):
         """Publish scheduled autonomous commands when their configured time arrives."""

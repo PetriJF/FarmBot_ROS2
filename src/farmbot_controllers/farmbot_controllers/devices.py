@@ -7,13 +7,9 @@ that are connected to the Farmbot
 from farmbot_interfaces.srv import (ConfigurePin, MoveServo, ReadI2C, ReadPin,
                                     SetI2C, Watering, WritePin)
 
+from farmbot_utils.exceptions import ServerError
+
 from rclpy.node import Node
-
-
-class ServerError(Exception):
-    """Raised when a server is not available."""
-
-    pass
 
 
 class DeviceControl:

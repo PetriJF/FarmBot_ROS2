@@ -6,15 +6,11 @@ through ROS2 action commands.
 """
 from farmbot_interfaces.action import HomeAxes, MoveGantry
 
+from farmbot_utils.exceptions import ServerError
+
 from rclpy.action import ActionClient
 from rclpy.action.client import ClientGoalHandle
 from rclpy.node import Node
-
-
-class ServerError(Exception):
-    """Raised when a server is not available."""
-
-    pass
 
 
 class Movement:

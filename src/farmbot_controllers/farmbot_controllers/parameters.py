@@ -6,15 +6,11 @@ through ROS2 service interactions.
 """
 from farmbot_interfaces.srv import ReadParameter, WriteParameter
 
+from farmbot_utils.exceptions import ServerError
+
 from rclpy.node import Node
 
 from std_srvs.srv import Trigger
-
-
-class ServerError(Exception):
-    """Raised when a server is not available."""
-
-    pass
 
 
 class Parameters:

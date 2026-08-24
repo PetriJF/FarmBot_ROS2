@@ -8,7 +8,7 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 
-from farmbot_hardware_comm.modules.exceptions import YAMLError
+from farmbot_utils.exceptions import YAMLError
 
 import yaml
 
