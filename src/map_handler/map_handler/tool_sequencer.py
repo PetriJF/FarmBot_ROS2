@@ -6,6 +6,8 @@ tool exchanger, including validation and coordinate command creation.
 """
 from rclpy.node import Node
 
+# DEPRECATED
+
 
 class ToolDetails:
     """Object representing the tool details needed to sequence mounting and unmounting actions."""

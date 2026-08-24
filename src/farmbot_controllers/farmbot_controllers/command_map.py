@@ -109,7 +109,27 @@ COMMANDS = {
     'D_S_C': Call('check_soil', 'devices', 'read_pin', fixed={'pin': SOIL_PIN, 'pin_mode': True}),
 
     # States
-    'SW_VER': Call('sw_version', 'states', 'request_sw_version')
+    'SW_VER': Call('sw_version', 'states', 'request_sw_version'),
+
+    # Map sequences
+    'P_3': Call('seed_plants', 'map_sequences', 'seed_plants_command'),
+    'P_4': Call('general_watering', 'map_sequences', 'water_plants_cmd', fixed={'rigid': True}),
+    'P_5': Call('moisture_watering', 'map_sequences', 'water_plants_cmd', fixed={'rigid': False}),
+    'P_9': Call('check_moisture', 'map_sequences', 'check_moisture_cmd'),
+
+    # Tool sequences
+    'T_1_1': Call('mount_tool_1', 'tool_sequences', 'mount_tool_command', fixed={'index': 1}),
+    'T_1_2': Call('unmount_tool_1', 'tool_sequences', 'unmount_tool_command', fixed={'index': 1}),
+    'T_2_1': Call('mount_tool_2', 'tool_sequences', 'mount_tool_command', fixed={'index': 2}),
+    'T_2_2': Call('unmount_tool_2', 'tool_sequences', 'unmount_tool_command', fixed={'index': 2}),
+    'T_3_1': Call('mount_tool_2', 'tool_sequences', 'mount_tool_command', fixed={'index': 3}),
+    'T_3_2': Call('unmount_tool_2', 'tool_sequences', 'unmount_tool_command', fixed={'index': 3}),
+    'T_4_1': Call('mount_tool_2', 'tool_sequences', 'mount_tool_command', fixed={'index': 4}),
+    'T_4_2': Call('unmount_tool_2', 'tool_sequences', 'unmount_tool_command', fixed={'index': 4}),
+    'T_5_1': Call('mount_tool_2', 'tool_sequences', 'mount_tool_command', fixed={'index': 5}),
+    'T_5_2': Call('unmount_tool_2', 'tool_sequences', 'unmount_tool_command', fixed={'index': 5}),
+    'T_6_1': Call('mount_tool_2', 'tool_sequences', 'mount_tool_command', fixed={'index': 6}),
+    'T_6_2': Call('unmount_tool_2', 'tool_sequences', 'unmount_tool_command', fixed={'index': 6}),
 }
 
 

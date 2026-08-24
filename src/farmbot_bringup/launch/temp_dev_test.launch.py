@@ -24,6 +24,16 @@ def generate_launch_description():
             default_value='/dev/ttyACM0',
             description='Serial port for communicating with the FarmBot.'
         ),
+        Node(
+            package='map_handler',
+            executable='map_controller',
+            name='map_controller',
+            output='screen',
+            parameters=[
+                {'ws_path': ws_path},
+                {'folder_config_name': 'local_config'},
+            ]
+        ),
 
         # The serial bridge
         Node(

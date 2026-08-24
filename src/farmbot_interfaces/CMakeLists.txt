@@ -13,9 +13,11 @@ find_package(geometry_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/PlantManage.msg"
-  "msg/MapCommand.msg"
   "msg/ImageMessage.msg"
   "msg/SequenceStatus.msg"
+  "srv/AddPlant.srv"
+  "srv/AddSeedTray.srv"
+  "srv/AddTool.srv"
   "srv/CaptureImage.srv"
   "srv/ConfigurePin.srv"
   "srv/EnableCamera.srv"
@@ -25,8 +27,10 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/ReadI2C.srv"
   "srv/ReadParameter.srv"
   "srv/ReadPin.srv"
+  "srv/RemoveMapObject.srv"
   "srv/SetI2C.srv"
   "srv/StringRepReq.srv"
+  "srv/UpdateMap.srv"
   "srv/Watering.srv"
   "srv/WriteParameter.srv"
   "srv/WritePin.srv"

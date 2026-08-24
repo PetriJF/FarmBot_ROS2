@@ -1,0 +1,8 @@
+int64 index
+string name
+string seed_type
+geometry_msgs/Point position
+int64 tray_type
+---
+bool success
+string message

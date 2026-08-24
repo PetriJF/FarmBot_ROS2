@@ -1,0 +1,8 @@
+uint8 PLANT=0                   # code to remove a plant
+uint8 TOOL=1                    # code to remove a tool
+uint8 SEED_TRAY=2               # code to remove a seed tray
+uint8 op
+int64 index                     # index of the object to remove
+---
+bool success
+string message

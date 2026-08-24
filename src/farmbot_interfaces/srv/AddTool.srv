@@ -1,0 +1,7 @@
+int64 index
+string tool_name
+geometry_msgs/Point position
+int64 release_dir
+---
+bool success
+string message
