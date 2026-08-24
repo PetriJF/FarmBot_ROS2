@@ -26,7 +26,7 @@ class FindHome(Step):
         try:
             hardware.movement.find_axis_home(
                 x=self.x, y=self.y, z=self.z,
-                on_done=lambda result: done(hardware.result_to_outcome(result)))
+                on_done=lambda result: done(hardware.to_outcome(result)))
         except Exception as error:  # any client error - report, never hang the engine
             done(StepResult(Outcome.FAILED, str(error)))
 

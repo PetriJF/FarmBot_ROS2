@@ -5,15 +5,13 @@ Provides helper methods to interact with FarmBot state commands, including
 emergency stop, abort, reset, software version, current position and end stops
 requests through ROS2 services.
 """
+import asyncio
+
+from farmbot_utils.exceptions import ServerError
+
 from rclpy.node import Node
 
 from std_srvs.srv import Trigger
-
-
-class ServerError(Exception):
-    """Raised when a server is not available."""
-
-    pass
 
 
 class State:
@@ -69,6 +67,14 @@ class State:
         """
         self._send('Estop', self.estop_client, on_done)
 
+    def reset_estop(self, on_done=None):
+        """
+        Call the FarmBot reset emergency stop service.
+
+        Sends a request to reset the emergency stop state.
+        """
+        self._send('Reset estop', self.resume_client, on_done)
+
     def abort_movement(self, on_done=None):
         """
         Call the FarmBot abort service.
@@ -77,13 +83,13 @@ class State:
         """
         self._send('Abort', self.abort_client, on_done)
 
-    def reset_estop(self, on_done=None):
+    async def timer_pause(self, tick_delay: float):
         """
-        Call the FarmBot reset emergency stop service.
+        Pause the current async task for the specified delay.
 
-        Sends a request to reset the emergency stop state.
+        This function should only be used in sequences.
         """
-        self._send('Reset estop', self.resume_client, on_done)
+        await asyncio.sleep(tick_delay)
 
     def request_end_stop(self, on_done=None):
         """

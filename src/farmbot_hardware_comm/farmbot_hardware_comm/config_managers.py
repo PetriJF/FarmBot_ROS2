@@ -5,18 +5,18 @@ Contains the ParameterTable and ConfigServer classes.
 ParameterTable is used for organizing the parameter indexing and values, while the
 ConfigServer wraps it in the services the rest of the system calls.
 """
-from farmbot_hardware_comm.modules.exceptions import EncodeError, YAMLError
 from farmbot_hardware_comm.modules.param_info import ParameterList
-from farmbot_hardware_comm.modules.yaml_handler import YAMLHandler
 
 from farmbot_interfaces.action import LoadingParameters
-from farmbot_interfaces.msg import MapCommand
-from farmbot_interfaces.srv import WriteParameter
+from farmbot_interfaces.srv import UpdateMap, WriteParameter
+
+from farmbot_utils.exceptions import EncodeError, ServerError, YAMLError
+from farmbot_utils.yaml_handler import YAMLHandler
 
 from rclpy.action.server import ServerGoalHandle
 from rclpy.node import Node
 
-from std_srvs.srv import Trigger
+# from std_srvs.srv import Trigger
 
 LOAD_FAILURES = {
     'firmware error': LoadingParameters.Result.FIRMWARE_ERROR,
@@ -107,9 +107,9 @@ class ParameterTable:
     def axis_lengths(self) -> dict:
         """Return the {x, y, z} axis lengths in mm implied by the table."""
         axes = (
-            ('X', self.params.MOVEMENT_AXIS_NR_STEPS_X, self.params.MOVEMENT_STEP_PER_MM_X),
-            ('Y', self.params.MOVEMENT_AXIS_NR_STEPS_Y, self.params.MOVEMENT_STEP_PER_MM_Y),
-            ('Z', self.params.MOVEMENT_AXIS_NR_STEPS_Z, self.params.MOVEMENT_STEP_PER_MM_Z),
+            ('x_len', self.params.MOVEMENT_AXIS_NR_STEPS_X, self.params.MOVEMENT_STEP_PER_MM_X),
+            ('y_len', self.params.MOVEMENT_AXIS_NR_STEPS_Y, self.params.MOVEMENT_STEP_PER_MM_Y),
+            ('z_len', self.params.MOVEMENT_AXIS_NR_STEPS_Z, self.params.MOVEMENT_STEP_PER_MM_Z),
         )
 
         lengths = {}
@@ -149,11 +149,11 @@ class ConfigServer:
 
         # FIXME TODO these should be handled automatically and removed in the future
         # Config Service Servers
-        self.map_dimensions_server = self.node.create_service(Trigger, 'publish_map_dimensions',
-                                                              self.map_dimensions_server_cb)
-        # Map updating publisher
-        self.map_cmd_pub = self.node.create_publisher(MapCommand, 'map_cmd', 10)
-        ###
+        # self.map_dimensions_server = self.node.create_service(Trigger, 'publish_map_dimensions',
+        #                                                       self.map_dimensions_server_cb)
+
+        # Update map client
+        self.update_map_client = self.node.create_client(UpdateMap, 'update_map')
 
         # Log the initialization
         self.node.get_logger().info('Config Server Initialized..')
@@ -170,6 +170,13 @@ class ConfigServer:
             self.table.set_value(param, value, self.loading)
         except YAMLError:
             self.node.get_logger().warn(f'{self.table.set_value(param, value, self.loading)}')
+        if param in (self.table.params.MOVEMENT_AXIS_NR_STEPS_X,
+                     self.table.params.MOVEMENT_STEP_PER_MM_X,
+                     self.table.params.MOVEMENT_AXIS_NR_STEPS_Y,
+                     self.table.params.MOVEMENT_STEP_PER_MM_Y,
+                     self.table.params.MOVEMENT_AXIS_NR_STEPS_Z,
+                     self.table.params.MOVEMENT_STEP_PER_MM_Z):
+            self.update_map_dimensions()
 
     def get_value(self, param: int) -> int:
         """Return a value of a selected parameter."""
@@ -294,20 +301,40 @@ class ConfigServer:
 
         self.node.get_logger().info(f'Saved the current parameter configuration at {path}')
 
-    def map_dimensions_server_cb(self, request: Trigger.Request,
-                                 response: Trigger.Response) -> Trigger.Response:
-        """Server reports the bed dimensions the parameters imply to the map."""
+    def update_map_dimensions(self, on_done=None):
+        """Update the map with the bed dimensions reported by the table configuration."""
         lengths = self.table.axis_lengths()
         if len(lengths) != 3:
-            response.success = False
-            response.message = 'axis lengths are not set in the parameter configuration'
-            return response
+            raise Exception('axis lengths are not set in the parameter configuration')
 
-        map_cmd = MapCommand()
-        map_cmd.update = True
-        map_cmd.update_info = [f'{axis} {length}' for axis, length in lengths.items()]
-        self.map_cmd_pub.publish(map_cmd)
+        update_info = [f'map_reference {axis} {length}' for axis, length in lengths.items()]
+        self.update_map_cmd(update_info=update_info)
 
-        response.success = True
-        response.message = ' '.join(map_cmd.update_info)
-        return response
+        self._server_availability('UpdateMap', self.update_map_client)
+        request = UpdateMap.Request()
+        request.update_info = update_info
+        self.update_map_client.call_async(request=request).add_done_callback(
+                    lambda future: self._complete(future, on_done))
+
+    def _server_availability(self, cmd_name: str, client):
+        if not client.wait_for_server(1.0):
+            self.get_logger().fatal(f'{cmd_name} Server not available!')
+            raise ServerError('ConfigServer failed: server unavailable')
+
+    def _complete(self, future, on_done=None):
+        """Log the outcome and forward the response (or None on failure) to on_done."""
+        try:
+            response = future.result()
+        except Exception as error:  # call failed - report, never leave on_done hanging
+            self.get_logger().error('Service call failed %r' % (error, ))
+            response = None
+        if response is None:
+            self.get_logger().warn('Command failure!')
+        elif not response.success:
+            self.get_logger().warn(f'Command failed: {response.message}')
+        elif response.message:
+            self.get_logger().info(response.message)
+        else:
+            self.get_logger().info('Command successful')
+        if on_done is not None:
+            on_done(response)

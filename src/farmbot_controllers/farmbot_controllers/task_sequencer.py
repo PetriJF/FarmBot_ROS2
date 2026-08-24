@@ -9,12 +9,14 @@ from collections import deque
 
 from farmbot_controllers import command_map
 from farmbot_controllers.devices import DeviceControl
+from farmbot_controllers.map_sequences import MapSequences
 from farmbot_controllers.movement import Movement
 from farmbot_controllers.parameters import Parameters
 from farmbot_controllers.sequence_runner import engine
 from farmbot_controllers.sequence_runner.steps import Outcome, StepResult
 from farmbot_controllers.sequences.single_call import single_call
 from farmbot_controllers.states import State
+from farmbot_controllers.tool_sequences import ToolSequences
 
 from farmbot_interfaces.msg import SequenceStatus
 
@@ -50,13 +52,16 @@ _ACTION_OUTCOMES = {0: Outcome.OK, 2: Outcome.ESTOPPED, 3: Outcome.ABORTED}
 class Hardware:
     """Client module helper."""
 
-    def __init__(self, movement: Movement, devices: DeviceControl,
-                 states: State, parameters: Parameters):
+    def __init__(self, movement: Movement, devices: DeviceControl, states: State,
+                 parameters: Parameters, map_sequences: MapSequences,
+                 tool_sequences: ToolSequences):
         """Bundle the client modules the steps call."""
         self.movement = movement
         self.devices = devices
         self.states = states
         self.parameters = parameters
+        self.map_sequences = map_sequences
+        self.tool_sequences = tool_sequences
 
     @staticmethod
     def to_outcome(raw) -> StepResult:
@@ -80,7 +85,10 @@ class TaskSequencer(Node):
         self.devices = DeviceControl(self)
         self.states = State(self)
         self.parameters = Parameters(self)
-        hardware = Hardware(self.movement, self.devices, self.states, self.parameters)
+        self.map_sequences = MapSequences(self)
+        self.tool_sequences = ToolSequences(self)
+        hardware = Hardware(self.movement, self.devices, self.states,
+                            self.parameters, self.map_sequences, self.tool_sequences)
         self._engine = engine.SequenceEngine(
             hardware=hardware,
             on_status=self._publish_status,
