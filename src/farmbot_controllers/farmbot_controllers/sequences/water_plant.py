@@ -22,7 +22,7 @@ class MoveGantry(Step):
         try:
             hardware.movement.move_gantry_abs(
                 x=self.x_coord, y=self.y_coord, z=self.z_coord,
-                on_done=lambda result: done(hardware.result_to_outcome(result)))
+                on_done=lambda result: done(hardware.to_outcome(result)))
         except Exception as error:  # any client error - report, never hang the engine
             done(StepResult(Outcome.FAILED, str(error)))
 
@@ -44,7 +44,7 @@ class WaterPulse(Step):
             hardware.devices.set_pin_value(
                 pin=self.water_pin, value=self.value1, pin_mode=self.pin_mode, pulse=self.pulse,
                 value2=self.value2,
-                on_done=lambda result: done(hardware.result_to_outcome(result)))
+                on_done=lambda result: done(hardware.to_outcome(result)))
         except Exception as error:  # any client error - report, never hang the engine
             done(StepResult(Outcome.FAILED, str(error)))
 

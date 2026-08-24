@@ -5,7 +5,6 @@ Define the steps required to move the gantry to a probing
 location, read the soil moisture sensor, and return the gantry to its
 initial height.
 """
-import time
 from dataclasses import dataclass
 
 from farmbot_controllers.sequence_runner.steps import Outcome, Sequence, Step, StepResult
@@ -24,7 +23,7 @@ class MoveGantry(Step):
         try:
             hardware.movement.move_gantry_abs(
                 x=self.x_coord, y=self.y_coord, z=self.z_coord,
-                on_done=lambda result: done(hardware.result_to_outcome(result)))
+                on_done=lambda result: done(hardware.to_outcome(result)))
         except Exception as error:  # any client error - report, never hang the engine
             done(StepResult(Outcome.FAILED, str(error)))
 
@@ -38,11 +37,9 @@ class Pause(Step):
     def run(self, hardware, done):
         """Set the vacuum device state and report the operation result."""
         try:
-            hardware.states.abort_movement(
-                on_done=lambda result: done(hardware.result_to_outcome(result)))
-            time.sleep(self.delay)
-            hardware.states.abort_movement(
-                on_done=lambda result: done(hardware.result_to_outcome(result)))
+            hardware.states.timer_pause(
+                tick_delay=self.delay,
+                on_done=lambda result: done(hardware.to_outcome(result)))
         except Exception as error:  # any client error - report, never hang the engine
             done(StepResult(Outcome.FAILED, str(error)))
 
@@ -53,19 +50,38 @@ class ReadSoil(Step):
 
     readsoil_pin: int = 59
     pin_mode: bool = False
+    plant_index: int = 0
 
     def run(self, hardware, done):
         """Set the vacuum device state and report the operation result."""
         try:
             hardware.devices.read_pin(
                 pin=self.readsoil_pin, pin_mode=self.pin_mode,
-                on_done=lambda result: done(hardware.result_to_outcome(result)))
+                on_done=lambda result: done(self._update_soil_moisture(hardware, result, done)))
         except Exception as error:  # any client error - report, never hang the engine
             done(StepResult(Outcome.FAILED, str(error)))
 
+    def _update_soil_moisture(self, hardware, result, done):
+        """
+        Update the soil moisture of the current plant in the map.
 
-def check_moisture(max_z: float = 0.0, tick_delay: int = 0,
-                   x: float = 0.0, y: float = 0.0, z: float = 0.0) -> Sequence:
+        The soil moisture value is sent to the map update service. The provided
+        callback is called when the map update is completed or if an error occurs.
+        """
+        outcome = hardware.to_outcome(result)
+        if outcome.ok:
+            try:
+                hardware.map_sequences.update_map_cmd(
+                    update_info=[f'plant_details plants {self.plant_index} plant_details '
+                                 f'soil_moisture {result.value}'],
+                    on_done=lambda result: done(hardware.to_outcome(result)))
+            except Exception as error:  # any client error - report, never hang the engine
+                done(StepResult(Outcome.FAILED, str(error)))
+        done(outcome)
+
+
+def check_moisture(max_z: float = 0.0, tick_delay: int = 0, x: float = 0.0,
+                   y: float = 0.0, z: float = 0.0, plant_index: int = 0) -> Sequence:
     """
     Build a sequence to check the soil moisture at a specified location.
 
@@ -93,7 +109,7 @@ def check_moisture(max_z: float = 0.0, tick_delay: int = 0,
     steps.append(Pause(delay=tick_delay))
 
     # Probe the moisture value
-    steps.append(ReadSoil(pin_mode=True))
+    steps.append(ReadSoil(pin_mode=True, plant_index=plant_index))
 
     # Raise from probing location
     steps.append(MoveGantry(x_coord=x, y_coord=y, z_coord=z))

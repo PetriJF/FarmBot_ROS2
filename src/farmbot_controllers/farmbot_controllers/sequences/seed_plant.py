@@ -21,7 +21,7 @@ class MoveGantry(Step):
         try:
             hardware.movement.move_gantry_abs(
                 x=self.x_coord, y=self.y_coord, z=self.z_coord,
-                on_done=lambda result: done(hardware.result_to_outcome(result)))
+                on_done=lambda result: done(hardware.to_outcome(result)))
         except Exception as error:  # any client error - report, never hang the engine
             done(StepResult(Outcome.FAILED, str(error)))
 
@@ -40,14 +40,14 @@ class VacuumDevice(Step):
         try:
             hardware.devices.set_pin_value(
                 pin=self.vacuum_pin, value=self.state, pin_mode=self.pin_mode, pulse=self.pulse,
-                on_done=lambda result: done(hardware.result_to_outcome(result)))
+                on_done=lambda result: done(hardware.to_outcome(result)))
         except Exception as error:  # any client error - report, never hang the engine
             done(StepResult(Outcome.FAILED, str(error)))
 
 
 def seed_plant(plant_x: float = 0.0, plant_y: float = 0.0, plant_z: float = 0.0,
                tray_x: float = 0.0, tray_y: float = 0.0, tray_z: float = 0.0,
-               z_increment: float = 80.0) -> Sequence:
+               z_increment: float = 0.0) -> Sequence:
     """
     Build a sequence to pick up a seed from the seed tray and plant it.
 
