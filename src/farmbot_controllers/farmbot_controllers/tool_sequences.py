@@ -76,8 +76,8 @@ class ToolSequences:
                 self.node.get_logger().error('Tool mounting failed %r' % (error, ))
                 return
 
-            Sequence(mount_tool(x=tool['x'], y=tool['y'], z=tool['z'], x_inc=release_x_inc,
-                                y_inc=release_y_inc,
+            Sequence(mount_tool(x=tool['position']['x'], y=tool['position']['y'], z=tool['position']['z'],
+                                x_inc=release_x_inc, y_inc=release_y_inc,
                                 z_inc=self.current_map['map_reference']['safe_z_increment']))
 
         self.get_map(on_done=mount_tool_cmd)
@@ -104,7 +104,8 @@ class ToolSequences:
                 self.node.get_logger().error('Tool unmounting failed %r' % (error, ))
                 return
 
-            Sequence(unmount_tool(x=tool['x'], y=tool['y'], z=tool['z'], x_inc=release_x_inc,
+            Sequence(unmount_tool(x=tool['position']['x'], y=tool['position']['y'],
+                                  z=tool['position']['z'], x_inc=release_x_inc,
                                   y_inc=release_y_inc,
                                   z_inc=self.current_map['map_reference']['safe_z_increment']))
 
@@ -134,24 +135,24 @@ class ToolSequences:
         map_max_y = self.current_map['map_reference']['y_len']
         map_max_z = self.current_map['map_reference']['z_len']
         # Check if the tool position is reachable
-        if not self.__outside_bounds(x_min=0.0, x_max=self.map_max_x, y_min=0.0,
-                                     y_max=self.map_max_y, z_min=self.map_max_z,
-                                     z_max=0.0, x=tool_info['x'], y=tool_info['y'],
-                                     z=tool_info['z']):
-            self.node_.get_logger().warn(f'Max pos {map_max_x}  {map_max_y}  '
+        if not self.__outside_bounds(x_min=0.0, x_max=map_max_x, y_min=0.0,
+                                     y_max=map_max_y, z_min=(-1)*map_max_z,
+                                     z_max=0.0, x=tool_info['position']['x'], y=tool_info['position']['y'],
+                                     z=tool_info['position']['z']):
+            self.node.get_logger().warn(f'Max pos {map_max_x}  {map_max_y}  '
                                          f'{map_max_z} ')
 
-            raise ValueError(f"Tool home position {tool_info['x']} {tool_info['y']} "
-                             f"{tool_info['z']} is outside of the farmbot's reach!")
+            raise ValueError(f"Tool home position {tool_info['position']['x']} {tool_info['position']['y']} "
+                             f"{tool_info['position']['z']} is outside of the farmbot's reach ({map_max_x},{map_max_y},{map_max_z})!")
 
         # Check if the release position is valid
         if not self.__outside_bounds(x_min=0.0, x_max=map_max_x, y_min=0.0,
-                                     y_max=map_max_y, z_min=map_max_z, z_max=0.0,
-                                     x=tool_info['x'] + x_inc, y=tool_info['y'] + y_inc,
-                                     z=tool_info['z']):
-            raise ValueError(f"Tool release position {tool_info['x'] + x_inc} "
-                             f"{tool_info['y'] + y_inc} {tool_info['z']} is outside of "
-                             "the farmbot's reach!")
+                                     y_max=map_max_y, z_min=(-1)*map_max_z, z_max=0.0,
+                                     x=tool_info['position']['x'] + x_inc, y=tool_info['position']['y'] + y_inc,
+                                     z=tool_info['position']['z']):
+            raise ValueError(f"Tool release position {tool_info['position']['x'] + x_inc} "
+                             f"{tool_info['position']['y'] + y_inc} {tool_info['position']['z']} is outside of "
+                             f"the farmbot's reach ({map_max_x},{map_max_y},{map_max_z})!")
 
     def __outside_bounds(self, x_min: float, x_max: float, y_min: float, y_max: float,
                          z_min: float, z_max: float, x: float, y: float, z: float):

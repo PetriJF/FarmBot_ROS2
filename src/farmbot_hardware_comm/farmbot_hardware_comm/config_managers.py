@@ -308,7 +308,6 @@ class ConfigServer:
             raise Exception('axis lengths are not set in the parameter configuration')
 
         update_info = [f'map_reference {axis} {length}' for axis, length in lengths.items()]
-        self.update_map_cmd(update_info=update_info)
 
         self._server_availability('UpdateMap', self.update_map_client)
         request = UpdateMap.Request()
@@ -317,8 +316,8 @@ class ConfigServer:
                     lambda future: self._complete(future, on_done))
 
     def _server_availability(self, cmd_name: str, client):
-        if not client.wait_for_server(1.0):
-            self.get_logger().fatal(f'{cmd_name} Server not available!')
+        if not client.wait_for_service(1.0):
+            self.node.get_logger().fatal(f'{cmd_name} Server not available!')
             raise ServerError('ConfigServer failed: server unavailable')
 
     def _complete(self, future, on_done=None):
@@ -326,15 +325,15 @@ class ConfigServer:
         try:
             response = future.result()
         except Exception as error:  # call failed - report, never leave on_done hanging
-            self.get_logger().error('Service call failed %r' % (error, ))
+            self.node.get_logger().error('Service call failed %r' % (error, ))
             response = None
         if response is None:
-            self.get_logger().warn('Command failure!')
+            self.node.get_logger().warn('Command failure!')
         elif not response.success:
-            self.get_logger().warn(f'Command failed: {response.message}')
+            self.node.get_logger().warn(f'Command failed: {response.message}')
         elif response.message:
-            self.get_logger().info(response.message)
+            self.node.get_logger().info(response.message)
         else:
-            self.get_logger().info('Command successful')
+            self.node.get_logger().info('Command successful')
         if on_done is not None:
             on_done(response)
