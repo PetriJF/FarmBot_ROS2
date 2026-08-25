@@ -5,7 +5,6 @@ Provides helper methods to build tools sequences.
 """
 import ast
 
-from farmbot_controllers.command_map import Sequence
 from farmbot_controllers.sequences.mount_tool import mount_tool
 from farmbot_controllers.sequences.unmount_tool import unmount_tool
 
@@ -63,10 +62,12 @@ class ToolSequences:
         """
         def mount_tool_cmd(response):
             if response is None or not response.success:
-                if on_done:
-                    on_done(response)
-                return
+                error = response.message if response is not None else 'no response'
+                raise ServerError(f'get_map server failed:{error}')
+
             tool = self.current_map['map_reference']['tools'][f'T{index}']
+            if not tool:
+                raise ValueError(f'There is no tool at the index {index} in the active_map')
 
             # Check the tool information for any possible errors
             try:
@@ -76,9 +77,9 @@ class ToolSequences:
                 self.node.get_logger().error('Tool mounting failed %r' % (error, ))
                 return
 
-            Sequence(mount_tool(x=tool['position']['x'], y=tool['position']['y'], z=tool['position']['z'],
-                                x_inc=release_x_inc, y_inc=release_y_inc,
-                                z_inc=self.current_map['map_reference']['safe_z_increment']))
+            on_done(mount_tool(x=tool['position']['x'], y=tool['position']['y'],
+                               z=tool['position']['z'], x_inc=release_x_inc, y_inc=release_y_inc,
+                               z_inc=self.current_map['map_reference']['safe_z_increment']))
 
         self.get_map(on_done=mount_tool_cmd)
 
@@ -91,9 +92,9 @@ class ToolSequences:
         """
         def unmount_tool_cmd(response):
             if response is None or not response.success:
-                if on_done:
-                    on_done(response)
-                return
+                error = response.message if response is not None else 'no response'
+                raise ServerError(f'get_map server failed:{error}')
+
             tool = self.current_map['map_reference']['tools'][f'T{index}']
 
             # Check the tool information for any possible errors
@@ -104,10 +105,10 @@ class ToolSequences:
                 self.node.get_logger().error('Tool unmounting failed %r' % (error, ))
                 return
 
-            Sequence(unmount_tool(x=tool['position']['x'], y=tool['position']['y'],
-                                  z=tool['position']['z'], x_inc=release_x_inc,
-                                  y_inc=release_y_inc,
-                                  z_inc=self.current_map['map_reference']['safe_z_increment']))
+            on_done(unmount_tool(x=tool['position']['x'], y=tool['position']['y'],
+                                 z=tool['position']['z'], x_inc=release_x_inc,
+                                 y_inc=release_y_inc,
+                                 z_inc=self.current_map['map_reference']['safe_z_increment']))
 
         self.get_map(on_done=unmount_tool_cmd)
 
@@ -137,22 +138,26 @@ class ToolSequences:
         # Check if the tool position is reachable
         if not self.__outside_bounds(x_min=0.0, x_max=map_max_x, y_min=0.0,
                                      y_max=map_max_y, z_min=(-1)*map_max_z,
-                                     z_max=0.0, x=tool_info['position']['x'], y=tool_info['position']['y'],
+                                     z_max=0.0, x=tool_info['position']['x'],
+                                     y=tool_info['position']['y'],
                                      z=tool_info['position']['z']):
             self.node.get_logger().warn(f'Max pos {map_max_x}  {map_max_y}  '
-                                         f'{map_max_z} ')
+                                        f'{map_max_z} ')
 
-            raise ValueError(f"Tool home position {tool_info['position']['x']} {tool_info['position']['y']} "
-                             f"{tool_info['position']['z']} is outside of the farmbot's reach ({map_max_x},{map_max_y},{map_max_z})!")
+            raise ValueError(f"Tool home position {tool_info['position']['x']} "
+                             f"{tool_info['position']['y']} {tool_info['position']['z']} is outside"
+                             f" of the farmbot's reach ({map_max_x},{map_max_y},{map_max_z})!")
 
         # Check if the release position is valid
         if not self.__outside_bounds(x_min=0.0, x_max=map_max_x, y_min=0.0,
                                      y_max=map_max_y, z_min=(-1)*map_max_z, z_max=0.0,
-                                     x=tool_info['position']['x'] + x_inc, y=tool_info['position']['y'] + y_inc,
+                                     x=tool_info['position']['x'] + x_inc,
+                                     y=tool_info['position']['y'] + y_inc,
                                      z=tool_info['position']['z']):
             raise ValueError(f"Tool release position {tool_info['position']['x'] + x_inc} "
-                             f"{tool_info['position']['y'] + y_inc} {tool_info['position']['z']} is outside of "
-                             f"the farmbot's reach ({map_max_x},{map_max_y},{map_max_z})!")
+                             f"{tool_info['position']['y'] + y_inc} {tool_info['position']['z']} "
+                             "outside of the farmbot's reach is "
+                             f'({map_max_x},{map_max_y},{map_max_z})!')
 
     def __outside_bounds(self, x_min: float, x_max: float, y_min: float, y_max: float,
                          z_min: float, z_max: float, x: float, y: float, z: float):

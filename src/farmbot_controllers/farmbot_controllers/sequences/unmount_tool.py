@@ -56,20 +56,16 @@ class CheckMountedTool(Step):
 def unmount_tool(x: float = 0.0, y: float = 0, z: float = 0.0,
                  x_inc: float = 0.0, y_inc: float = 0.0, z_inc: float = 0.0) -> Sequence:
     """
-    Build a sequence to check the soil moisture at a specified location.
-
-    The sequence moves the gantry to the probing location, lowers it to
-    the specified probing height, pauses briefly, reads the soil moisture
-    sensor, and raises the gantry back to its initial height.
+    Build a sequence to unmount a tool at a specified gantry location.
 
     Args:
-        max_x (float): Maximum X coordinate for the probing location.
-        max_y (float): Maximum Y coordinate for the probing location.
-        max_z (float): Z coordinate used for the probing position.
-        x (float): X coordinate of the probing location.
-        y (float): Y coordinate of the probing location.
-        z (float): Safe Z coordinate used before and after probing.
-        tick_delay (int): Delay between sequence steps.
+        x (float): X coordinate of the tool.
+        y (float): Y coordinate of the tool.
+        z (float): Z coordinate of the tool.
+        x_inc (float): X-axis offset applied when moving to the release position.
+        y_inc (float): Y-axis offset applied when moving to the release position.
+        z_inc (float): Z-axis offset used to define the safe height above the
+                        tool position.
     """
     steps = []
 

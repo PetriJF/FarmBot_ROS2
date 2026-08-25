@@ -87,10 +87,10 @@ class TaskSequencer(Node):
         self.parameters = Parameters(self)
         self.map_sequences = MapSequences(self)
         self.tool_sequences = ToolSequences(self)
-        hardware = Hardware(self.movement, self.devices, self.states,
-                            self.parameters, self.map_sequences, self.tool_sequences)
+        self.hardware = Hardware(self.movement, self.devices, self.states,
+                                 self.parameters, self.map_sequences, self.tool_sequences)
         self._engine = engine.SequenceEngine(
-            hardware=hardware,
+            hardware=self.hardware,
             on_status=self._publish_status,
             log=lambda message: self.get_logger().warn(message))
 
@@ -114,10 +114,10 @@ class TaskSequencer(Node):
         self.create_subscription(Bool, 'estop_active', self._on_estop, latched)
         self.create_subscription(Bool, 'abort_active', self._on_abort, latched)
 
-        broken = command_map.unresolved(hardware)
+        broken = command_map.unresolved(self.hardware)
         if broken:
             self.get_logger().error(f'command map has unresolved calls: {", ".join(broken)}')
-        self.get_logger().info('task sequencer initialized')
+        self.get_logger().info('Task sequencer initialised')
 
     # --- dispatch for command map ------------------------------------
 
@@ -129,6 +129,9 @@ class TaskSequencer(Node):
             task = command_map.to_task(msg.data)
         except (ValueError, IndexError) as error:
             self.get_logger().warn(f"ignored '{msg.data}': {error}")
+            return
+        if callable(task):
+            task(hardware=self.hardware, done=self._submit)
             return
         self._submit(task)
 

@@ -7,7 +7,6 @@ import ast
 import math
 
 from farmbot_controllers.command_map import Call
-from farmbot_controllers.command_map import Sequence
 from farmbot_controllers.sequences.check_moisture import check_moisture
 from farmbot_controllers.sequences.seed_plant import seed_plant
 from farmbot_controllers.sequences.water_plant import water_plant
@@ -94,11 +93,12 @@ class MapSequences:
 
         EXECUTION OF THE SEQUENCE DOES NOT HAPPEN HERE
         """
+
         def seed_all_plants(response):
             if response is None or not response.success:
-                if on_done:
-                    on_done(response)
-                return
+                error = response.message if response is not None else 'no response'
+                raise ServerError(f'get_map server failed:{error}')
+
             updated_map = []
 
             plants = self.current_map['plant_details']['plants']
@@ -129,16 +129,17 @@ class MapSequences:
 
                     safe_z_increment = self.current_map['map_reference']['safe_z_increment']
 
-                    Sequence(seed_plant(plant_x, plant_y, plant_z, tray_x, tray_y, tray_z,
-                                        safe_z_increment))
+                    on_done(seed_plant(plant_x=plant_x, plant_y=plant_y, plant_z=plant_z,
+                                       tray_x=tray_x, tray_y=tray_y, tray_z=tray_z,
+                                       z_increment=safe_z_increment))
 
                     updated_map.append(f'plant_details plants {plant_index} status '
                                        'growth_stage "Seedling"')
 
+                    self.update_map_cmd(update_info=updated_map)
+
             if not updated_map:
                 self.node.get_logger().warn('No seeds needed planting!')
-
-            self.update_map_cmd(update_info=updated_map)
 
         self.get_map(on_done=seed_all_plants)
 
@@ -157,11 +158,12 @@ class MapSequences:
 
     def water_plants_cmd(self, rigid=False, on_done=None):
         """Create a watering sequence for each plant in the current map."""
+
         def general_watering(response):
             if response is None or not response.success:
-                if on_done:
-                    on_done(response)
-                return
+                error = response.message if response is not None else 'no response'
+                raise ServerError(f'get_map server failed:{error}')
+
             plant_nb = 0
             plants = self.current_map['plant_details']['plants']
             for plant_index in plants:
@@ -178,12 +180,12 @@ class MapSequences:
                                                      plant_name=plant['identifiers']['plant_name']))
                     )
 
-                Sequence(water_plant(plant_x=plant_x, plant_y=plant_y, delay_ms=water_pulses))
+                on_done(water_plant(plant_x=plant_x, plant_y=plant_y, delay_ms=water_pulses))
 
                 plant_nb += 1
 
             if plant_nb == 0:
-                self.node.get_logger().warn('No plants found!')
+                raise ValueError('No plants found!')
 
         self.get_map(on_done=general_watering)
 
@@ -209,11 +211,11 @@ class MapSequences:
         Returns:
         str: A sequence of commands for probing soil moisture.
         """
+
         def moisture_checking(response):
             if response is None or not response.success:
-                if on_done:
-                    on_done(response)
-                return
+                error = response.message if response is not None else 'no response'
+                raise ServerError(f'get_map server failed:{error}')
 
             # Get the constraints of the map
             max_x = self.current_map['map_reference']['x_len']
@@ -240,10 +242,10 @@ class MapSequences:
                     return
 
                 x, y = location
-                Sequence(check_moisture(max_z=max_z, tick_delay=2, x=x, y=y, plant_index=index))
+                on_done(check_moisture(max_z=max_z, ticj_delay=2, x=x, y=y, plant_index=index))
 
             # Return home
-            Call('home', 'movement', 'go_home')
+            on_done(Call('home', 'movement', 'go_home'))
 
         self.get_map(on_done=moisture_checking)
 
