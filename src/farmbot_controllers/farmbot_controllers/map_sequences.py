@@ -180,7 +180,7 @@ class MapSequences:
                                                      plant_name=plant['identifiers']['plant_name']))
                     )
 
-                on_done(water_plant(plant_x=plant_x, plant_y=plant_y, delay_ms=water_pulses))
+                on_done(water_plant(plant_x=plant_x, plant_y=plant_y, delay_ms=water_pulses*1000))
 
                 plant_nb += 1
 
@@ -242,7 +242,7 @@ class MapSequences:
                     return
 
                 x, y = location
-                on_done(check_moisture(max_z=max_z, ticj_delay=2, x=x, y=y, plant_index=index))
+                on_done(check_moisture(max_z=max_z, tick_delay=2, x=x, y=y, plant_index=index))
 
             # Return home
             on_done(Call('home', 'movement', 'go_home'))

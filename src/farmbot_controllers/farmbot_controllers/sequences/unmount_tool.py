@@ -22,7 +22,7 @@ class MoveGantry(Step):
         """Move the gantry to the specified position and report the result."""
         try:
             hardware.movement.move_gantry_abs(
-                x=self.x_coord, y=self.y_coord, z=self.z_coord,
+                x_coord=self.x_coord, y_coord=self.y_coord, z_coord=self.z_coord,
                 on_done=lambda result: done(hardware.to_outcome(result)))
         except Exception as error:  # any client error - report, never hang the engine
             done(StepResult(Outcome.FAILED, str(error)))
@@ -40,7 +40,7 @@ class CheckMountedTool(Step):
         try:
             hardware.devices.read_pin(
                 pin=self.tool_pin, pin_mode=self.pin_mode,
-                on_done=lambda result: done(self._update_soil_moisture(hardware, result, done)))
+                on_done=lambda result: done(self._print(hardware, result, done)))
         except Exception as error:  # any client error - report, never hang the engine
             done(StepResult(Outcome.FAILED, str(error)))
 

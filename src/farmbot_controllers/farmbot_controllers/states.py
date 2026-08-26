@@ -83,13 +83,17 @@ class State:
         """
         self._send('Abort', self.abort_client, on_done)
 
-    async def timer_pause(self, tick_delay: float):
-        """
-        Pause the current async task for the specified delay.
+    def timer_pause(self, tick_delay: float, on_done=None):
+        timer = self.node.create_timer(
+            tick_delay,
+            lambda: self._timer_done(timer, on_done)
+        )
 
-        This function should only be used in sequences.
-        """
-        await asyncio.sleep(tick_delay)
+    def _timer_done(self, timer, on_done=None):
+        timer.cancel()
+
+        if on_done:
+            on_done()
 
     def request_end_stop(self, on_done=None):
         """

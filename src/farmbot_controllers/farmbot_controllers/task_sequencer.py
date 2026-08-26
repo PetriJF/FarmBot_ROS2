@@ -29,7 +29,7 @@ from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile
 
 from std_msgs.msg import Bool, String
 
-_MAX_QUEUED = 16   # bounded pending queue
+_MAX_QUEUED = 64   # bounded pending queue
 
 # Manual movement: the increment presets (mm) and the (x, y) direction each key nudges.
 _INCREMENTS = {'1': 10.0, '2': 100.0, '3': 500.0}

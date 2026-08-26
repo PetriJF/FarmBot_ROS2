@@ -5,6 +5,8 @@ Define the steps required to move the gantry to a probing
 location, read the soil moisture sensor, and return the gantry to its
 initial height.
 """
+import asyncio
+
 from dataclasses import dataclass
 
 from farmbot_controllers.sequence_runner.steps import Outcome, Sequence, Step, StepResult
@@ -39,7 +41,7 @@ class Pause(Step):
         try:
             hardware.states.timer_pause(
                 tick_delay=self.delay,
-                on_done=lambda result: done(hardware.to_outcome(result)))
+                on_done=lambda: done(StepResult(Outcome.OK, "Pause completed")))
         except Exception as error:  # any client error - report, never hang the engine
             done(StepResult(Outcome.FAILED, str(error)))
 
