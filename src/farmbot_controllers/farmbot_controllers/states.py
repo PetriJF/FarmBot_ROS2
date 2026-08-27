@@ -5,8 +5,6 @@ Provides helper methods to interact with FarmBot state commands, including
 emergency stop, abort, reset, software version, current position and end stops
 requests through ROS2 services.
 """
-import asyncio
-
 from farmbot_utils.exceptions import ServerError
 
 from rclpy.node import Node
@@ -84,12 +82,21 @@ class State:
         self._send('Abort', self.abort_client, on_done)
 
     def timer_pause(self, tick_delay: float, on_done=None):
+        """
+        Create a timer to pause the FarmBot during a sequence.
+
+        You must use this function only for sequences
+
+        Args:
+            tick_delay: Delay in seconds before the timer completes.
+        """
         timer = self.node.create_timer(
             tick_delay,
             lambda: self._timer_done(timer, on_done)
         )
 
     def _timer_done(self, timer, on_done=None):
+        """Cancel a timer and execute its completion callback."""
         timer.cancel()
 
         if on_done:

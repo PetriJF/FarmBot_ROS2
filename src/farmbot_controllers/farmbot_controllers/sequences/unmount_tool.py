@@ -40,7 +40,7 @@ class CheckMountedTool(Step):
         try:
             hardware.devices.read_pin(
                 pin=self.tool_pin, pin_mode=self.pin_mode,
-                on_done=lambda result: done(self._print(hardware, result, done)))
+                on_done=lambda result: self._print(hardware, result, done))
         except Exception as error:  # any client error - report, never hang the engine
             done(StepResult(Outcome.FAILED, str(error)))
 

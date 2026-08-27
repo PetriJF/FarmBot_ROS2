@@ -5,8 +5,6 @@ Define the steps required to move the gantry to a probing
 location, read the soil moisture sensor, and return the gantry to its
 initial height.
 """
-import asyncio
-
 from dataclasses import dataclass
 
 from farmbot_controllers.sequence_runner.steps import Outcome, Sequence, Step, StepResult
@@ -41,7 +39,7 @@ class Pause(Step):
         try:
             hardware.states.timer_pause(
                 tick_delay=self.delay,
-                on_done=lambda: done(StepResult(Outcome.OK, "Pause completed")))
+                on_done=lambda: done(StepResult(Outcome.OK, '')))
         except Exception as error:  # any client error - report, never hang the engine
             done(StepResult(Outcome.FAILED, str(error)))
 
@@ -59,7 +57,7 @@ class ReadSoil(Step):
         try:
             hardware.devices.read_pin(
                 pin=self.readsoil_pin, pin_mode=self.pin_mode,
-                on_done=lambda result: done(self._update_soil_moisture(hardware, result, done)))
+                on_done=lambda result: self._update_soil_moisture(hardware, result, done))
         except Exception as error:  # any client error - report, never hang the engine
             done(StepResult(Outcome.FAILED, str(error)))
 
@@ -71,15 +69,18 @@ class ReadSoil(Step):
         callback is called when the map update is completed or if an error occurs.
         """
         outcome = hardware.to_outcome(result)
-        if outcome.ok:
-            try:
-                hardware.map_sequences.update_map_cmd(
-                    update_info=[f'plant_details plants {self.plant_index} plant_details '
-                                 f'soil_moisture {result.value}'],
-                    on_done=lambda result: done(hardware.to_outcome(result)))
-            except Exception as error:  # any client error - report, never hang the engine
-                done(StepResult(Outcome.FAILED, str(error)))
-        done(outcome)
+
+        if not outcome.ok:
+            done(outcome)
+            return
+
+        try:
+            hardware.map_sequences.update_map_cmd(
+                update_info=[f'plant_details plants {self.plant_index} plant_details '
+                             f'soil_moisture {result.value}'],
+                on_done=lambda result: done(hardware.to_outcome(result)))
+        except Exception as error:  # any client error - report, never hang the engine
+            done(StepResult(Outcome.FAILED, str(error)))
 
 
 def check_moisture(max_z: float = 0.0, tick_delay: int = 0, x: float = 0.0,
