@@ -79,9 +79,11 @@ class MapSequences:
             parsed_map = ast.literal_eval(response.message)
             if isinstance(parsed_map, dict):
                 self.current_map = parsed_map
+                self.node.get_logger().info('Command successful') 
+            else:
+                raise ValueError(f'Invalid map: {parsed_map}')
         else:
             self.node.get_logger().info('Command successful')
-            self.current_map = ast.literal_eval(response.message)
         if on_done is not None:
             on_done(response)
 
@@ -243,9 +245,6 @@ class MapSequences:
 
                 x, y = location
                 on_done(check_moisture(max_z=max_z, tick_delay=2, x=x, y=y, plant_index=index))
-
-            # Return home
-            on_done(Call('home', 'movement', 'go_home'))
 
         self.get_map(on_done=moisture_checking)
 

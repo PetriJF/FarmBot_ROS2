@@ -169,6 +169,10 @@ class MapController(Node):
                 map_copy = self.map_instance
 
                 for keys in cmd_split[:n-2]:
+                    try :
+                        keys = ast.literal_eval(keys)
+                    except (ValueError, SyntaxError):
+                        pass
                     map_copy = map_copy[keys]
                 map_copy[cmd_split[-2]] = ast.literal_eval(cmd_split[-1])
             YAMLHandler.save_to_yaml(self.map_instance, self.config_path, self.active_map)
