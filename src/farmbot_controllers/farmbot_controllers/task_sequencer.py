@@ -104,20 +104,22 @@ class TaskSequencer(Node):
         self._increment = 10.0       # step multiplier in mm (set by 1/2/3)
         self._position = None        # latest gantry position, for manual movement
 
-        self._status_pub = self.create_publisher(SequenceStatus, 'sequence_status', 10)
-        self.create_subscription(String, 'request_command', self._on_command, 10)
-        self.create_subscription(PointStamped, 'farmbot_position', self._on_position, 10)
+        self._status_pub = self.create_publisher(SequenceStatus, 'controller/sequence_status', 10)
+
+        self.create_subscription(String, 'hri/request_command', self._on_command, 10)
+        self.create_subscription(PointStamped, 'farmbot_status/farmbot_position',
+                                 self._on_position, 10)
 
         latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL,
                              history=HistoryPolicy.KEEP_LAST)
         self._estop_active = False
-        self.create_subscription(Bool, 'estop_active', self._on_estop, latched)
-        self.create_subscription(Bool, 'abort_active', self._on_abort, latched)
+        self.create_subscription(Bool, 'farmbot_status/estop_active', self._on_estop, latched)
+        self.create_subscription(Bool, 'farmbot_status/abort_active', self._on_abort, latched)
 
         broken = command_map.unresolved(self.hardware)
         if broken:
             self.get_logger().error(f'command map has unresolved calls: {", ".join(broken)}')
-        self.get_logger().info('Task sequencer initialised')
+        self.get_logger().info('Task sequencer Initialised')
 
     # --- dispatch for command map ------------------------------------
 
@@ -223,7 +225,7 @@ class TaskSequencer(Node):
 
 
 def main(args=None):
-    """Initialize and run the task sequencer node."""
+    """Initialise and run the task sequencer node."""
     rclpy.init(args=args)
     node = TaskSequencer()
     try:

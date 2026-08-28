@@ -19,12 +19,12 @@ class State:
         """Initialise the state module and the ROS2 service clients."""
         self.node = node
 
-        self.estop_client = self.node.create_client(Trigger, 'estop')
-        self.abort_client = self.node.create_client(Trigger, 'abort')
-        self.resume_client = self.node.create_client(Trigger, 'resume')
-        self.end_stop_client = self.node.create_client(Trigger, 'end_stop')
-        self.sw_version_client = self.node.create_client(Trigger, 'sw_version')
-        self.curr_position_client = self.node.create_client(Trigger, 'curr_pos')
+        self.estop_client = self.node.create_client(Trigger, 'priority_cmd/estop')
+        self.abort_client = self.node.create_client(Trigger, 'priority_cmd/abort')
+        self.resume_client = self.node.create_client(Trigger, 'priority_cmd/resume')
+        self.end_stop_client = self.node.create_client(Trigger, 'hardware_comm/end_stop')
+        self.sw_version_client = self.node.create_client(Trigger, 'hardware_comm/sw_version')
+        self.curr_position_client = self.node.create_client(Trigger, 'hardware_comm/curr_pos')
 
     def _server_availability(self, cmd_name: str, client):
         if not client.wait_for_service(1.0):

@@ -43,15 +43,15 @@ class LuxonisCameraNode(Node):
         Reads the Luxonis camera packets and publishes the RGB and depth frames on their
         respective topics.
         """
-        super().__init__('LuxonisCamera')
+        super().__init__('luxonis_camera')
 
         self.bridge = CvBridge()  # Bridge to convert between ROS and OpenCV images
         self.load_config()        # Load configuration from YAML file
-        self.setup_camera()       # Initialize and configure the DepthAI camera
+        self.setup_camera()       # Initialise and configure the DepthAI camera
 
-        # Initialize publishers for RGB and depth images
-        self.rgb_publisher = self.create_publisher(Image, 'rgb_img', 10)
-        self.depth_publisher = self.create_publisher(Image, 'depth_img', 10)
+        # Initialise publishers for RGB and depth images
+        self.rgb_publisher = self.create_publisher(Image, 'camera/rgb_img', 10)
+        self.depth_publisher = self.create_publisher(Image, 'camera/depth_img', 10)
 
         self.rgb_image_ = None
         self.depth_image_ = None
@@ -62,7 +62,7 @@ class LuxonisCameraNode(Node):
         self.processing_thread.daemon = True  # Check the thread was closed when the main ends
         self.processing_thread.start()
 
-        self.get_logger().info('Luxonis Camera Node initialized...')
+        self.get_logger().info('Luxonis Camera Node initialised...')
 
     def setup_camera(self):
         """Set the camera links and pipeline."""
@@ -211,7 +211,7 @@ class LuxonisCameraNode(Node):
 
 
 def main(args=None):
-    """Initialize ROS2 and run the LuxonisCameraNode until shutdown."""
+    """Initialise ROS2 and run the luxonis_camera Node until shutdown."""
     rclpy.init(args=args)
     camera_node = LuxonisCameraNode()
 

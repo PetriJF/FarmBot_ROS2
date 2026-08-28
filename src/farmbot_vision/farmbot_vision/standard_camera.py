@@ -38,8 +38,8 @@ class StandardCameraNode(Node):
     """Camera Node reads packets from the standard farmbot camera and publishes the RGB frames."""
 
     def __init__(self):
-        """Initialize the standard camera node and start the capture timer."""
-        super().__init__('StandardCamera')
+        """Initialise the standard camera node and start the capture timer."""
+        super().__init__('standard_camera')
 
         # Configurable parameters
         self.camera_port = self.declare_parameter('camera_index', 0).value
@@ -71,7 +71,7 @@ class StandardCameraNode(Node):
         period = 1.0 / self.fps if self.fps > 0 else 1.0 / 30.0
         self.capture_timer = self.create_timer(period, self.capture_frame)
 
-        self.get_logger().info('Standard Camera Node initialized...')
+        self.get_logger().info('Standard Camera Node initialised...')
 
     def init_camera(self) -> bool:
         """Open and configure the camera. Return True on success."""
@@ -186,7 +186,7 @@ class StandardCameraNode(Node):
 
 
 def main(args=None):
-    """Initialize ROS2 and run the StandardCameraNode until shutdown."""
+    """Initialise ROS2 and run the standard_camera Node until shutdown."""
     rclpy.init(args=args)
 
     cam = StandardCameraNode()

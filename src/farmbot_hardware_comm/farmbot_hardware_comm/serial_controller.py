@@ -48,7 +48,7 @@ class SerialController(Node):
     # Node constructor
     def __init__(self):
         """Node Constructor."""
-        super().__init__('SerialController')
+        super().__init__('serial_controller')
 
         self.fb_startup = False
         self.goal_handle = None
@@ -126,15 +126,16 @@ class SerialController(Node):
                                               self.cmd_callback_group)
 
         # Initialise motor servers
-        self.move_gantry_server = ActionServer(self, MoveGantry, 'move_gantry',
+        self.move_gantry_server = ActionServer(self, MoveGantry, 'hardware_comm/move_gantry',
                                                goal_callback=self.goal_callback,
                                                execute_callback=self.gantry_execute_callback,
                                                callback_group=self.cmd_callback_group)
-        self.home_axes_server = ActionServer(self, HomeAxes, 'home_axes',
+        self.home_axes_server = ActionServer(self, HomeAxes, 'hardware_comm/home_axes',
                                              goal_callback=self.goal_callback,
                                              execute_callback=self.home_execute_callback,
                                              callback_group=self.cmd_callback_group)
-        self.load_params_server = ActionServer(self, LoadingParameters, 'loading_params',
+        self.load_params_server = ActionServer(self, LoadingParameters,
+                                               'hardware_comm/loading_params',
                                                goal_callback=self.goal_callback,
                                                execute_callback=(
                                                    self.config_server
@@ -142,30 +143,34 @@ class SerialController(Node):
                                                callback_group=self.cmd_callback_group)
 
         # Initialise state servers
-        self.estop_trigger_server = self.create_service(Trigger, 'estop',
+        self.estop_trigger_server = self.create_service(Trigger, 'priority_cmd/estop',
                                                         self.estop_command_server,
                                                         callback_group=self.cmd_callback_group)
-        self.resume_trigger_server = self.create_service(Trigger, 'resume',
+        self.resume_trigger_server = self.create_service(Trigger, 'priority_cmd/resume',
                                                          self.resume_command_server,
                                                          callback_group=self.cmd_callback_group)
-        self.abort_trigger_server = self.create_service(Trigger, 'abort',
+        self.abort_trigger_server = self.create_service(Trigger, 'priority_cmd/abort',
                                                         self.abort_command_server,
                                                         callback_group=self.cmd_callback_group)
 
         # Initialise publishers
         self.fb_position = PointStamped()
         self.fb_position.header.stamp = self.get_clock().now().to_msg()
-        self.fb_position_pub = self.create_publisher(PointStamped, 'farmbot_position', 10)
+        self.fb_position_pub = self.create_publisher(PointStamped,
+                                                     'farmbot_status/farmbot_position', 10)
         # Latched for late subscriptions of estop/abort state
         latched_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.estop_active = Bool()
-        self.estop_active_pub = self.create_publisher(Bool, 'estop_active', latched_qos)
+        self.estop_active_pub = self.create_publisher(Bool, 'farmbot_status/estop_active',
+                                                      latched_qos)
         self.estop_active_pub.publish(self.estop_active)
         self.abort_active = Bool()
-        self.abort_active_pub = self.create_publisher(Bool, 'abort_active', latched_qos)
+        self.abort_active_pub = self.create_publisher(Bool, 'farmbot_status/abort_active',
+                                                      latched_qos)
         self.abort_active_pub.publish(self.abort_active)
         self.serial_feedback = String()
-        self.serial_feedback_pub = self.create_publisher(String, 'serial_feedback', 10)
+        self.serial_feedback_pub = self.create_publisher(String, 'farmbot_status/serial_feedback',
+                                                         10)
 
         # Initialise Serial Communication
         self.ser = serial.Serial(serial_port, serial_speed, timeout=1)

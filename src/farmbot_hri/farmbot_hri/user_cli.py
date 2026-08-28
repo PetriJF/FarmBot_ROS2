@@ -32,28 +32,32 @@ class UserCLI(Node):
 
     # Node contructor
     def __init__(self):
-        """Initialize the UserCLI node and its ROS2 publishers."""
-        super().__init__('UserCLI')
+        """Initialise the user_cli node and its ROS2 publishers."""
+        super().__init__('user_cli')
 
         # User command publisher
         self.cmd = String()
-        self.input_pub = self.create_publisher(String, 'request_command', 10)
+        self.input_pub = self.create_publisher(String, 'hri/request_command', 10)
 
         # Initialisation of the service clients for priority commands (estop, abort, resume)
-        self.estop_client = self.create_client(Trigger, 'estop')
-        self.abort_client = self.create_client(Trigger, 'abort')
-        self.resume_client = self.create_client(Trigger, 'resume')
-        self.add_plant_client = self.create_client(AddPlant, 'add_plant')
-        self.add_tool_client = self.create_client(AddTool, 'add_tool')
-        self.add_tray_client = self.create_client(AddSeedTray, 'add_seed_tray')
-        self.remove_map_object_client = self.create_client(RemoveMapObject, 'remove_map_object')
+        self.estop_client = self.create_client(Trigger, 'priority_cmd/estop')
+        self.abort_client = self.create_client(Trigger, 'priority_cmd/abort')
+        self.resume_client = self.create_client(Trigger, 'priority_cmd/resume')
 
-        self.loading_params_client = ActionClient(self, LoadingParameters, 'loading_params')
+        self.loading_params_client = ActionClient(self, LoadingParameters,
+                                                  'hardware_comm/loading_params')
+
+        # Initialisation of the service clients for commands to change the map
+        self.add_plant_client = self.create_client(AddPlant, 'map_cmd/add_plant')
+        self.add_tool_client = self.create_client(AddTool, 'map_cmd/add_tool')
+        self.add_tray_client = self.create_client(AddSeedTray, 'map_cmd/add_seed_tray')
+        self.remove_map_object_client = self.create_client(RemoveMapObject,
+                                                           'map_cmd/remove_map_object')
 
         self.line_number_list = []
 
-        # Log the initialization
-        self.get_logger().info('User CLI Initialized..')
+        # Log the initialisation
+        self.get_logger().info('User CLI Initialised..')
 
         self.get_logger().info("""\n
                                This is a user interface for the ROS2 Farmbot
@@ -214,6 +218,8 @@ class UserCLI(Node):
                       'P_2', 'C_1', 'C_2', 'T_1_0', 'T_2_0', 'T_3_0', 'T_4_0', 'T_5_0', 'T_6_0',
                       'T_1_9', 'T_2_9', 'T_3_9', 'T_4_9', 'T_5_9', 'T_6_9', 'S_1_0', 'S_2_0',
                       'S_3_0', 'S_1_1', 'S_2_1', 'S_3_1', 'M', 'M_S', 'CONF', 'H_1', 'M_SV')
+
+        # TODO: Implement I_0, I_1, I_2, I_3, I_4, w, s, a, d, 1, 2 and 3 commands
 
         # Record the user input
         user_input = input('\nEnter command: ')
@@ -394,7 +400,7 @@ class UserCLI(Node):
 
 
 def main(args=None):
-    """Initialize and run the user CLI node."""
+    """Initialise and run the user_cli node."""
     rclpy.init(args=args)
 
     user_cli_node = UserCLI()

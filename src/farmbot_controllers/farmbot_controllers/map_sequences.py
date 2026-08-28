@@ -6,7 +6,6 @@ Provides helper methods for watering and check moisture commands.
 import ast
 import math
 
-from farmbot_controllers.command_map import Call
 from farmbot_controllers.sequences.check_moisture import check_moisture
 from farmbot_controllers.sequences.seed_plant import seed_plant
 from farmbot_controllers.sequences.water_plant import water_plant
@@ -30,10 +29,10 @@ class MapSequences:
         self.current_map = {}
 
         # Config service client
-        self.get_map_client = self.node.create_client(Trigger, 'get_map')
+        self.get_map_client = self.node.create_client(Trigger, 'map_cmd/get_map')
 
         # Update map client
-        self.update_map_client = self.node.create_client(UpdateMap, 'update_map')
+        self.update_map_client = self.node.create_client(UpdateMap, 'map_cmd/update_map')
 
         self.directory = YAMLHandler.get_directory_package('farmbot_controllers', 'config')
         try:
@@ -45,7 +44,7 @@ class MapSequences:
             return
 
     def get_map(self, on_done=None):
-        """Request the current map from the MapController node."""
+        """Request the current map from the map_controller node."""
         self._server_availability('GetMap', self.get_map_client)
 
         self.get_map_client.call_async(Trigger.Request()).add_done_callback(
@@ -79,7 +78,7 @@ class MapSequences:
             parsed_map = ast.literal_eval(response.message)
             if isinstance(parsed_map, dict):
                 self.current_map = parsed_map
-                self.node.get_logger().info('Command successful') 
+                self.node.get_logger().info('Command successful')
             else:
                 raise ValueError(f'Invalid map: {parsed_map}')
         else:

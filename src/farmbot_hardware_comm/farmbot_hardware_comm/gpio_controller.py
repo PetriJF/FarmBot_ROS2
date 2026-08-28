@@ -34,8 +34,8 @@ class GPIOController(Node):
 
     # Node constructor
     def __init__(self):
-        """Initialise the GPIO controller node and configure hardware pins."""
-        super().__init__('GPIOController')
+        """Initialise the gpio_controller node and configure hardware pins."""
+        super().__init__('gpio_controller')
 
         GPIO.setmode(GPIO.BCM)
 
@@ -66,16 +66,17 @@ class GPIOController(Node):
         GPIO.setup(self.fb_panel['button_b'], GPIO.IN)
         GPIO.setup(self.fb_panel['button_c'], GPIO.IN)
 
-        self.estop_client = self.create_client(Trigger, 'estop')
-        self.resume_client = self.create_client(Trigger, 'resume')
+        self.estop_client = self.create_client(Trigger, 'priority_cmd/estop')
+        self.resume_client = self.create_client(Trigger, 'priority_cmd/resume')
 
         # If configured, Button A calls the abort trigger instead of sending its command
         self.abort_button = bool(self.button['button_a'].get('abort', False))
         if self.abort_button:
-            self.abort_client = self.create_client(Trigger, 'abort')
+            self.abort_client = self.create_client(Trigger, 'priority_cmd/abort')
 
         # TODO: migrate high-level commands to language-agnostic service calls
-        self.request_command_pub = self.create_publisher(String, 'request_command', 10)
+
+        self.request_command_pub = self.create_publisher(String, 'hri/request_command', 10)
 
         # Maps a button's GPIO channel to its ButtonCommand.yaml entry
         self.button_channels = {self.fb_panel[button]: button
@@ -93,7 +94,7 @@ class GPIOController(Node):
         # Button A is set to abort, use its LED to track the abort state
         if self.abort_button:
             GPIO.output(self.fb_panel['button_led_a'], GPIO.HIGH)
-            self.create_subscription(Bool, 'abort_active', self.abort_led,
+            self.create_subscription(Bool, 'farmbot_status/abort_active', self.abort_led,
                                      QoSProfile(depth=1,
                                                 durability=DurabilityPolicy.TRANSIENT_LOCAL))
 
@@ -111,7 +112,8 @@ class GPIOController(Node):
             self.fb_panel['button_led_c']
         ]
 
-        self.led_panel_server = self.create_service(LedPanelHandler, 'set_led', self.led_server)
+        self.led_panel_server = self.create_service(LedPanelHandler, 'hardware_comm/set_led',
+                                                    self.led_server)
 
         # Log the Initialisation
         self.get_logger().info('GPIO Controller Initialised..')

@@ -24,9 +24,12 @@ class AutonomousCmds(Node):
     """
 
     def __init__(self):
-        """Initialize the autonomous command sender node."""
-        super().__init__('command_sender')
-        self.publisher = self.create_publisher(String, '/input_topic', 10)
+        """Initialise the autonomous command sender node."""
+        super().__init__('autonomous_controller')
+
+        self.cmd = String()
+        self.input_pub = self.create_publisher(String, 'hri/request_command', 10)
+
         timer_period = 60  # seconds
         self.timer = self.create_timer(timer_period, self.send_command)
 
@@ -49,11 +52,11 @@ class AutonomousCmds(Node):
                 self.get_logger().info('Publishing: "%s"' % command)
                 msg = String()
                 msg.data = command
-                self.publisher.publish(msg)
+                self.input_pub.publish(msg)
 
 
 def main(args=None):
-    """Initialize and run the autonomous command sender node."""
+    """Initialise and run the autonomous command sender node."""
     rclpy.init(args=args)
     command_sender = AutonomousCmds()
     rclpy.spin(command_sender)

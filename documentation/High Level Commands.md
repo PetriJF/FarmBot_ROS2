@@ -1,8 +1,10 @@
-These are the high level commands that the user inputs in order to achieve a specific functionality. The low level commands, including the sequencing commands are covered in another wiki page.
+These are the high level commands that the user inputs in order to achieve a specific functionality.
 
 # Movement commands
 
 Movement commands are used to move the gantry relative to the home position.
+
+WITH THE REFACTORING THE w, a, s, d, 1, 2 and 3 COMMANDS ARE NOT IMPLEMENTED ANYMORE
 
 | Code | Subcodes    | Description                                                                                     |
 | ---- | ----------- | ----------------------------------------------------------------------------------------------- |
@@ -78,6 +80,8 @@ Commands that control the different devices connected to the farmbot.
 # Vision Commands
 
 The commands that are related to the vision system.
+
+WITH THE REFACTORING THOSE COMMANDS ARE NOT IMPLEMENTED ANYMORE
 
 | Code | Subcodes | Description                                                                                             |
 | ---- | -------- | ------------------------------------------------------------------------------------------------------- |

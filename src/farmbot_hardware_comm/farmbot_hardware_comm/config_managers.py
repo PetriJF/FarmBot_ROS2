@@ -147,16 +147,11 @@ class ConfigServer:
                                     log=lambda message: self.node.get_logger().warn(message))
         self.params = self.table.params
 
-        # FIXME TODO these should be handled automatically and removed in the future
-        # Config Service Servers
-        # self.map_dimensions_server = self.node.create_service(Trigger, 'publish_map_dimensions',
-        #                                                       self.map_dimensions_server_cb)
-
         # Update map client
-        self.update_map_client = self.node.create_client(UpdateMap, 'update_map')
+        self.update_map_client = self.node.create_client(UpdateMap, 'map_cmd/update_map')
 
-        # Log the initialization
-        self.node.get_logger().info('Config Server Initialized..')
+        # Log the initialisation
+        self.node.get_logger().info('Config Server Initialised..')
 
     @property
     def param_vals(self) -> dict:

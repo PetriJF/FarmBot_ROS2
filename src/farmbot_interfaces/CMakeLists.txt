@@ -12,7 +12,6 @@ find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/PlantManage.msg"
   "msg/ImageMessage.msg"
   "msg/SequenceStatus.msg"
   "srv/AddPlant.srv"

@@ -19,13 +19,14 @@ class DeviceControl:
         """Initialise the device module and the ROS2 service clients."""
         self.node = node
 
-        self.read_i2c_client = self.node.create_client(ReadI2C, 'read_i2c')
-        self.set_i2c_client = self.node.create_client(SetI2C, 'set_i2c')
-        self.watering_client = self.node.create_client(Watering, 'watering')
-        self.read_pin_client = self.node.create_client(ReadPin, 'read_pin')
-        self.write_pin_client = self.node.create_client(WritePin, 'write_pin')
-        self.configure_pin_client = self.node.create_client(ConfigurePin, 'configure_pin')
-        self.move_servo_client = self.node.create_client(MoveServo, 'move_servo')
+        self.read_i2c_client = self.node.create_client(ReadI2C, 'hardware_comm/read_i2c')
+        self.set_i2c_client = self.node.create_client(SetI2C, 'hardware_comm/set_i2c')
+        self.watering_client = self.node.create_client(Watering, 'hardware_comm/watering')
+        self.read_pin_client = self.node.create_client(ReadPin, 'hardware_comm/read_pin')
+        self.write_pin_client = self.node.create_client(WritePin, 'hardware_comm/write_pin')
+        self.configure_pin_client = self.node.create_client(ConfigurePin,
+                                                            'hardware_comm/configure_pin')
+        self.move_servo_client = self.node.create_client(MoveServo, 'hardware_comm/move_servo')
 
     def _server_availability(self, cmd_name: str, client):
         if not client.wait_for_service(1.0):

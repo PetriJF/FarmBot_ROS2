@@ -24,10 +24,10 @@ class ToolSequences:
         self.current_map = {}
 
         # Config service client
-        self.get_map_client = self.node.create_client(Trigger, 'get_map')
+        self.get_map_client = self.node.create_client(Trigger, 'map_cmd/get_map')
 
     def get_map(self, on_done=None):
-        """Request the current map from the MapController node."""
+        """Request the current map from the map_controller node."""
         self._server_availability('GetMap', self.get_map_client)
         self.get_map_client.call_async(Trigger.Request()).add_done_callback(
                                        lambda future: self._complete(future, on_done))
