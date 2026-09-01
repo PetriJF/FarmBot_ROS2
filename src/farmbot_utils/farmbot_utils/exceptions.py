@@ -19,6 +19,12 @@ class EncodeError(Exception):
     pass
 
 
+class InputError(Exception):
+    """Raised when an input command is invalid."""
+
+    pass
+
+
 class YAMLError(Exception):
     """Raised when an error occurs while reading or parsing a YAML file."""
 

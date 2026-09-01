@@ -8,6 +8,9 @@ demonstrates command priority handling versus sequencer commands.
 import readline
 
 from farmbot_interfaces.action import LoadingParameters
+from farmbot_interfaces.srv import AddPlant, AddSeedTray, AddTool, RemoveMapObject
+
+from farmbot_utils.exceptions import InputError, ServerError
 
 import rclpy
 from rclpy.action import ActionClient
@@ -17,12 +20,6 @@ from rclpy.node import Node
 from std_msgs.msg import String
 
 from std_srvs.srv import Trigger
-
-
-class ServerError(Exception):
-    """Raised when a server is not available."""
-
-    pass
 
 
 class UserCLI(Node):
@@ -35,24 +32,32 @@ class UserCLI(Node):
 
     # Node contructor
     def __init__(self):
-        """Initialize the UserCLI node and its ROS2 publishers."""
-        super().__init__('UserCLI')
+        """Initialise the user_cli node and its ROS2 publishers."""
+        super().__init__('user_cli')
 
         # User command publisher
         self.cmd = String()
-        self.input_pub = self.create_publisher(String, 'request_command', 10)
+        self.input_pub = self.create_publisher(String, 'hri/request_command', 10)
 
         # Initialisation of the service clients for priority commands (estop, abort, resume)
-        self.estop_client = self.create_client(Trigger, 'estop')
-        self.abort_client = self.create_client(Trigger, 'abort')
-        self.resume_client = self.create_client(Trigger, 'resume')
+        self.estop_client = self.create_client(Trigger, 'priority_cmd/estop')
+        self.abort_client = self.create_client(Trigger, 'priority_cmd/abort')
+        self.resume_client = self.create_client(Trigger, 'priority_cmd/resume')
 
-        self.loading_params_client = ActionClient(self, LoadingParameters, 'loading_params')
+        self.loading_params_client = ActionClient(self, LoadingParameters,
+                                                  'hardware_comm/loading_params')
+
+        # Initialisation of the service clients for commands to change the map
+        self.add_plant_client = self.create_client(AddPlant, 'map_cmd/add_plant')
+        self.add_tool_client = self.create_client(AddTool, 'map_cmd/add_tool')
+        self.add_tray_client = self.create_client(AddSeedTray, 'map_cmd/add_seed_tray')
+        self.remove_map_object_client = self.create_client(RemoveMapObject,
+                                                           'map_cmd/remove_map_object')
 
         self.line_number_list = []
 
-        # Log the initialization
-        self.get_logger().info('User CLI Initialized..')
+        # Log the initialisation
+        self.get_logger().info('User CLI Initialised..')
 
         self.get_logger().info("""\n
                                This is a user interface for the ROS2 Farmbot
@@ -75,8 +80,107 @@ class UserCLI(Node):
             client.call_async(Trigger.Request()).add_done_callback(
                               lambda future: self._complete(future, on_done))
 
+    def add_plant_command(self, command: list, on_done=None):
+        """
+        Send a request to add a new plant to the active map.
+
+        Args:
+            command (list): List containing the plant parameters, including
+                            position, radii, water quantity, maximum height,
+                            plant name, and growth stage.
+        """
+        if len(command) != 9:
+            raise InputError("The command P_1 must be written as 'P_1 x y z plant_radius "
+                             "canopy_radius water_quantity max_height plant_name growth_stage'")
+
+        self._server_availability('AddPlant', self.add_plant_client)
+
+        plant = AddPlant.Request()
+
+        plant.plant_name = command[7]
+        plant.position.x = float(command[0])
+        plant.position.y = float(command[1])
+        plant.position.z = float(command[2])
+        plant.plant_radius = float(command[3])
+        plant.canopy_radius = float(command[4])
+        plant.max_height = float(command[6])
+        plant.water_quantity = float(command[5])
+        plant.growth_stage = command[8]
+        plant.autopos = False
+
+        self.add_plant_client.call_async(request=plant).add_done_callback(
+            lambda future: self._complete(future, on_done))
+
+    def add_tool_command(self, command: list, on_done=None):
+        """
+        Send a request to add a new tool to the active map.
+
+        Args:
+            command (list): List containing the tool parameters, including
+                            index, tool name, position, and release direction.
+        """
+        if len(command) != 6:
+            raise InputError("The command T_n_0 must be written as 'T_n_0 tool_name x y "
+                             "z release_direction'")
+
+        self._server_availability('AddTool', self.add_tool_client)
+
+        request = AddTool.Request()
+
+        request.index = int(command[0][2])
+        request.tool_name = command[1]
+        request.position.x = float(command[2])
+        request.position.y = float(command[3])
+        request.position.z = float(command[4])
+        request.release_dir = int(command[5])
+
+        self.add_tool_client.call_async(request=request).add_done_callback(
+            lambda future: self._complete(future, on_done))
+
+    def add_tray_command(self, command: list, on_done=None):
+        """
+        Send a request to add a new tray to the active map.
+
+        Args:
+            command (list): List containing the tray details.
+        """
+        if len(command) != 7:
+            raise InputError("The command S_n_0 must be written as 'S_n_0 tray_type tray_name "
+                             "seed_type x y z'")
+
+        self._server_availability('AddTray', self.add_tray_client)
+
+        request = AddSeedTray.Request()
+
+        request.index = int(command[0][2])
+        request.tray_type = int(command[1])
+        request.name = command[2]
+        request.seed_type = command[3]
+        request.position.x = float(command[4])
+        request.position.y = float(command[5])
+        request.position.z = float(command[6])
+
+        self.add_tray_client.call_async(request=request).add_done_callback(
+            lambda future: self._complete(future, on_done))
+
+    def remove_object_command(self, index: int, map_object: int, on_done=None):
+        """
+        Send a request to remove an object from the active map.
+
+        Args:
+            index (int): Index of the object to remove.
+            map_object (int): code of the object
+        """
+        self._server_availability('RemoveMapObject', self.remove_map_object_client)
+        request = RemoveMapObject.Request()
+        request.index = index
+        request.op = map_object
+
+        self.remove_map_object_client.call_async(request=request).add_done_callback(
+            lambda future: self._complete(future, on_done))
+
     def _server_availability(self, cmd_name: str, client):
-        if not client.wait_for_server(1.0):
+        if not client.wait_for_service(1.0):
             self.get_logger().fatal(f'{cmd_name} Server not available!')
             raise ServerError('Task_Sequencer failed: server unavailable')
 
@@ -112,7 +216,10 @@ class UserCLI(Node):
                       'P_9', 'I_0', 'I_1', 'I_2', 'I_3', 'I_4', 'D_C', 'D_L_1', 'D_L_0', 'D_W_1',
                       'D_W_0', 'D_V_1', 'D_V_0', 'H_0', 'D_S_C', 'P4_0', 'P4_1', 'C_0', 'P_1',
                       'P_2', 'C_1', 'C_2', 'T_1_0', 'T_2_0', 'T_3_0', 'T_4_0', 'T_5_0', 'T_6_0',
-                      'S_1_0', 'S_2_0', 'S_3_0', 'M', 'M_S', 'CONF', 'H_1', 'M_SV')
+                      'T_1_9', 'T_2_9', 'T_3_9', 'T_4_9', 'T_5_9', 'T_6_9', 'S_1_0', 'S_2_0',
+                      'S_3_0', 'S_1_1', 'S_2_1', 'S_3_1', 'M', 'M_S', 'CONF', 'H_1', 'M_SV')
+
+        # TODO: Implement I_0, I_1, I_2, I_3, I_4, w, s, a, d, 1, 2 and 3 commands
 
         # Record the user input
         user_input = input('\nEnter command: ')
@@ -123,23 +230,51 @@ class UserCLI(Node):
         # Send the user input to the farmbot controller if it is a valid key or command
         if code[0] in valid_keys:
             # Send the command with priority at the UART controller
-            if user_input == 'E':
-                self._send(self.estop_client)
-                self.get_logger().info('ESTOP button pressed')
-                line_number += 1
-            elif user_input == 'R':
-                self._send(self.resume_client)
-                self.get_logger().info('RESET button pressed')
-                line_number += 1
-            elif user_input == '@':
-                self._send(self.abort_client)
-                self.get_logger().info('Abort movement')
-                line_number += 1
-            elif code[0] == 'C_1':
-                self.send_load_params_goal(code[1])
-            else:
-                self.cmd.data = user_input
-                self.input_pub.publish(self.cmd)
+            match code[0]:
+                case 'E':
+                    self._send(self.estop_client)
+                    self.get_logger().info('ESTOP button pressed')
+                    line_number += 1
+                case 'R':
+                    self._send(self.resume_client)
+                    self.get_logger().info('RESET button pressed')
+                    line_number += 1
+                case '@':
+                    self._send(self.abort_client)
+                    self.get_logger().info('Abort movement')
+                    line_number += 1
+                case 'C_1':
+                    try:
+                        self.send_load_params_goal(code)
+                    except InputError as e:
+                        self.get_logger().warn(f'{e}')
+                case 'P_1':
+                    try:
+                        self.add_plant_command(code[1:])
+                    except InputError as e:
+                        self.get_logger().warn(f'{e}')
+                        line_number += 2
+                case 'P_2':
+                    self.remove_object_command(index=int(code[1]), map_object=0)
+                case 'T_1_0' | 'T_2_0' | 'T_3_0' | 'T_4_0' | 'T_5_0' | 'T_6_0':
+                    try:
+                        self.add_tool_command(code)
+                    except InputError as e:
+                        self.get_logger().warn(f'{e}')
+                        line_number += 2
+                case 'T_1_9' | 'T_2_9' | 'T_3_9' | 'T_4_9' | 'T_5_9' | 'T_6_9':
+                    self.remove_object_command(index=int(code[0][2]), map_object=1)
+                case 'S_1_0' | 'S_2_0' | 'S_3_0':  # e.g. S_1_0 0 Tray1 Radish 1198.0 332.4 -240.0
+                    try:
+                        self.add_tray_command(code)
+                    except InputError as e:
+                        self.get_logger().warn(f'{e}')
+                        line_number += 2
+                case 'S_1_1' | 'S_2_1' | 'S_3_1':
+                    self.remove_object_command(index=int(code[0][2]), map_object=2)
+                case _:
+                    self.cmd.data = user_input
+                    self.input_pub.publish(self.cmd)
         else:
             print('Invalid input\n')
             line_number += 2
@@ -165,7 +300,7 @@ class UserCLI(Node):
             self.line_number_list.pop(0)
             print(f'\033[{sum(self.line_number_list)}B', end='')
 
-    def send_load_params_goal(self, config_name: str, params=[], values=[], on_done=None):
+    def send_load_params_goal(self, command: list, params=[], values=[], on_done=None):
         """
         Send a LoadingParameters goal to the FarmBot action server.
 
@@ -178,10 +313,12 @@ class UserCLI(Node):
             values (list[int]): List of values corresponding to the specified parameters.
             on_done (callable, optional): Callback function called when the goal has been completed.
         """
+        if len(command) != 2:
+            raise InputError('You must enter the name of the configuration you want to use!')
         self._server_availability('LoadingParameters', self.loading_params_client)
 
         goal = LoadingParameters.Goal()
-        goal.profile = config_name
+        goal.profile = command[1]
         goal.params = params
         goal.values = values
 
@@ -263,7 +400,7 @@ class UserCLI(Node):
 
 
 def main(args=None):
-    """Initialize and run the user CLI node."""
+    """Initialise and run the user_cli node."""
     rclpy.init(args=args)
 
     user_cli_node = UserCLI()

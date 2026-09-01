@@ -44,10 +44,11 @@ def generate_launch_description():
             choices=['None'] + camera_choices,
             description='Select the camera type to use with the FarmBot.'
         ),
+        # The sequence engine
         Node(
             package='farmbot_controllers',
-            executable='farmbot_controller',
-            name='controller',
+            executable='task_sequencer',
+            name='task_sequencer',
             output='screen'
         ),
         Node(
@@ -59,18 +60,6 @@ def generate_launch_description():
                 {'ws_path': ws_path},
                 {'folder_config_name': 'local_config'},
             ]
-        ),
-        Node(
-            package='camera_handler',
-            executable='camera_controller',
-            name='camera_controller',
-            output='screen',
-            condition=IfCondition(
-                PythonExpression([
-                    "'", camera, "'",
-                    ' in ', str(camera_choices)
-                ])
-            )
         ),
         Node(
             package='farmbot_vision',

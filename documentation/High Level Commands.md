@@ -1,8 +1,10 @@
-These are the high level commands that the user inputs in order to achieve a specific functionality. The low level commands, including the sequencing commands are covered in another wiki page.
+These are the high level commands that the user inputs in order to achieve a specific functionality.
 
 # Movement commands
 
 Movement commands are used to move the gantry relative to the home position.
+
+WITH THE REFACTORING THE w, a, s, d, 1, 2 and 3 COMMANDS ARE NOT IMPLEMENTED ANYMORE
 
 | Code | Subcodes    | Description                                                                                     |
 | ---- | ----------- | ----------------------------------------------------------------------------------------------- |
@@ -41,9 +43,11 @@ These commands handle the position and information of the toolheads and trays th
 | Code  | Subcodes          | Description                                                                                                                                                                |
 | ----- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | T_n_0 | tn x y z dir      | Set the location of the Toolhead **n** by specifying its name (**tn**), position (**x, y, z**) and release direction (**dir**). E.g. *T_1_0 Seeder 1198.0 332.4 -240.0 1*  |
+| T_n_9 | index     | Remove the {index} tool from the configuration|
 | T_n_1 |                   | Mount the tool with the index **n**. E.g. *T_1_1*                                                                                                                          |
 | T_n_2 |                   | Unmount the tool with the index **n**. E.g. *T_1_2*                                                                                                                        |
 | S_n_0 | type plant x y z  | Setting the location of the Seed Tray of index **n** by specifying the tray type (**type**), seed loaded in the tray (**plant**) and position (**x, y, z**). E.g. *S_1_0 0 Tray1 Radish 1198.0 332.4 -240.0* |
+| S_n_1 | index     | Remove the {index} seed tray from the configuration|
 
 # Plant Commands
 
@@ -76,6 +80,8 @@ Commands that control the different devices connected to the farmbot.
 # Vision Commands
 
 The commands that are related to the vision system.
+
+WITH THE REFACTORING THOSE COMMANDS ARE NOT IMPLEMENTED ANYMORE
 
 | Code | Subcodes | Description                                                                                             |
 | ---- | -------- | ------------------------------------------------------------------------------------------------------- |

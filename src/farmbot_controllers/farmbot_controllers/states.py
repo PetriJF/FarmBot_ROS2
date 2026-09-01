@@ -5,15 +5,11 @@ Provides helper methods to interact with FarmBot state commands, including
 emergency stop, abort, reset, software version, current position and end stops
 requests through ROS2 services.
 """
+from farmbot_utils.exceptions import ServerError
+
 from rclpy.node import Node
 
 from std_srvs.srv import Trigger
-
-
-class ServerError(Exception):
-    """Raised when a server is not available."""
-
-    pass
 
 
 class State:
@@ -23,12 +19,12 @@ class State:
         """Initialise the state module and the ROS2 service clients."""
         self.node = node
 
-        self.estop_client = self.node.create_client(Trigger, 'estop')
-        self.abort_client = self.node.create_client(Trigger, 'abort')
-        self.resume_client = self.node.create_client(Trigger, 'resume')
-        self.end_stop_client = self.node.create_client(Trigger, 'end_stop')
-        self.sw_version_client = self.node.create_client(Trigger, 'sw_version')
-        self.curr_position_client = self.node.create_client(Trigger, 'curr_pos')
+        self.estop_client = self.node.create_client(Trigger, 'priority_cmd/estop')
+        self.abort_client = self.node.create_client(Trigger, 'priority_cmd/abort')
+        self.resume_client = self.node.create_client(Trigger, 'priority_cmd/resume')
+        self.end_stop_client = self.node.create_client(Trigger, 'hardware_comm/end_stop')
+        self.sw_version_client = self.node.create_client(Trigger, 'hardware_comm/sw_version')
+        self.curr_position_client = self.node.create_client(Trigger, 'hardware_comm/curr_pos')
 
     def _server_availability(self, cmd_name: str, client):
         if not client.wait_for_service(1.0):
@@ -69,6 +65,14 @@ class State:
         """
         self._send('Estop', self.estop_client, on_done)
 
+    def reset_estop(self, on_done=None):
+        """
+        Call the FarmBot reset emergency stop service.
+
+        Sends a request to reset the emergency stop state.
+        """
+        self._send('Reset estop', self.resume_client, on_done)
+
     def abort_movement(self, on_done=None):
         """
         Call the FarmBot abort service.
@@ -77,13 +81,26 @@ class State:
         """
         self._send('Abort', self.abort_client, on_done)
 
-    def reset_estop(self, on_done=None):
+    def timer_pause(self, tick_delay: float, on_done=None):
         """
-        Call the FarmBot reset emergency stop service.
+        Create a timer to pause the FarmBot during a sequence.
 
-        Sends a request to reset the emergency stop state.
+        You must use this function only for sequences
+
+        Args:
+            tick_delay: Delay in seconds before the timer completes.
         """
-        self._send('Reset estop', self.resume_client, on_done)
+        timer = self.node.create_timer(
+            tick_delay,
+            lambda: self._timer_done(timer, on_done)
+        )
+
+    def _timer_done(self, timer, on_done=None):
+        """Cancel a timer and execute its completion callback."""
+        timer.cancel()
+
+        if on_done:
+            on_done()
 
     def request_end_stop(self, on_done=None):
         """

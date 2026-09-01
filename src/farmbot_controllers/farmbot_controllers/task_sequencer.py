@@ -9,12 +9,14 @@ from collections import deque
 
 from farmbot_controllers import command_map
 from farmbot_controllers.devices import DeviceControl
+from farmbot_controllers.map_sequences import MapSequences
 from farmbot_controllers.movement import Movement
 from farmbot_controllers.parameters import Parameters
 from farmbot_controllers.sequence_runner import engine
 from farmbot_controllers.sequence_runner.steps import Outcome, StepResult
 from farmbot_controllers.sequences.single_call import single_call
 from farmbot_controllers.states import State
+from farmbot_controllers.tool_sequences import ToolSequences
 
 from farmbot_interfaces.msg import SequenceStatus
 
@@ -27,7 +29,7 @@ from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile
 
 from std_msgs.msg import Bool, String
 
-_MAX_QUEUED = 16   # bounded pending queue
+_MAX_QUEUED = 64   # bounded pending queue
 
 # Manual movement: the increment presets (mm) and the (x, y) direction each key nudges.
 _INCREMENTS = {'1': 10.0, '2': 100.0, '3': 500.0}
@@ -50,13 +52,16 @@ _ACTION_OUTCOMES = {0: Outcome.OK, 2: Outcome.ESTOPPED, 3: Outcome.ABORTED}
 class Hardware:
     """Client module helper."""
 
-    def __init__(self, movement: Movement, devices: DeviceControl,
-                 states: State, parameters: Parameters):
+    def __init__(self, movement: Movement, devices: DeviceControl, states: State,
+                 parameters: Parameters, map_sequences: MapSequences,
+                 tool_sequences: ToolSequences):
         """Bundle the client modules the steps call."""
         self.movement = movement
         self.devices = devices
         self.states = states
         self.parameters = parameters
+        self.map_sequences = map_sequences
+        self.tool_sequences = tool_sequences
 
     @staticmethod
     def to_outcome(raw) -> StepResult:
@@ -80,9 +85,12 @@ class TaskSequencer(Node):
         self.devices = DeviceControl(self)
         self.states = State(self)
         self.parameters = Parameters(self)
-        hardware = Hardware(self.movement, self.devices, self.states, self.parameters)
+        self.map_sequences = MapSequences(self)
+        self.tool_sequences = ToolSequences(self)
+        self.hardware = Hardware(self.movement, self.devices, self.states,
+                                 self.parameters, self.map_sequences, self.tool_sequences)
         self._engine = engine.SequenceEngine(
-            hardware=hardware,
+            hardware=self.hardware,
             on_status=self._publish_status,
             log=lambda message: self.get_logger().warn(message))
 
@@ -96,20 +104,22 @@ class TaskSequencer(Node):
         self._increment = 10.0       # step multiplier in mm (set by 1/2/3)
         self._position = None        # latest gantry position, for manual movement
 
-        self._status_pub = self.create_publisher(SequenceStatus, 'sequence_status', 10)
-        self.create_subscription(String, 'request_command', self._on_command, 10)
-        self.create_subscription(PointStamped, 'farmbot_position', self._on_position, 10)
+        self._status_pub = self.create_publisher(SequenceStatus, 'controller/sequence_status', 10)
+
+        self.create_subscription(String, 'hri/request_command', self._on_command, 10)
+        self.create_subscription(PointStamped, 'farmbot_status/farmbot_position',
+                                 self._on_position, 10)
 
         latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL,
                              history=HistoryPolicy.KEEP_LAST)
         self._estop_active = False
-        self.create_subscription(Bool, 'estop_active', self._on_estop, latched)
-        self.create_subscription(Bool, 'abort_active', self._on_abort, latched)
+        self.create_subscription(Bool, 'farmbot_status/estop_active', self._on_estop, latched)
+        self.create_subscription(Bool, 'farmbot_status/abort_active', self._on_abort, latched)
 
-        broken = command_map.unresolved(hardware)
+        broken = command_map.unresolved(self.hardware)
         if broken:
             self.get_logger().error(f'command map has unresolved calls: {", ".join(broken)}')
-        self.get_logger().info('task sequencer initialized')
+        self.get_logger().info('Task sequencer Initialised')
 
     # --- dispatch for command map ------------------------------------
 
@@ -121,6 +131,9 @@ class TaskSequencer(Node):
             task = command_map.to_task(msg.data)
         except (ValueError, IndexError) as error:
             self.get_logger().warn(f"ignored '{msg.data}': {error}")
+            return
+        if callable(task):
+            task(hardware=self.hardware, done=self._submit)
             return
         self._submit(task)
 
@@ -212,7 +225,7 @@ class TaskSequencer(Node):
 
 
 def main(args=None):
-    """Initialize and run the task sequencer node."""
+    """Initialise and run the task sequencer node."""
     rclpy.init(args=args)
     node = TaskSequencer()
     try:

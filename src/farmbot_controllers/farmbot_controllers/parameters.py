@@ -6,15 +6,11 @@ through ROS2 service interactions.
 """
 from farmbot_interfaces.srv import ReadParameter, WriteParameter
 
+from farmbot_utils.exceptions import ServerError
+
 from rclpy.node import Node
 
 from std_srvs.srv import Trigger
-
-
-class ServerError(Exception):
-    """Raised when a server is not available."""
-
-    pass
 
 
 class Parameters:
@@ -24,9 +20,12 @@ class Parameters:
         """Initialise the parameter module and the ROS2 service clients."""
         self.node = node
 
-        self.read_param_client = self.node.create_client(ReadParameter, 'read_parameter')
-        self.write_param_client = self.node.create_client(WriteParameter, 'write_parameter')
-        self.list_all_param_client = self.node.create_client(Trigger, 'list_all_parameters')
+        self.read_param_client = self.node.create_client(ReadParameter,
+                                                         'hardware_comm/read_parameter')
+        self.write_param_client = self.node.create_client(WriteParameter,
+                                                          'hardware_comm/write_parameter')
+        self.list_all_param_client = self.node.create_client(Trigger,
+                                                             'hardware_comm/list_all_parameters')
 
     def _server_availability(self, cmd_name: str, client):
         if not client.wait_for_service(1.0):

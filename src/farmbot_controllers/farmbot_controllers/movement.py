@@ -6,15 +6,11 @@ through ROS2 action commands.
 """
 from farmbot_interfaces.action import HomeAxes, MoveGantry
 
+from farmbot_utils.exceptions import ServerError
+
 from rclpy.action import ActionClient
 from rclpy.action.client import ClientGoalHandle
 from rclpy.node import Node
-
-
-class ServerError(Exception):
-    """Raised when a server is not available."""
-
-    pass
 
 
 class Movement:
@@ -24,8 +20,8 @@ class Movement:
         """Initialise the movement module and the ROS2 action clients."""
         self.node = node
 
-        self.move_gantry_client = ActionClient(self.node, MoveGantry, 'move_gantry')
-        self.home_axes_client = ActionClient(self.node, HomeAxes, 'home_axes')
+        self.move_gantry_client = ActionClient(self.node, MoveGantry, 'hardware_comm/move_gantry')
+        self.home_axes_client = ActionClient(self.node, HomeAxes, 'hardware_comm/home_axes')
 
     def _server_availability(self, cmd_name: str, client):
         if not client.wait_for_server(1.0):

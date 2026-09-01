@@ -2,6 +2,7 @@ map_reference:
   x_len: 0.0
   y_len: 0.0
   z_len: 0.0
+  safe_z_increment: 0.0
   tools:
     T1:
     T2:

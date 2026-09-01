@@ -4,11 +4,11 @@ Straight-through command servers for the FarmBot SerialController.
 Every service here encodes the request into FCode, then runs it and copy the outcome
 into the response.
 """
-from farmbot_hardware_comm.modules.exceptions import EncodeError
-
 from farmbot_interfaces.srv import (ConfigurePin, MoveServo, ReadI2C,
                                     ReadParameter, ReadPin, SetI2C, Watering,
                                     WriteParameter, WritePin)
+
+from farmbot_utils.exceptions import EncodeError
 
 from rclpy.node import Node
 
@@ -36,40 +36,47 @@ class CommandServers:
 
         # Device servers
         self.watering_server = node.create_service(
-            Watering, 'watering', self.watering_command_server, callback_group=callback_group)
+            Watering, 'hardware_comm/watering', self.watering_command_server,
+            callback_group=callback_group)
         self.read_i2c_server = node.create_service(
-            ReadI2C, 'read_i2c', self.read_i2c_command_server, callback_group=callback_group)
+            ReadI2C, 'hardware_comm/read_i2c', self.read_i2c_command_server,
+            callback_group=callback_group)
         self.set_i2c_server = node.create_service(
-            SetI2C, 'set_i2c', self.set_i2c_command_server, callback_group=callback_group)
+            SetI2C, 'hardware_comm/set_i2c', self.set_i2c_command_server,
+            callback_group=callback_group)
         self.configure_pin_server = node.create_service(
-            ConfigurePin, 'configure_pin', self.configure_pin_command_server,
+            ConfigurePin, 'hardware_comm/configure_pin', self.configure_pin_command_server,
             callback_group=callback_group)
         self.read_pin_server = node.create_service(
-            ReadPin, 'read_pin', self.read_pin_command_server, callback_group=callback_group)
+            ReadPin, 'hardware_comm/read_pin', self.read_pin_command_server,
+            callback_group=callback_group)
         self.write_pin_server = node.create_service(
-            WritePin, 'write_pin', self.write_pin_command_server, callback_group=callback_group)
+            WritePin, 'hardware_comm/write_pin', self.write_pin_command_server,
+            callback_group=callback_group)
         self.move_servo_server = node.create_service(
-            MoveServo, 'move_servo', self.move_servo_command_server,
+            MoveServo, 'hardware_comm/move_servo', self.move_servo_command_server,
             callback_group=callback_group)
 
         # Parameter servers
         self.read_parameter_server = node.create_service(
-            ReadParameter, 'read_parameter', self.read_parameter_command_server,
+            ReadParameter, 'hardware_comm/read_parameter', self.read_parameter_command_server,
             callback_group=callback_group)
         self.write_parameter_server = node.create_service(
-            WriteParameter, 'write_parameter', self.write_parameter_command_server,
+            WriteParameter, 'hardware_comm/write_parameter', self.write_parameter_command_server,
             callback_group=callback_group)
         self.list_all_parameter_server = node.create_service(
-            Trigger, 'list_all_parameters', self.list_all_command_server,
+            Trigger, 'hardware_comm/list_all_parameters', self.list_all_command_server,
             callback_group=callback_group)
 
         # Report servers
         self.end_stop_trigger_server = node.create_service(
-            Trigger, 'end_stop', self.end_stop_command_server, callback_group=callback_group)
+            Trigger, 'hardware_comm/end_stop', self.end_stop_command_server,
+            callback_group=callback_group)
         self.sw_version_trigger_server = node.create_service(
-            Trigger, 'sw_version', self.sw_version_command_server, callback_group=callback_group)
+            Trigger, 'hardware_comm/sw_version', self.sw_version_command_server,
+            callback_group=callback_group)
         self.curr_pos_trigger_server = node.create_service(
-            Trigger, 'curr_pos', self.curr_position_command_server,
+            Trigger, 'hardware_comm/curr_pos', self.curr_position_command_server,
             callback_group=callback_group)
 
     async def _encoded(self, encode, request, response, returns_value=False):

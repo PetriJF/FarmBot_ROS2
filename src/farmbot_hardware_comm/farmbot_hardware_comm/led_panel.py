@@ -15,7 +15,7 @@ class LedPanel:
         """Set up the LED client for the pins listed in the panel configuration."""
         self.node = node
         self.panel = panel
-        self.led_client = self.node.create_client(LedPanelHandler, 'set_led')
+        self.led_client = self.node.create_client(LedPanelHandler, 'hardware_comm/set_led')
 
     def show_ready(self):
         """Light the panel for a farmbot that is running and not e-stopped."""

@@ -1,0 +1,11 @@
+string plant_name
+bool autopos
+geometry_msgs/Point position
+float32 plant_radius
+float32 canopy_radius
+float32 max_height
+float32 water_quantity
+string growth_stage
+---
+bool success
+string message
